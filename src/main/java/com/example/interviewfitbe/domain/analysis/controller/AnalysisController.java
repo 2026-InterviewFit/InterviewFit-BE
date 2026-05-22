@@ -1,4 +1,4 @@
-package com.example.interviewfitbe.domain.analysis.api;
+package com.example.interviewfitbe.domain.analysis.controller;
 
 import com.example.interviewfitbe.domain.analysis.dto.VideoUrlRequest;
 import com.example.interviewfitbe.domain.analysis.dto.VideoUrlResponse;
