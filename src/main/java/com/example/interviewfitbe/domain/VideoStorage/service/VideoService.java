@@ -1,11 +1,11 @@
-package com.example.interviewfitbe.domain.analysis.service;
+package com.example.interviewfitbe.domain.VideoStorage.service;
 
-import com.example.interviewfitbe.domain.analysis.dto.VideoUrlRequest;
-import com.example.interviewfitbe.domain.analysis.dto.VideoUrlResponse;
+import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlRequest;
+import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlResponse;
 import org.springframework.stereotype.Service;
 
 @Service
-public class AnalysisService {
+public class VideoService {
 
     public VideoUrlResponse saveVideoUrl(VideoUrlRequest request) {
 

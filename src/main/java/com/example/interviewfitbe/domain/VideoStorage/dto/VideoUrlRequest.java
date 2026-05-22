@@ -1,4 +1,4 @@
-package com.example.interviewfitbe.domain.analysis.dto;
+package com.example.interviewfitbe.domain.VideoStorage.dto;
 
 public class VideoUrlRequest {
 
