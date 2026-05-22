@@ -6,20 +6,20 @@ import com.example.interviewfitbe.domain.VideoStorage.service.VideoService;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/analysis")
+@RequestMapping("/videos")
 public class VideoController {
 
-    private final VideoService analysisService;
+    private final VideoService videoService;
 
-    public VideoController(VideoService analysisService) {
-        this.analysisService = analysisService;
+    public VideoController(VideoService videoService) {
+        this.videoService = videoService;
     }
 
-    @PostMapping("/videos")
+    @PostMapping
     public VideoUrlResponse saveVideoUrl(
             @RequestBody VideoUrlRequest request
     ) {
 
-        return analysisService.saveVideoUrl(request);
+        return videoService.saveVideoUrl(request);
     }
 }
