@@ -14,7 +14,8 @@ import java.util.UUID;
 @Service
 public class VideoService {
 
-    private final String uploadDir = "uploads/videos/";
+    private final String uploadDir = System.getProperty("user.dir")
+            + "/uploads/videos/";
 
     public VideoUrlResponse saveVideoFile(MultipartFile file) throws IOException {
 
