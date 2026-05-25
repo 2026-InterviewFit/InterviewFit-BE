@@ -1,9 +1,11 @@
 package com.example.interviewfitbe.domain.VideoStorage.controller;
 
-import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlRequest;
 import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlResponse;
 import com.example.interviewfitbe.domain.VideoStorage.service.VideoService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/videos")
@@ -15,11 +17,8 @@ public class VideoController {
         this.videoService = videoService;
     }
 
-    @PostMapping
-    public VideoUrlResponse saveVideoUrl(
-            @RequestBody VideoUrlRequest request
-    ) {
-
-        return videoService.saveVideoUrl(request);
+    @PostMapping("/upload")
+    public VideoUrlResponse uploadVideo(@RequestParam("file") MultipartFile file) throws IOException {
+        return videoService.saveVideoFile(file);
     }
 }
