@@ -35,3 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+
+# db테스트용으로 일단 막아두기
+build.gradle
+src/main/resources/application.properties
+data/
