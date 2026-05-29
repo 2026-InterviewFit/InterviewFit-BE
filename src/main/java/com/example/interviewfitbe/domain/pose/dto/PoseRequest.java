@@ -10,5 +10,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PoseRequest {
-    private String videoUrl;
+    private String videoObjectKey;
 }

@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PoseAnalysisRequest {
-    @JsonProperty("video_url")
-    private String videoUrl;
+    @JsonProperty("video_object_key")
+    private String videoObjectKey;
 }

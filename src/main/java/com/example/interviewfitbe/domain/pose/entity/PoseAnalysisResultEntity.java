@@ -24,7 +24,7 @@ public class PoseAnalysisResultEntity {
     private Integer badCount;
     private Integer badDuration;
 
-    // 부위별 BAD 횟수
+    // 부위별 BAD 구간 횟수 (BAD가 연속으로 나온다면 한 번으로 카운트)
     private Integer shoulderBadCount;
     private Integer faceBadCount;
 
@@ -32,6 +32,8 @@ public class PoseAnalysisResultEntity {
     private Integer shoulderBadDuration;
     private Integer faceBadDuration;
 
+    // BAD 비율
+    private Double badRatio;
     // 점수
     private Integer score;
     // 등급

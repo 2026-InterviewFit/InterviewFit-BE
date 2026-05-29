@@ -4,5 +4,6 @@ public enum PoseGrade {
     A,
     B,
     C,
-    D
+    D,
+    E
 }
