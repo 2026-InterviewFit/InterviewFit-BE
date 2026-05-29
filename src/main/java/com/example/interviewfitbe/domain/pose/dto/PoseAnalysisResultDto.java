@@ -19,6 +19,7 @@ public class PoseAnalysisResultDto {
     private Integer faceBadCount;
     private Integer shoulderBadDuration;
     private Integer faceBadDuration;
+    private Double badRatio;
     private Integer score;
     private PoseGrade grade;
 }

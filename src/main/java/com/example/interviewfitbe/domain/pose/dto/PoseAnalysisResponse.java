@@ -11,13 +11,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PoseAnalysisResponse {
-    private int timestamp;
+    private Integer timestamp;
 
     @JsonProperty("shoulder_tilt")
-    private double shoulderTilt;
+    private Double shoulderTilt;
 
     @JsonProperty("face_direction")
-    private double faceDirection;
+    private Double faceDirection;
 
     @JsonProperty("shoulder_status")
     private String shoulderStatus;

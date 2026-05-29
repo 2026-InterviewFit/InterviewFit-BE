@@ -16,9 +16,9 @@ import java.util.List;
 public class PoseAnalysisService {
     private final WebClient fastApiWebClient;
 
-    public List<PoseAnalysisResponse> analyzePosture(String videoUrl) {
+    public List<PoseAnalysisResponse> analyzePosture(String videoObjectKey) {
         PoseAnalysisRequest request = PoseAnalysisRequest.builder()
-                .videoUrl(videoUrl)
+                .videoObjectKey(videoObjectKey)
                 .build();
 
         try {
@@ -31,10 +31,6 @@ public class PoseAnalysisService {
                     .block();
         } catch (WebClientResponseException e) {
             String body = e.getResponseBodyAsString();
-
-            if (body.contains("POSE_NOT_DETECTED")) {
-                throw new BaseException(FastApiErrorCode.POSE_NOT_DETECTED);
-            }
 
             if (body.contains("FRAME_NOT_FOUND")) {
                 throw new BaseException(FastApiErrorCode.FRAME_NOT_FOUND);
