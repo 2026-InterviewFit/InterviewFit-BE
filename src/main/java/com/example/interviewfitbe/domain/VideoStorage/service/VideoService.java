@@ -44,7 +44,7 @@ public class VideoService {
     }
 
     private void sendToFastApi(VideoUrlRequest request) {
-        String fastApiUrl = "http://127.0.0.1:8000/video";
+        String fastApiUrl = "http://127.0.0.1:8000/VideoStorage/save";
 
         RestTemplate restTemplate = new RestTemplate();
 
