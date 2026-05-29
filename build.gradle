@@ -31,6 +31,8 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    implementation 'io.minio:minio:8.5.17'
+    runtimeOnly 'org.postgresql:postgresql'
 
     // postgresSQL
     runtimeOnly 'org.postgresql:postgresql'
