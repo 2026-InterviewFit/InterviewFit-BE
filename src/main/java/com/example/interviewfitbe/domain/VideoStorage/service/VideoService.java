@@ -17,6 +17,8 @@ public class VideoService {
     private final String uploadDir = System.getProperty("user.dir")
             + "/uploads/videos/";
 
+    private final String serverBaseUrl = "http://localhost:8080";
+
     public VideoUrlResponse saveVideoFile(MultipartFile file) throws IOException {
 
         File dir = new File(uploadDir);
@@ -32,18 +34,25 @@ public class VideoService {
         File savedFile = new File(savedPath);
         file.transferTo(savedFile);
 
-        VideoUrlRequest request = new VideoUrlRequest();
-        request.setVideoUrl(savedPath);
+        String videoUrl = serverBaseUrl + "/videos/" + savedFileName;
 
-        sendToFastApi(request);
+        VideoUrlRequest request = new VideoUrlRequest();
+        request.setVideoUrl(videoUrl);
+
+        try {
+            sendToFastApi(request);
+        } catch (Exception e) {
+            System.out.println("FastAPI 전송 실패: " + e.getMessage());
+        }
 
         return new VideoUrlResponse(
-                "Video file saved and sent to FastAPI",
-                savedPath
+                "Video file saved",
+                videoUrl
         );
     }
 
     private void sendToFastApi(VideoUrlRequest request) {
+
         String fastApiUrl = "http://127.0.0.1:8000/VideoStorage/save";
 
         RestTemplate restTemplate = new RestTemplate();
