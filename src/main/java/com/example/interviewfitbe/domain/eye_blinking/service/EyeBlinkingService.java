@@ -4,11 +4,11 @@ import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeRequ
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeResponse;
 import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
-import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -18,18 +18,21 @@ public class EyeBlinkingService {
 
     private final EyeBlinkingReportRepository eyeBlinkingReportRepository;
     private final ObjectMapper objectMapper;
+    private final WebClient webClient;
 
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(EyeBlinkingAnalyzeRequest request) {
-        String fastApiUrl = "http://127.0.0.1:8000/api/v1/vision/blinks";
 
-        RestTemplate restTemplate = new RestTemplate();
+        Map<String, Object> fastApiResult = webClient.post()
+                .uri("/api/v1/vision/blinks")
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
 
-        Map<String, Object> fastApiResult = restTemplate.postForObject(
-                fastApiUrl,
-                request,
-                Map.class
-        );
+        if (fastApiResult == null) {
+            throw new RuntimeException("FastAPI 눈 깜빡임 분석 결과가 비어 있습니다.");
+        }
 
         EyeBlinkingReport report = EyeBlinkingReport.builder()
                 .userId(request.getUserId())
