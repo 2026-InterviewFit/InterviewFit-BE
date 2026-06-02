@@ -10,6 +10,8 @@ import lombok.Setter;
 @NoArgsConstructor
 public class FollowUpCreateRequest {
 
+    private Long jobRoleId;
+
     private String job;
 
     @JsonProperty("original_question")

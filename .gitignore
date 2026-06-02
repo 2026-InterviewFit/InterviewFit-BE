@@ -39,5 +39,7 @@ out/
 
 # db테스트용으로 일단 막아두기
 build.gradle
-src/main/resources/application.properties
+*.properties
 data/
+dockerfile
+docker-compose.yml
