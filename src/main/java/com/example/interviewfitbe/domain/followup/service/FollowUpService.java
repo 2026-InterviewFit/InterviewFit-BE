@@ -7,7 +7,7 @@ import com.example.interviewfitbe.domain.followup.repository.FollowUpQuestionRep
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Map;
 
@@ -16,18 +16,21 @@ import java.util.Map;
 public class FollowUpService {
 
     private final FollowUpQuestionRepository followUpQuestionRepository;
+    private final WebClient webClient;
 
     @Transactional
     public FollowUpCreateResponse createAndSave(FollowUpCreateRequest request) {
-        String fastApiUrl = "http://127.0.0.1:8000/api/followup/create";
 
-        RestTemplate restTemplate = new RestTemplate();
+        Map<String, Object> fastApiResult = webClient.post()
+                .uri("/api/v1/interview/follow-up-question")
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
 
-        Map<String, Object> fastApiResult = restTemplate.postForObject(
-                fastApiUrl,
-                request,
-                Map.class
-        );
+        if (fastApiResult == null || fastApiResult.get("follow_up_question") == null) {
+            throw new RuntimeException("FastAPI 꼬리질문 생성 결과가 비어 있습니다.");
+        }
 
         String followUpQuestion = fastApiResult.get("follow_up_question").toString();
 
