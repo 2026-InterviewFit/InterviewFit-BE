@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.question.entity;
 
+import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,6 +21,7 @@ public class QuestionEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
 
-    @Column(nullable = false)
-    private String jobType;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_role_id", nullable = false)
+    private JobRoleEntity jobRole;
 }

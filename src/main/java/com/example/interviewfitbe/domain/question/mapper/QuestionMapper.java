@@ -10,7 +10,7 @@ public class QuestionMapper {
         return QuestionDto.builder()
                 .id(entity.getId())
                 .question(entity.getQuestion())
-                .jobType(entity.getJobType())
+                .jobName(entity.getJobRole().getName())
                 .build();
     }
 }

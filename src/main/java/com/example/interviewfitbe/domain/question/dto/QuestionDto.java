@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class QuestionDto {
     private Long id;
     private String question;
-    private String jobType;
+    private String jobName;
 }

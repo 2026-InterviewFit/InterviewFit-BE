@@ -1,5 +1,7 @@
 package com.example.interviewfitbe.domain.question.service;
 
+import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
+import com.example.interviewfitbe.domain.job.service.JobRoleService;
 import com.example.interviewfitbe.domain.question.dto.QuestionClientResponse;
 import com.example.interviewfitbe.domain.question.dto.QuestionDto;
 import com.example.interviewfitbe.domain.question.dto.QuestionRequest;
@@ -16,15 +18,18 @@ import java.util.List;
 public class QuestionService {
     private final QuestionClientService questionClientService;
     private final QuestionRepository questionRepository;
+    private final JobRoleService jobRoleService;
     private final QuestionMapper questionMapper;
 
     public List<QuestionDto> createQuestions(QuestionRequest request) {
-        QuestionClientResponse response = this.questionClientService.createQuestions(request.getCount(), request.getJobType(), request.getResumeContent());
+        JobRoleEntity jobRole = this.jobRoleService.getJobRoleEntity(request.getJobRoleId());
+
+        QuestionClientResponse response = this.questionClientService.createQuestions(request.getCount(), jobRole.getName(), request.getResumeContent());
         List<QuestionEntity> entities = response.getQuestions()
                 .stream()
                 .map(q -> QuestionEntity.builder()
                         .question(q)
-                        .jobType(request.getJobType())
+                        .jobRole(jobRole)
                         .build())
                 .toList();
 
