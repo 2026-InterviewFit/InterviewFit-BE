@@ -1,4 +1,3 @@
-// package com.example.interviewfitbe.domain.speech_coaching.controller;
 package com.example.interviewfitbe.domain.speech_coaching.controller;
 
 import com.example.interviewfitbe.domain.speech_coaching.dto.SpeechReportRequest;
@@ -24,7 +23,9 @@ public class SpeechReportController {
      */
     @PostMapping("/report")
     public ResponseEntity<?> receiveReport(@RequestBody SpeechReportRequest request) {
-        log.info("FastAPI로부터 스피치 리포트 수신 - 직무: {}", request.getJobCategory());
+        // 수정: jobCategory 필드가 삭제되었으므로 request에서는 불러올 수 없음.
+        // 대신 interviewId를 사용하여 어떤 면접의 결과인지 로그에 남김
+        log.info("FastAPI로부터 스피치 리포트 수신 - 면접 ID: {}", request.getInterviewId());
         log.debug("수신 데이터: {}", request);
 
         Long savedId = speechReportService.saveReport(request);
