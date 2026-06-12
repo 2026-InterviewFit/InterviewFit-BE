@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class QuestionRequest {
     private Integer count;
     private Long jobRoleId;
-    private String resumeContent;
+    private String coverLetter;
 }

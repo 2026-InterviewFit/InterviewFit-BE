@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.question.entity;
 
+import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -24,4 +25,9 @@ public class QuestionEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_role_id", nullable = false)
     private JobRoleEntity jobRole;
+
+    // 자기소개서 (null 허용)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cover_letter_id")
+    private CoverLetterEntity coverLetter;
 }
