@@ -2,7 +2,6 @@ package com.example.interviewfitbe.domain.pose.controller;
 
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.PoseRequest;
-import com.example.interviewfitbe.domain.pose.entity.PoseBadLogEntity;
 import com.example.interviewfitbe.domain.pose.service.PoseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

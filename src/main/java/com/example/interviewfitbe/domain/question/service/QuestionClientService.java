@@ -11,11 +11,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class QuestionClientService {
     private final WebClient fastApiWebClient;
 
-    public QuestionClientResponse createQuestions(Integer count, String jobType, String resume) {
+    public QuestionClientResponse createQuestions(Integer count, String jobType, String coverLetter) {
         QuestionClientRequest request = QuestionClientRequest.builder()
                 .count(count)
                 .jobType(jobType)
-                .resumeContent(resume)
+                .coverLetter(coverLetter)
                 .build();
 
         return this.fastApiWebClient.post()

@@ -4,7 +4,6 @@ import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseScoreResult;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseStatistics;
 import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
-import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
 import org.springframework.stereotype.Component;
 
 @Component

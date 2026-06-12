@@ -17,6 +17,6 @@ public class QuestionClientRequest {
     @JsonProperty("job")
     private String jobType;
 
-    @JsonProperty("resume_content")
-    private String resumeContent;
+    @JsonProperty("cover_letter")
+    private String coverLetter;
 }
