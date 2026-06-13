@@ -42,6 +42,7 @@ public class SpeechReportService {
                     .totalSilenceSeconds(request.getSilenceAnalysis().getTotalSilenceSeconds())
                     .criticalSilenceCount(request.getSilenceAnalysis().getCriticalSilenceCount())
                     .aiEvaluationJson(objectMapper.writeValueAsString(request.getAiEvaluation()))
+                    .modelAnswer(request.getModelAnswer())
                     .build();
 
             SpeechReportEntity saved = speechReportRepository.save(report);

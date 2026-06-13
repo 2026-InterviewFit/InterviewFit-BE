@@ -30,6 +30,11 @@ public class SpeechReportRequest {
     @JsonProperty("ai_evaluation")
     private Map<String, Object> aiEvaluation;
 
+    // 적정답안 예시
+    @JsonProperty("model_answer")
+    private String modelAnswer;
+
+
     @Getter
     @Setter
     @NoArgsConstructor

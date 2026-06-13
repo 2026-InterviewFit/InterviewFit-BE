@@ -50,6 +50,10 @@ public class SpeechReportEntity {
     @Column(columnDefinition = "TEXT")
     private String aiEvaluationJson;      // Gemini AI 결과 저장
 
+    // [추가] 모범 답안 저장 필드
+    @Column(columnDefinition = "TEXT")
+    private String modelAnswer;
+
     @CreationTimestamp
     private LocalDateTime createdAt;      // 리포트 생성 시간
 }
