@@ -38,11 +38,11 @@ public class InterviewEntity {
 
     // 면접 질문
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "question_id", nullable = false)
+    @JoinColumn(name = "question_id", nullable = true)
     private QuestionEntity question;
 
     // 자세 분석 결과
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pose_analysis_id", nullable = false)
+    @JoinColumn(name = "pose_analysis_id", nullable = true)
     private PoseAnalysisResultEntity poseAnalysis;
 }
