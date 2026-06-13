@@ -18,7 +18,9 @@ public class VideoController {
     }
 
     @PostMapping("/upload")
-    public VideoUrlResponse uploadVideo(@RequestParam("file") MultipartFile file) throws IOException {
+    public VideoUrlResponse uploadVideo(
+            @RequestPart("file") MultipartFile file
+    ) throws IOException {
         return videoService.saveVideoFile(file);
     }
 }

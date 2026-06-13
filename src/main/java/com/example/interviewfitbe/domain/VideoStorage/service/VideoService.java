@@ -2,42 +2,68 @@ package com.example.interviewfitbe.domain.VideoStorage.service;
 
 import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlRequest;
 import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlResponse;
+import io.minio.BucketExistsArgs;
+import io.minio.MakeBucketArgs;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
 @Service
 public class VideoService {
 
-    private final String uploadDir = System.getProperty("user.dir")
-            + "/uploads/videos/";
+    private final MinioClient minioClient;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    private final String serverBaseUrl = "http://localhost:8080";
+    @Value("${minio.bucket}")
+    private String bucketName;
+
+    @Value("${fastapi.base-url}")
+    private String fastApiBaseUrl;
+
+    public VideoService(MinioClient minioClient) {
+        this.minioClient = minioClient;
+    }
 
     public VideoUrlResponse saveVideoFile(MultipartFile file) throws IOException {
 
-        File dir = new File(uploadDir);
-        if (!dir.exists()) {
-            dir.mkdirs();
+        if (file == null || file.isEmpty()) {
+            throw new IOException("업로드된 파일이 비어 있습니다.");
         }
 
         String originalFileName = file.getOriginalFilename();
+
+        if (originalFileName == null || originalFileName.isBlank()) {
+            originalFileName = "video.mp4";
+        }
+
         String savedFileName = UUID.randomUUID() + "_" + originalFileName;
+        String objectKey = "videos/" + savedFileName;
 
-        String savedPath = uploadDir + savedFileName;
+        try {
+            createBucketIfNotExists();
 
-        File savedFile = new File(savedPath);
-        file.transferTo(savedFile);
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectKey)
+                            .stream(file.getInputStream(), file.getSize(), -1)
+                            .contentType(file.getContentType())
+                            .build()
+            );
 
-        String videoUrl = serverBaseUrl + "/videos/" + savedFileName;
+        } catch (Exception e) {
+            throw new IOException("MinIO 업로드 실패: " + e.getMessage(), e);
+        }
 
         VideoUrlRequest request = new VideoUrlRequest();
-        request.setVideoUrl(videoUrl);
+        request.setVideoUrl(objectKey);
 
         try {
             sendToFastApi(request);
@@ -46,16 +72,30 @@ public class VideoService {
         }
 
         return new VideoUrlResponse(
-                "Video file saved",
-                videoUrl
+                "Video file saved to MinIO",
+                objectKey
         );
+    }
+
+    private void createBucketIfNotExists() throws Exception {
+        boolean exists = minioClient.bucketExists(
+                BucketExistsArgs.builder()
+                        .bucket(bucketName)
+                        .build()
+        );
+
+        if (!exists) {
+            minioClient.makeBucket(
+                    MakeBucketArgs.builder()
+                            .bucket(bucketName)
+                            .build()
+            );
+        }
     }
 
     private void sendToFastApi(VideoUrlRequest request) {
 
-        String fastApiUrl = "http://127.0.0.1:8000/VideoStorage/save";
-
-        RestTemplate restTemplate = new RestTemplate();
+        String fastApiUrl = fastApiBaseUrl + "/VideoStorage/save";
 
         ResponseEntity<String> response =
                 restTemplate.postForEntity(
