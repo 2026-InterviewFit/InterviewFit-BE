@@ -2,16 +2,17 @@ package com.example.interviewfitbe.domain.pose.service;
 
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResponse;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
-import com.example.interviewfitbe.domain.pose.dto.PoseRequest;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseScoreResult;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseStatistics;
 import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
 import com.example.interviewfitbe.domain.pose.entity.PoseBadLogEntity;
 import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
 import com.example.interviewfitbe.domain.pose.enums.PoseIssueType;
+import com.example.interviewfitbe.domain.pose.exception.PoseAnalysisResultErrorCode;
 import com.example.interviewfitbe.domain.pose.mapper.PoseMapper;
 import com.example.interviewfitbe.domain.pose.repository.PoseAnalysisResultRepository;
 import com.example.interviewfitbe.domain.pose.repository.PoseBadLogRepository;
+import com.example.interviewfitbe.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -26,9 +27,22 @@ public class PoseService {
     private final PoseAnalysisResultRepository poseAnalysisResultRepository;
     private final PoseMapper poseMapper;
 
-    public PoseAnalysisResultDto analyzeFullPosture(PoseRequest request) {
+    public List<PoseAnalysisResultDto> getAllPostureAnalysis() {
+        return this.poseAnalysisResultRepository.findAll().stream()
+                .map(this.poseMapper::toDto)
+                .toList();
+    }
+
+    public PoseAnalysisResultDto getPoseAnalysis(Long id) {
+        return this.poseMapper.toDto(
+                this.poseAnalysisResultRepository.findById(id).orElseThrow(() ->
+                        new BaseException(PoseAnalysisResultErrorCode.POSE_ANALYSIS_RESULT_NOT_FOUND))
+        );
+    }
+
+    public PoseAnalysisResultDto analyzeFullPosture(String videoObjectKey) {
         // 1. FastAPI 분석 결과 (전체 기준)
-        List<PoseAnalysisResponse> responses = this.poseAnalysisService.analyzePosture(request.getVideoObjectKey());
+        List<PoseAnalysisResponse> responses = this.poseAnalysisService.analyzePosture(videoObjectKey);
         Integer totalDuration = responses.size();
 
         // 2. BAD 로그 생성 + 저장
@@ -45,7 +59,7 @@ public class PoseService {
         List<PoseBadLogEntity> logs = new ArrayList<>();
 
         for (PoseAnalysisResponse analysis : responses) {
-            // 어깨 BAD 및 NOT_DETECTED 로그 저장
+            // 어깨 BAD 로그 저장
             if ("ShoulderStatus.BAD".equals(analysis.getShoulderStatus())) {
                 logs.add(PoseBadLogEntity.builder()
                         .timestamp(analysis.getTimestamp())
@@ -54,7 +68,7 @@ public class PoseService {
                         .build());
             }
 
-            // 얼굴 BAD 및 NOT_DETECTED 로그 저장
+            // 얼굴 BAD 로그 저장
             if ("FaceStatus.BAD".equals(analysis.getFaceStatus())) {
                 logs.add(PoseBadLogEntity.builder()
                         .timestamp(analysis.getTimestamp())
@@ -86,7 +100,6 @@ public class PoseService {
     }
 
     private PoseStatistics calculateStatistics(List<PoseBadLogEntity> logs) {
-
         PoseStatistics stats = new PoseStatistics();
 
         // 전체 BAD 시간
@@ -154,7 +167,6 @@ public class PoseService {
     }
 
     private int calculateBadCount(List<Integer> timestamps) {
-
         if (timestamps.isEmpty()) {
             return 0;
         }
