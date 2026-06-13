@@ -86,17 +86,89 @@ public class PoseService {
     }
 
     private PoseStatistics calculateStatistics(List<PoseBadLogEntity> logs) {
+
         PoseStatistics stats = new PoseStatistics();
 
-        for (PoseBadLogEntity log : logs) {
+        // 전체 BAD 시간
+        stats.setBadDuration(
+                (int) logs.stream()
+                        .map(PoseBadLogEntity::getTimestamp)
+                        .distinct()
+                        .count()
+        );
 
-            switch (log.getIssueType()) {
-                case SHOULDER -> stats.handleShoulderBad(true);
-                case FACE -> stats.handleFaceBad(true);
+        // 어깨 BAD 시간
+        stats.setShoulderBadDuration(
+                (int) logs.stream()
+                        .filter(log -> log.getIssueType() == PoseIssueType.SHOULDER)
+                        .map(PoseBadLogEntity::getTimestamp)
+                        .distinct()
+                        .count()
+        );
+
+        // 얼굴 BAD 시간
+        stats.setFaceBadDuration(
+                (int) logs.stream()
+                        .filter(log -> log.getIssueType() == PoseIssueType.FACE)
+                        .map(PoseBadLogEntity::getTimestamp)
+                        .distinct()
+                        .count()
+        );
+
+        // 어깨 BAD 발생 횟수
+        stats.setShoulderBadCount(
+                calculateBadCount(
+                        logs.stream()
+                                .filter(log -> log.getIssueType() == PoseIssueType.SHOULDER)
+                                .map(PoseBadLogEntity::getTimestamp)
+                                .distinct()
+                                .sorted()
+                                .toList()
+                )
+        );
+
+        // 얼굴 BAD 발생 횟수
+        stats.setFaceBadCount(
+                calculateBadCount(
+                        logs.stream()
+                                .filter(log -> log.getIssueType() == PoseIssueType.FACE)
+                                .map(PoseBadLogEntity::getTimestamp)
+                                .distinct()
+                                .sorted()
+                                .toList()
+                )
+        );
+
+        // 전체 BAD 발생 횟수
+        stats.setBadCount(
+                calculateBadCount(
+                        logs.stream()
+                                .map(PoseBadLogEntity::getTimestamp)
+                                .distinct()
+                                .sorted()
+                                .toList()
+                )
+        );
+
+        return stats;
+    }
+
+    private int calculateBadCount(List<Integer> timestamps) {
+
+        if (timestamps.isEmpty()) {
+            return 0;
+        }
+
+        int count = 1;
+
+        for (int i = 1; i < timestamps.size(); i++) {
+
+            if (timestamps.get(i) - timestamps.get(i - 1) > 1) {
+                count++;
             }
         }
 
-        return stats;
+        return count;
     }
 
     private PoseScoreResult calculateScoreResult(int badDuration, int totalDuration) {
