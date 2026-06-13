@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.pose.entity;
 
+import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -17,6 +18,10 @@ public class PoseAnalysisResultEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_id")
+    private InterviewEntity interview;
 
     private Integer totalDuration;
 

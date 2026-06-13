@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.question.entity;
 
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -18,6 +19,10 @@ public class QuestionEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_id")
+    private InterviewEntity interview;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
