@@ -2,6 +2,8 @@ package com.example.interviewfitbe.domain.VideoStorage.service;
 
 import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlRequest;
 import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlResponse;
+import com.example.interviewfitbe.domain.VideoStorage.entity.VideoEntity;
+import com.example.interviewfitbe.domain.VideoStorage.repository.VideoRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -19,6 +21,7 @@ import java.util.UUID;
 public class VideoService {
 
     private final MinioClient minioClient;
+    private final VideoRepository videoRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${minio.bucket}")
@@ -27,8 +30,12 @@ public class VideoService {
     @Value("${fastapi.base-url}")
     private String fastApiBaseUrl;
 
-    public VideoService(MinioClient minioClient) {
+    public VideoService(
+            MinioClient minioClient,
+            VideoRepository videoRepository
+    ) {
         this.minioClient = minioClient;
+        this.videoRepository = videoRepository;
     }
 
     public VideoUrlResponse saveVideoFile(MultipartFile file) throws IOException {
@@ -62,6 +69,11 @@ public class VideoService {
             throw new IOException("MinIO 업로드 실패: " + e.getMessage(), e);
         }
 
+        VideoEntity video = new VideoEntity();
+        video.setOriginalFileName(originalFileName);
+        video.setObjectKey(objectKey);
+        videoRepository.save(video);
+
         VideoUrlRequest request = new VideoUrlRequest();
         request.setVideoUrl(objectKey);
 
@@ -72,7 +84,7 @@ public class VideoService {
         }
 
         return new VideoUrlResponse(
-                "Video file saved to MinIO",
+                "Video file saved to MinIO and DB",
                 objectKey
         );
     }
@@ -105,5 +117,8 @@ public class VideoService {
                 );
 
         System.out.println("FastAPI 응답: " + response.getBody());
+
+
     }
+
 }
