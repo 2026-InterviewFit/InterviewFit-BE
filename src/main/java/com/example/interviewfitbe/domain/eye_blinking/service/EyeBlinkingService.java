@@ -32,12 +32,20 @@ public class EyeBlinkingService {
     @Value("${app.upload-dir}")
     private String uploadDir;
 
-    /*
-     * 이미 저장된 videoUrl을 받아서 FastAPI 분석 후 DB 저장.
-     * request.interviewId가 있으면 InterviewEntity와 연결한다.
+    /**
+     * 저장된 영상의 videoUrl을 받아 FastAPI 눈 깜빡임 분석을 실행하고 DB에 저장한다.
+     *
+     * 변경 이유:
+     * - VideoService가 /videos/upload에서 영상을 MinIO에 저장하고
+     *   videoUrl(objectKey, 예: videos/xxx.webm)을 반환한다.
+     * - 따라서 eye-blink는 영상을 다시 업로드받거나 Spring에서 MinIO를 다시 다운로드하지 않고,
+     *   videoUrl을 그대로 FastAPI에 넘긴다.
+     * - FastAPI의 VideoStorage/minio_downloader가 이미 MinIO 다운로드 책임을 가지고 있으므로
+     *   Python 쪽에서 objectKey를 실제 임시 파일로 바꾸는 것이 역할 분리상 더 깔끔하다.
      */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(EyeBlinkingAnalyzeRequest request) {
+        validateVideoUrl(request.getVideoUrl());
 
         InterviewEntity interview = findInterviewOrNull(request.getInterviewId());
 
@@ -45,6 +53,8 @@ public class EyeBlinkingService {
 
         EyeBlinkingReport report = EyeBlinkingReport.builder()
                 .interview(interview)
+                // DB에는 원본 저장 위치를 남긴다.
+                // MinIO 기반이면 videos/xxx.webm, 단독 테스트면 로컬 파일 경로가 저장된다.
                 .videoUrl(request.getVideoUrl())
                 .blinkCount(getInteger(fastApiResult, "blink_count"))
                 .blinkRate(getDouble(fastApiResult, "blink_rate"))
@@ -62,9 +72,15 @@ public class EyeBlinkingService {
         );
     }
 
-    /*
-     * FE에서 multipart 영상 파일을 업로드하면
-     * Spring 서버에 저장한 뒤 FastAPI에 저장 경로를 넘긴다.
+    /**
+     * eye-blink 단독 테스트용 multipart 업로드 API에서 사용한다.
+     *
+     * 최종 통합 흐름에서는 아래 방식이 우선이다.
+     * 1) FE → Spring /videos/upload
+     * 2) Spring → MinIO 저장 후 videoUrl 반환
+     * 3) FE 또는 Spring → /api/eye-blinking/analyze에 videoUrl 전달
+     *
+     * 그래도 Swagger/개발 중에는 파일 하나를 바로 업로드해서 분석하는 기능이 유용하므로 유지한다.
      */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeUploadedVideoAndSave(
@@ -76,20 +92,21 @@ public class EyeBlinkingService {
 
         EyeBlinkingAnalyzeRequest request = new EyeBlinkingAnalyzeRequest();
         request.setVideoUrl(savedPath);
-
-        /*
-         * userId는 현재 request 호환용으로만 받는다.
-         * 실제 저장 기준은 interviewId → InterviewEntity 관계다.
-         */
         request.setUserId(userId);
         request.setInterviewId(interviewId);
 
         return analyzeAndSave(request);
     }
 
-    /*
+    private void validateVideoUrl(String videoUrl) {
+        if (videoUrl == null || videoUrl.isBlank()) {
+            throw new IllegalArgumentException("videoUrl 값이 필요합니다.");
+        }
+    }
+
+    /**
      * interviewId가 있으면 실제 InterviewEntity를 조회한다.
-     * 없으면 단독 테스트로 보고 null 허용.
+     * interviewId가 없으면 eye-blink 단독 테스트로 보고 null 저장을 허용한다.
      */
     private InterviewEntity findInterviewOrNull(Long interviewId) {
         if (interviewId == null) {
@@ -102,9 +119,12 @@ public class EyeBlinkingService {
                 ));
     }
 
-    /*
+    /**
      * FastAPI /api/v1/vision/blinks 호출.
-     * WebClientConfig의 fastapi.base-url을 baseUrl로 사용한다.
+     *
+     * request.videoUrl은 두 형태 모두 가능하다.
+     * - videos/xxx.webm: FastAPI가 MinIO에서 다운로드한다.
+     * - /local/path/xxx.webm: FastAPI가 바로 OpenCV로 읽는다.
      */
     private Map<String, Object> callFastApi(EyeBlinkingAnalyzeRequest request) {
         Map<String, Object> fastApiResult = webClient.post()
@@ -121,14 +141,16 @@ public class EyeBlinkingService {
         return fastApiResult;
     }
 
-    /*
-     * 업로드된 영상을 로컬 파일로 저장한다.
-     *
-     * Docker로 백엔드와 FastAPI를 각각 컨테이너로 띄울 경우,
-     * 이 경로는 두 컨테이너가 모두 볼 수 있는 shared volume이어야 한다.
+    /**
+     * 단독 테스트용 로컬 저장 메서드.
+     * 팀원 VideoService의 MinIO 저장 흐름을 대체하지 않는다.
      */
     private String saveVideoFile(MultipartFile file) {
         try {
+            if (file == null || file.isEmpty()) {
+                throw new IOException("업로드된 영상 파일이 비어 있습니다.");
+            }
+
             File dir = new File(uploadDir + "/eye-blinking");
 
             if (!dir.exists()) {
