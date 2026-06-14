@@ -28,9 +28,9 @@ public class PoseController {
     }
 
     // 아래 함수는 나중에 지우기
-    @PostMapping("/analyze")
-    public ResponseEntity<PoseAnalysisResultDto> analyzePosture(@RequestBody PoseRequest request) {
-        PoseAnalysisResultDto result = this.poseService.analyzeFullPosture(request.getVideoObjectKey());
-        return ResponseEntity.ok(result);
-    }
+//    @PostMapping("/analyze")
+//    public ResponseEntity<PoseAnalysisResultDto> analyzePosture(@RequestBody PoseRequest request) {
+//        PoseAnalysisResultDto result = this.poseService.analyzeFullPosture(request.getVideoObjectKey());
+//        return ResponseEntity.ok(result);
+//    }
 }
