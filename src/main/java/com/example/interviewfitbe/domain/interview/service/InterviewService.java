@@ -31,8 +31,8 @@ public class InterviewService {
     public void generateAnalysisResult(InterviewAnalyzeRequest request) {
         InterviewEntity interview = createInterview(request);
 
-        // 1. 눈 깜박임 분석 및 저장
-//        this.eyeBlinkingService.analyzeAndSave();
+// 1. 눈 깜박임 분석 및 저장
+        this.eyeBlinkingService.analyzeAndSave(request.getVideoObjectKey(), interview);
 
         // 2. 자세 분석 및 저장
         this.poseService.analyzeFullPosture(request.getVideoObjectKey(), interview);
