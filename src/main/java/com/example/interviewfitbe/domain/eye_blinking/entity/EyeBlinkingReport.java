@@ -20,24 +20,19 @@ public class EyeBlinkingReport {
     private Long id;
 
     /*
-     * 새로 추가된 InterviewEntity와 연결한다.
+     * 어떤 면접 세션의 눈 깜빡임 분석 결과인지 연결
      *
-     * 기존에는 userId, interviewId를 Long 값으로만 저장했지만,
-     * 이제는 interview_id FK로 면접 세션과 연결하는 구조가 더 적절하다.
+     * 기존:
+     * private Long userId;
+     * private Long interviewId;
      *
-     * nullable을 강제하지 않은 이유:
-     * - Swagger 단독 테스트나 임시 테스트에서는 interviewId 없이도 분석할 수 있게 하기 위함
-     * - 실제 서비스에서는 request에 interviewId를 넣어서 저장하면 됨
+     * 변경:
+     * InterviewEntity와 FK 관계로 연결
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    /*
-     * Spring이 저장한 영상 파일 경로.
-     * 로컬 실행 시: /Users/.../uploads/eye-blinking/xxx.webm
-     * Docker 실행 시: /shared/uploads/eye-blinking/xxx.webm 같은 공유 경로 권장
-     */
     @Column(columnDefinition = "TEXT")
     private String videoUrl;
 
@@ -50,10 +45,6 @@ public class EyeBlinkingReport {
     @Column(columnDefinition = "TEXT")
     private String feedback;
 
-    /*
-     * FastAPI에서 받은 원본 분석 결과 JSON 저장.
-     * 나중에 min_ear, max_ear, blink_timestamps 같은 디버깅 데이터도 확인 가능.
-     */
     @Column(columnDefinition = "TEXT")
     private String resultJson;
 

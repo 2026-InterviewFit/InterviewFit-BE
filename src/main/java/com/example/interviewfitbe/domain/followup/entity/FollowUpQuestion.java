@@ -20,19 +20,15 @@ public class FollowUpQuestion {
     private Long id;
 
     /*
-     * 꼬리질문이 어떤 면접 세션에서 생성된 것인지 연결한다.
+     * 어떤 면접 세션에서 생성된 꼬리질문인지 연결
      *
-     * 한 면접에서 꼬리질문이 여러 개 생성될 수도 있으므로
-     * OneToOne보다 ManyToOne이 안전하다.
+     * 한 면접에서 꼬리질문이 여러 개 생길 수도 있으므로
+     * ManyToOne으로 둔다.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    /*
-     * 실제 Gemini/FastAPI에 전달한 직무명.
-     * interview.jobRole.name에서 가져오거나, jobRoleId/job fallback으로 가져온다.
-     */
     private String job;
 
     @Column(columnDefinition = "TEXT")
