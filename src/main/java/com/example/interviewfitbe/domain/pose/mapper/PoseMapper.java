@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.pose.mapper;
 
+import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseScoreResult;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseStatistics;
@@ -11,6 +12,7 @@ public class PoseMapper {
     public PoseAnalysisResultDto toDto(PoseAnalysisResultEntity entity) {
         return PoseAnalysisResultDto.builder()
                 .id(entity.getId())
+                .interviewId(entity.getInterview().getId())
                 .totalDuration(entity.getTotalDuration())
                 .badCount(entity.getBadCount())
                 .badDuration(entity.getBadDuration())
@@ -24,8 +26,9 @@ public class PoseMapper {
                 .build();
     }
 
-    public PoseAnalysisResultEntity toEntity(Integer totalDuration, PoseStatistics stats, PoseScoreResult result) {
+    public PoseAnalysisResultEntity toEntity(Integer totalDuration, PoseStatistics stats, PoseScoreResult result, InterviewEntity interview) {
         return PoseAnalysisResultEntity.builder()
+                .interview(interview)
                 .totalDuration(totalDuration)
                 .badCount(stats.getBadCount())
                 .badDuration(stats.getBadDuration())

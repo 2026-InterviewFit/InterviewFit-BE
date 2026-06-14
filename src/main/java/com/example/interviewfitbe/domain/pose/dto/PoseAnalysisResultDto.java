@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PoseAnalysisResultDto {
     private Long id;
+    private Long interviewId;
     private Integer totalDuration;
     private Integer badCount;
     private Integer badDuration;
