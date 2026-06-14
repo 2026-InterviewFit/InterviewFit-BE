@@ -1,6 +1,8 @@
 package com.example.interviewfitbe.domain.VideoStorage.entity;
 
+import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,6 +18,10 @@ public class VideoEntity {
     private String objectKey;
 
     private LocalDateTime createdAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private UserEntity user;
 
     @PrePersist
     public void prePersist() {
@@ -44,5 +50,13 @@ public class VideoEntity {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public UserEntity getUser() {
+        return user;
+    }
+
+    public void setUser(UserEntity user) {
+        this.user = user;
     }
 }
