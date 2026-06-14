@@ -18,6 +18,10 @@ public class PoseBadLogEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pose_analysis_result_id")
+    private PoseAnalysisResultEntity poseAnalysisResult;
+
     // 발생 시간 (초 단위 추천)
     private Integer timestamp;
 
@@ -27,4 +31,9 @@ public class PoseBadLogEntity {
 
     // 얼마나 틀어졌는지 (각도 등)
     private Double deviation;
+
+    // 연관관계 설정 메서드
+    public void assignPoseAnalysisResult(PoseAnalysisResultEntity poseAnalysisResult) {
+        this.poseAnalysisResult = poseAnalysisResult;
+    }
 }

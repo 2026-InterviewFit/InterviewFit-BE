@@ -46,16 +46,16 @@ public class PoseService {
         Integer totalDuration = responses.size();
 
         // 2. BAD 로그 생성 + 저장
-        List<PoseBadLogEntity> logs = saveBadLog(responses);
+        List<PoseBadLogEntity> logs = createBadLog(responses);
 
         // 3. 분석
         if (logs.isEmpty()) {
-            return createEmptyBadLogResult(totalDuration);
+            return createEmptyBadLogResult(logs, totalDuration);
         }
         return analyzePosture(logs, totalDuration);
     }
 
-    private List<PoseBadLogEntity> saveBadLog(List<PoseAnalysisResponse> responses) {
+    private List<PoseBadLogEntity> createBadLog(List<PoseAnalysisResponse> responses) {
         List<PoseBadLogEntity> logs = new ArrayList<>();
 
         for (PoseAnalysisResponse analysis : responses) {
@@ -78,13 +78,21 @@ public class PoseService {
             }
         }
 
-        return this.poseBadLogRepository.saveAll(logs);
+        return logs;
     }
 
-    private PoseAnalysisResultDto createEmptyBadLogResult(Integer totalDuration) {
-        PoseAnalysisResultEntity result = createEmptyResult(totalDuration);
+    private PoseAnalysisResultDto createEmptyBadLogResult(List<PoseBadLogEntity> logs, Integer totalDuration) {
+        PoseAnalysisResultEntity saved = this.poseAnalysisResultRepository.save(
+                createEmptyResult(totalDuration)
+        );
 
-        return this.poseMapper.toDto(this.poseAnalysisResultRepository.save(result));
+        // BAD 로그에 분석 결과 연결
+        for (PoseBadLogEntity entity : logs) {
+            entity.assignPoseAnalysisResult(saved);
+        }
+        this.poseBadLogRepository.saveAll(logs);
+
+        return this.poseMapper.toDto(saved);
     }
 
     private PoseAnalysisResultDto analyzePosture(List<PoseBadLogEntity> logs, Integer totalDuration) {
@@ -94,9 +102,18 @@ public class PoseService {
         // 2. 점수화
         PoseScoreResult result = calculateScoreResult(stats.getBadDuration(), totalDuration);
 
-        PoseAnalysisResultEntity entity = this.poseMapper.toEntity(totalDuration, stats, result);
+        // 3. 분석 결과 저장
+        PoseAnalysisResultEntity saved = this.poseAnalysisResultRepository.save(
+                this.poseMapper.toEntity(totalDuration, stats, result)
+        );
 
-        return this.poseMapper.toDto(this.poseAnalysisResultRepository.save(entity));
+        // 4. BAD 로그에 분석 결과 연결
+        for (PoseBadLogEntity entity : logs) {
+            entity.assignPoseAnalysisResult(saved);
+        }
+        this.poseBadLogRepository.saveAll(logs);
+
+        return this.poseMapper.toDto(saved);
     }
 
     private PoseStatistics calculateStatistics(List<PoseBadLogEntity> logs) {
