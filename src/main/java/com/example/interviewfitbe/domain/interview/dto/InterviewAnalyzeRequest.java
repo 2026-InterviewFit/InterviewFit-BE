@@ -12,5 +12,6 @@ import lombok.NoArgsConstructor;
 public class InterviewAnalyzeRequest {
     private Long userId;
     private Long jobRoleId;
+    private Long questionId;
     private String videoObjectKey;
 }
