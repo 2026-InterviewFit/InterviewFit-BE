@@ -22,8 +22,8 @@ public class PoseAnalysisResultEntity {
     private Long id;
 
     /**
-     * 기존에는 OneToOne이었지만,
-     * 질문별 영상 분석을 위해 한 interview에 여러 pose 결과가 필요하므로 ManyToOne으로 변경한다.
+     * 하나의 면접에는 여러 질문 답변이 있고,
+     * 질문별로 자세 분석 결과가 여러 개 생길 수 있다.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
@@ -39,12 +39,15 @@ public class PoseAnalysisResultEntity {
     private Integer totalDuration;
 
     private Integer badCount;
+
     private Integer badDuration;
 
     private Integer shoulderBadCount;
+
     private Integer faceBadCount;
 
     private Integer shoulderBadDuration;
+
     private Integer faceBadDuration;
 
     private Double badRatio;
