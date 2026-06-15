@@ -44,3 +44,4 @@ build.gradle
 data/
 dockerfile
 docker-compose.yml
+uploads/
