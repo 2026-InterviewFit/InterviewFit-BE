@@ -2,6 +2,7 @@ package com.example.interviewfitbe.domain.interview.controller;
 
 import com.example.interviewfitbe.domain.interview.dto.InterviewAnalyzeRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewAnswerUploadResponse;
+import com.example.interviewfitbe.domain.interview.dto.InterviewReportResponse;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartResponse;
 import com.example.interviewfitbe.domain.interview.service.InterviewAnswerService;
@@ -67,6 +68,20 @@ public class InterviewController {
                         answerOrder
                 );
 
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 면접 분석 결과 조회 API.
+     *
+     * 대시보드에서 날짜/회차 클릭 시 이 API를 호출해서
+     * eye / pose / speech 결과를 가져온다.
+     */
+    @GetMapping("/{interviewId}/report")
+    public ResponseEntity<InterviewReportResponse> getInterviewReport(
+            @PathVariable Long interviewId
+    ) {
+        InterviewReportResponse response = interviewService.getInterviewReport(interviewId);
         return ResponseEntity.ok(response);
     }
 }
