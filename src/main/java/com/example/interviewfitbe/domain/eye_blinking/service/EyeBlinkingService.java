@@ -4,6 +4,7 @@ import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeRequ
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeResponse;
 import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -112,6 +113,38 @@ public class EyeBlinkingService {
 
         return new EyeBlinkingAnalyzeResponse(
                 "눈 깜빡임 분석 및 저장 완료",
+                saved.getId(),
+                analysisResult
+        );
+    }
+
+    @Transactional
+    public EyeBlinkingAnalyzeResponse analyzeAndSave(
+            String videoObjectKey,
+            InterviewAnswerEntity interviewAnswer
+    ) {
+        validateVideoUrl(videoObjectKey);
+
+        Map<String, Object> fastApiResponse =
+                eyeBlinkingAnalysisService.analyzeBlinking(videoObjectKey);
+
+        Map<String, Object> analysisResult = extractAnalysisResult(fastApiResponse);
+
+        EyeBlinkingReport report = EyeBlinkingReport.builder()
+                .interview(interviewAnswer.getInterview())
+                .interviewAnswer(interviewAnswer)
+                .videoUrl(videoObjectKey)
+                .blinkCount(getInteger(analysisResult, "blink_count"))
+                .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute"))
+                .score(getDouble(analysisResult, "score"))
+                .feedback(getString(analysisResult, "feedback", "evaluation"))
+                .resultJson(toJson(fastApiResponse))
+                .build();
+
+        EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+
+        return new EyeBlinkingAnalyzeResponse(
+                "질문별 눈 깜빡임 분석 및 저장 완료",
                 saved.getId(),
                 analysisResult
         );

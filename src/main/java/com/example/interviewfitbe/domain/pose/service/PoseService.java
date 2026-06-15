@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.pose.service;
 
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResponse;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
@@ -23,6 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Service
 public class PoseService {
+
     private final PoseAnalysisService poseAnalysisService;
     private final PoseBadLogRepository poseBadLogRepository;
     private final PoseAnalysisResultRepository poseAnalysisResultRepository;
@@ -41,26 +43,64 @@ public class PoseService {
         );
     }
 
-    public PoseAnalysisResultDto analyzeFullPosture(String videoObjectKey, InterviewEntity interviewEntity) {
-        // 1. FastAPI 분석 결과 (전체 기준)
+    /**
+     * 기존 interview 단위 자세 분석.
+     */
+    public PoseAnalysisResultDto analyzeFullPosture(
+            String videoObjectKey,
+            InterviewEntity interviewEntity
+    ) {
+        return analyzeFullPostureInternal(videoObjectKey, interviewEntity, null);
+    }
+
+    /**
+     * 질문별 답변 영상 자세 분석.
+     *
+     * interview_id와 interview_answer_id를 함께 저장한다.
+     */
+    public PoseAnalysisResultDto analyzeFullPosture(
+            String videoObjectKey,
+            InterviewAnswerEntity interviewAnswer
+    ) {
+        return analyzeFullPostureInternal(
+                videoObjectKey,
+                interviewAnswer.getInterview(),
+                interviewAnswer
+        );
+    }
+
+    private PoseAnalysisResultDto analyzeFullPostureInternal(
+            String videoObjectKey,
+            InterviewEntity interviewEntity,
+            InterviewAnswerEntity interviewAnswer
+    ) {
         List<PoseAnalysisResponse> responses = this.poseAnalysisService.analyzePosture(videoObjectKey);
+
         Integer totalDuration = responses.size();
 
-        // 2. BAD 로그 생성
         List<PoseBadLogEntity> logs = createBadLog(responses);
 
-        // 3. 분석
         if (logs.isEmpty()) {
-            return createEmptyBadLogResult(logs, totalDuration, interviewEntity);
+            return createEmptyBadLogResult(
+                    logs,
+                    totalDuration,
+                    interviewEntity,
+                    interviewAnswer
+            );
         }
-        return analyzePosture(logs, totalDuration, interviewEntity);
+
+        return analyzePosture(
+                logs,
+                totalDuration,
+                interviewEntity,
+                interviewAnswer
+        );
     }
 
     private List<PoseBadLogEntity> createBadLog(List<PoseAnalysisResponse> responses) {
         List<PoseBadLogEntity> logs = new ArrayList<>();
 
         for (PoseAnalysisResponse analysis : responses) {
-            // 어깨 BAD 로그 저장
             if ("ShoulderStatus.BAD".equals(analysis.getShoulderStatus())) {
                 logs.add(PoseBadLogEntity.builder()
                         .timestamp(analysis.getTimestamp())
@@ -69,7 +109,6 @@ public class PoseService {
                         .build());
             }
 
-            // 얼굴 BAD 로그 저장
             if ("FaceStatus.BAD".equals(analysis.getFaceStatus())) {
                 logs.add(PoseBadLogEntity.builder()
                         .timestamp(analysis.getTimestamp())
@@ -82,36 +121,56 @@ public class PoseService {
         return logs;
     }
 
-    private PoseAnalysisResultDto createEmptyBadLogResult(List<PoseBadLogEntity> logs, Integer totalDuration, InterviewEntity interviewEntity) {
+    private PoseAnalysisResultDto createEmptyBadLogResult(
+            List<PoseBadLogEntity> logs,
+            Integer totalDuration,
+            InterviewEntity interviewEntity,
+            InterviewAnswerEntity interviewAnswer
+    ) {
         PoseAnalysisResultEntity saved = this.poseAnalysisResultRepository.save(
-                createEmptyResult(totalDuration, interviewEntity)
+                createEmptyResult(totalDuration, interviewEntity, interviewAnswer)
         );
 
-        // BAD 로그에 분석 결과 연결
         for (PoseBadLogEntity entity : logs) {
             entity.assignPoseAnalysisResult(saved);
         }
+
         this.poseBadLogRepository.saveAll(logs);
 
         return this.poseMapper.toDto(saved);
     }
 
-    private PoseAnalysisResultDto analyzePosture(List<PoseBadLogEntity> logs, Integer totalDuration, InterviewEntity interviewEntity) {
-        // 1. 각 타입 별 집계 수행
+    private PoseAnalysisResultDto analyzePosture(
+            List<PoseBadLogEntity> logs,
+            Integer totalDuration,
+            InterviewEntity interviewEntity,
+            InterviewAnswerEntity interviewAnswer
+    ) {
         PoseStatistics stats = calculateStatistics(logs);
 
-        // 2. 점수화
         PoseScoreResult result = calculateScoreResult(stats.getBadDuration(), totalDuration);
 
-        // 3. 분석 결과 저장
         PoseAnalysisResultEntity saved = this.poseAnalysisResultRepository.save(
-                this.poseMapper.toEntity(totalDuration, stats, result, interviewEntity)
+                PoseAnalysisResultEntity.builder()
+                        .interview(interviewEntity)
+                        .interviewAnswer(interviewAnswer)
+                        .totalDuration(totalDuration)
+                        .badCount(stats.getBadCount())
+                        .badDuration(stats.getBadDuration())
+                        .shoulderBadCount(stats.getShoulderBadCount())
+                        .faceBadCount(stats.getFaceBadCount())
+                        .shoulderBadDuration(stats.getShoulderBadDuration())
+                        .faceBadDuration(stats.getFaceBadDuration())
+                        .badRatio(result.getBadRatio())
+                        .score(result.getScore())
+                        .grade(result.getGrade())
+                        .build()
         );
 
-        // 4. BAD 로그에 분석 결과 연결
         for (PoseBadLogEntity entity : logs) {
             entity.assignPoseAnalysisResult(saved);
         }
+
         this.poseBadLogRepository.saveAll(logs);
 
         return this.poseMapper.toDto(saved);
@@ -120,7 +179,6 @@ public class PoseService {
     private PoseStatistics calculateStatistics(List<PoseBadLogEntity> logs) {
         PoseStatistics stats = new PoseStatistics();
 
-        // 전체 BAD 시간
         stats.setBadDuration(
                 (int) logs.stream()
                         .map(PoseBadLogEntity::getTimestamp)
@@ -128,7 +186,6 @@ public class PoseService {
                         .count()
         );
 
-        // 어깨 BAD 시간
         stats.setShoulderBadDuration(
                 (int) logs.stream()
                         .filter(log -> log.getIssueType() == PoseIssueType.SHOULDER)
@@ -137,7 +194,6 @@ public class PoseService {
                         .count()
         );
 
-        // 얼굴 BAD 시간
         stats.setFaceBadDuration(
                 (int) logs.stream()
                         .filter(log -> log.getIssueType() == PoseIssueType.FACE)
@@ -146,7 +202,6 @@ public class PoseService {
                         .count()
         );
 
-        // 어깨 BAD 발생 횟수
         stats.setShoulderBadCount(
                 calculateBadCount(
                         logs.stream()
@@ -158,7 +213,6 @@ public class PoseService {
                 )
         );
 
-        // 얼굴 BAD 발생 횟수
         stats.setFaceBadCount(
                 calculateBadCount(
                         logs.stream()
@@ -170,7 +224,6 @@ public class PoseService {
                 )
         );
 
-        // 전체 BAD 발생 횟수
         stats.setBadCount(
                 calculateBadCount(
                         logs.stream()
@@ -192,7 +245,6 @@ public class PoseService {
         int count = 1;
 
         for (int i = 1; i < timestamps.size(); i++) {
-
             if (timestamps.get(i) - timestamps.get(i - 1) > 1) {
                 count++;
             }
@@ -202,6 +254,14 @@ public class PoseService {
     }
 
     private PoseScoreResult calculateScoreResult(int badDuration, int totalDuration) {
+        if (totalDuration <= 0) {
+            return PoseScoreResult.builder()
+                    .badRatio(0.0)
+                    .score(100)
+                    .grade(PoseGrade.A)
+                    .build();
+        }
+
         double badRatio = (double) badDuration / totalDuration;
 
         int score = Math.max(0, 100 - (int) (badRatio * 100));
@@ -223,9 +283,14 @@ public class PoseService {
         else return PoseGrade.E;
     }
 
-    private PoseAnalysisResultEntity createEmptyResult(Integer totalDuration, InterviewEntity interview) {
+    private PoseAnalysisResultEntity createEmptyResult(
+            Integer totalDuration,
+            InterviewEntity interview,
+            InterviewAnswerEntity interviewAnswer
+    ) {
         return PoseAnalysisResultEntity.builder()
                 .interview(interview)
+                .interviewAnswer(interviewAnswer)
                 .totalDuration(totalDuration)
                 .badCount(0)
                 .badDuration(0)
