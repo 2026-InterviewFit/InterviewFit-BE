@@ -35,4 +35,8 @@ public class QuestionEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;
+
+    public void linkInterview(InterviewEntity interview) {
+        this.interview = interview;
+    }
 }
