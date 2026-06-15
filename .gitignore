@@ -35,3 +35,13 @@ out/
 
 ### VS Code ###
 .vscode/
+
+.DS_Store
+
+# db테스트용으로 일단 막아두기
+build.gradle
+*.properties
+data/
+dockerfile
+docker-compose.yml
+uploads/
