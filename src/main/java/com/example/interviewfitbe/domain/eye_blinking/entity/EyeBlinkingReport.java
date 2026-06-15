@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.eye_blinking.entity;
 
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -19,19 +20,23 @@ public class EyeBlinkingReport {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /*
-     * 어떤 면접 세션의 눈 깜빡임 분석 결과인지 연결
+    /**
+     * 전체 면접 세션과 연결.
      *
-     * 기존:
-     * private Long userId;
-     * private Long interviewId;
-     *
-     * 변경:
-     * InterviewEntity와 FK 관계로 연결
+     * 기존 통합 분석 흐름과 호환하기 위해 유지한다.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
+
+    /**
+     * 질문별 답변 영상과 연결.
+     *
+     * 새 구조에서는 이 값을 사용한다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_answer_id")
+    private InterviewAnswerEntity interviewAnswer;
 
     @Column(columnDefinition = "TEXT")
     private String videoUrl;

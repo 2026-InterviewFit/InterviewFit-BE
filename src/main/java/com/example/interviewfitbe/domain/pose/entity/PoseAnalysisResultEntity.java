@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.pose.entity;
 
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
 import jakarta.persistence.*;
@@ -15,33 +16,41 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "pose_analysis_results")
 public class PoseAnalysisResultEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    /**
+     * 기존에는 OneToOne이었지만,
+     * 질문별 영상 분석을 위해 한 interview에 여러 pose 결과가 필요하므로 ManyToOne으로 변경한다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
+    /**
+     * 질문별 답변 영상과 연결.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_answer_id")
+    private InterviewAnswerEntity interviewAnswer;
+
     private Integer totalDuration;
 
-    // 전체 BAD
     private Integer badCount;
     private Integer badDuration;
 
-    // 부위별 BAD 구간 횟수 (BAD가 연속으로 나온다면 한 번으로 카운트)
     private Integer shoulderBadCount;
     private Integer faceBadCount;
 
-    // 부위별 BAD 지속 시간
     private Integer shoulderBadDuration;
     private Integer faceBadDuration;
 
-    // BAD 비율
     private Double badRatio;
-    // 점수
+
     private Integer score;
-    // 등급
+
     @Enumerated(EnumType.STRING)
     private PoseGrade grade;
 }
