@@ -2,6 +2,8 @@ package com.example.interviewfitbe.domain.interview.controller;
 
 import com.example.interviewfitbe.domain.interview.dto.InterviewAnalyzeRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewAnswerUploadResponse;
+import com.example.interviewfitbe.domain.interview.dto.InterviewStartRequest;
+import com.example.interviewfitbe.domain.interview.dto.InterviewStartResponse;
 import com.example.interviewfitbe.domain.interview.service.InterviewAnswerService;
 import com.example.interviewfitbe.domain.interview.service.InterviewService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,20 @@ public class InterviewController {
     private final InterviewAnswerService interviewAnswerService;
 
     /**
+     * 면접 시작 API.
+     *
+     * FE에서 직무 선택 후 면접 시작 버튼을 누르면 먼저 이 API를 호출한다.
+     * 응답으로 받은 interviewId를 이후 질문별 영상 업로드 API에 사용한다.
+     */
+    @PostMapping("/start")
+    public ResponseEntity<InterviewStartResponse> startInterview(
+            @RequestBody InterviewStartRequest request
+    ) {
+        InterviewStartResponse response = interviewService.startInterview(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 기존 통합 분석 API.
      * 지금 당장은 유지한다.
      */
@@ -33,11 +49,6 @@ public class InterviewController {
      * 질문별 답변 영상 업로드 API.
      *
      * FE에서 질문 하나의 답변이 끝날 때마다 호출한다.
-     *
-     * 예:
-     * Q1 답변 완료 → 이 API 호출
-     * Q2 답변 완료 → 이 API 호출
-     * Q3 답변 완료 → 이 API 호출
      */
     @PostMapping("/{interviewId}/answers")
     public ResponseEntity<InterviewAnswerUploadResponse> uploadInterviewAnswer(
