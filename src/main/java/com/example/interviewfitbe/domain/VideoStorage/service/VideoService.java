@@ -47,7 +47,7 @@ public class VideoService {
         String originalFileName = file.getOriginalFilename();
 
         if (originalFileName == null || originalFileName.isBlank()) {
-            originalFileName = "video.mp4";
+            originalFileName = "interview.webm";
         }
 
         String savedFileName = UUID.randomUUID() + "_" + originalFileName;
@@ -56,12 +56,14 @@ public class VideoService {
         try {
             createBucketIfNotExists();
 
+            String contentType = normalizeContentType(file.getContentType());
+
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(bucketName)
                             .object(objectKey)
                             .stream(file.getInputStream(), file.getSize(), -1)
-                            .contentType(file.getContentType())
+                            .contentType(contentType)
                             .build()
             );
 
@@ -87,6 +89,19 @@ public class VideoService {
                 "Video file saved to MinIO and DB",
                 objectKey
         );
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "video/webm";
+        }
+
+        // 예: "video/webm;codecs=vp8,opus" -> "video/webm"
+        if (contentType.contains(";")) {
+            return contentType.split(";")[0].trim();
+        }
+
+        return contentType.trim();
     }
 
     private void createBucketIfNotExists() throws Exception {
@@ -117,8 +132,5 @@ public class VideoService {
                 );
 
         System.out.println("FastAPI 응답: " + response.getBody());
-
-
     }
-
 }
