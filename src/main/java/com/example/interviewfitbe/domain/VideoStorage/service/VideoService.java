@@ -8,7 +8,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
-import lombok.extern.slf4j.Slf4j; // 로그 기록을 위해 추가
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.UUID;
 
-@Slf4j // 로그 사용을 위한 어노테이션
+@Slf4j
 @Service
 public class VideoService {
 
@@ -32,7 +32,10 @@ public class VideoService {
     @Value("${fastapi.base-url}")
     private String fastApiBaseUrl;
 
-    public VideoService(MinioClient minioClient, VideoRepository videoRepository) {
+    public VideoService(
+            MinioClient minioClient,
+            VideoRepository videoRepository
+    ) {
         this.minioClient = minioClient;
         this.videoRepository = videoRepository;
     }
@@ -43,8 +46,9 @@ public class VideoService {
         }
 
         String originalFileName = file.getOriginalFilename();
+
         if (originalFileName == null || originalFileName.isBlank()) {
-            originalFileName = "video.mp4";
+            originalFileName = "interview.webm";
         }
 
         String savedFileName = UUID.randomUUID() + "_" + originalFileName;
@@ -53,11 +57,7 @@ public class VideoService {
         try {
             createBucketIfNotExists();
 
-            // 💡 1. Content-Type 정제: 세미콜론 이후의 codecs 정보를 제거하여 RFC 규격 준수
-            String contentType = file.getContentType();
-            if (contentType != null && contentType.contains(";")) {
-                contentType = contentType.split(";")[0];
-            }
+            String contentType = normalizeContentType(file.getContentType());
 
             minioClient.putObject(
                     PutObjectArgs.builder()
@@ -68,45 +68,82 @@ public class VideoService {
                             .build()
             );
 
+            log.info("MinIO 업로드 성공: bucket={}, objectKey={}, contentType={}",
+                    bucketName,
+                    objectKey,
+                    contentType
+            );
+
         } catch (Exception e) {
-            log.error("MinIO 업로드 실패: {}", e.getMessage());
-            throw new IOException("MinIO 업로드 실패", e);
+            log.error("MinIO 업로드 실패: {}", e.getMessage(), e);
+            throw new IOException("MinIO 업로드 실패: " + e.getMessage(), e);
         }
 
-        // DB 저장
         VideoEntity video = new VideoEntity();
         video.setOriginalFileName(originalFileName);
         video.setObjectKey(objectKey);
         videoRepository.save(video);
 
-        // FastAPI 연동
         VideoUrlRequest request = new VideoUrlRequest();
         request.setVideoUrl(objectKey);
 
         try {
             sendToFastApi(request);
         } catch (Exception e) {
-            log.error("FastAPI 분석 요청 실패: {}", e.getMessage());
-            // 필요하다면 여기서 분석 실패 상태를 DB에 기록
+            log.error("FastAPI 분석 요청 실패: {}", e.getMessage(), e);
         }
 
-        return new VideoUrlResponse("Video file saved to MinIO and DB", objectKey);
+        return new VideoUrlResponse(
+                "Video file saved to MinIO and DB",
+                objectKey
+        );
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "video/webm";
+        }
+
+        // 예: "video/webm;codecs=vp8,opus" -> "video/webm"
+        if (contentType.contains(";")) {
+            return contentType.split(";")[0].trim();
+        }
+
+        return contentType.trim();
     }
 
     private void createBucketIfNotExists() throws Exception {
-        boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
+        boolean exists = minioClient.bucketExists(
+                BucketExistsArgs.builder()
+                        .bucket(bucketName)
+                        .build()
+        );
+
         if (!exists) {
-            minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
+            minioClient.makeBucket(
+                    MakeBucketArgs.builder()
+                            .bucket(bucketName)
+                            .build()
+            );
+
+            log.info("MinIO bucket 생성 완료: {}", bucketName);
         }
     }
 
     private void sendToFastApi(VideoUrlRequest request) {
         String fastApiUrl = fastApiBaseUrl + "/VideoStorage/save";
-        ResponseEntity<String> response = restTemplate.postForEntity(fastApiUrl, request, String.class);
+
+        ResponseEntity<String> response =
+                restTemplate.postForEntity(
+                        fastApiUrl,
+                        request,
+                        String.class
+                );
 
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new RuntimeException("FastAPI 서버 응답 실패: " + response.getStatusCode());
         }
+
         log.info("FastAPI 분석 요청 성공: {}", response.getBody());
     }
 }
