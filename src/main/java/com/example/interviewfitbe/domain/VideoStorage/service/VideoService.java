@@ -40,7 +40,52 @@ public class VideoService {
         this.videoRepository = videoRepository;
     }
 
+    /**
+     * 기존 /videos/upload API에서 사용하는 메서드.
+     *
+     * 흐름:
+     * 1. MinIO 저장
+     * 2. video 테이블 저장
+     * 3. FastAPI /VideoStorage/save 호출
+     *
+     * 질문별 업로드 API에서는 이 메서드를 쓰지 않고,
+     * uploadVideoToMinio()만 사용한다.
+     */
     public VideoUrlResponse saveVideoFile(MultipartFile file) throws IOException {
+        String objectKey = uploadVideoToMinio(file);
+
+        String originalFileName = file.getOriginalFilename();
+        if (originalFileName == null || originalFileName.isBlank()) {
+            originalFileName = "interview.webm";
+        }
+
+        VideoEntity video = new VideoEntity();
+        video.setOriginalFileName(originalFileName);
+        video.setObjectKey(objectKey);
+        videoRepository.save(video);
+
+        VideoUrlRequest request = new VideoUrlRequest();
+        request.setVideoUrl(objectKey);
+
+        try {
+            sendToFastApi(request);
+        } catch (Exception e) {
+            log.error("FastAPI 분석 요청 실패: {}", e.getMessage(), e);
+        }
+
+        return new VideoUrlResponse(
+                "Video file saved to MinIO and DB",
+                objectKey
+        );
+    }
+
+    /**
+     * MinIO에 영상만 저장하고 objectKey를 반환하는 공통 메서드.
+     *
+     * 질문별 답변 업로드 API에서 사용한다.
+     * 여기서는 FastAPI 분석 요청을 하지 않는다.
+     */
+    public String uploadVideoToMinio(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IOException("업로드된 파일이 비어 있습니다.");
         }
@@ -68,35 +113,19 @@ public class VideoService {
                             .build()
             );
 
-            log.info("MinIO 업로드 성공: bucket={}, objectKey={}, contentType={}",
+            log.info(
+                    "MinIO 업로드 성공: bucket={}, objectKey={}, contentType={}",
                     bucketName,
                     objectKey,
                     contentType
             );
 
+            return objectKey;
+
         } catch (Exception e) {
             log.error("MinIO 업로드 실패: {}", e.getMessage(), e);
             throw new IOException("MinIO 업로드 실패: " + e.getMessage(), e);
         }
-
-        VideoEntity video = new VideoEntity();
-        video.setOriginalFileName(originalFileName);
-        video.setObjectKey(objectKey);
-        videoRepository.save(video);
-
-        VideoUrlRequest request = new VideoUrlRequest();
-        request.setVideoUrl(objectKey);
-
-        try {
-            sendToFastApi(request);
-        } catch (Exception e) {
-            log.error("FastAPI 분석 요청 실패: {}", e.getMessage(), e);
-        }
-
-        return new VideoUrlResponse(
-                "Video file saved to MinIO and DB",
-                objectKey
-        );
     }
 
     private String normalizeContentType(String contentType) {
