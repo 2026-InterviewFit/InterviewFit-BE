@@ -11,6 +11,6 @@ public interface InterviewAnswerRepository extends JpaRepository<InterviewAnswer
 
     List<InterviewAnswerEntity> findByInterview_IdOrderByAnswerOrderAsc(Long interviewId);
 
-    @EntityGraph(attributePaths = {"interview"})
+    @EntityGraph(attributePaths = {"interview", "interview.jobRole"})
     Optional<InterviewAnswerEntity> findWithInterviewById(Long id);
 }
