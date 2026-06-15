@@ -8,6 +8,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class VideoService {
 
@@ -39,7 +41,6 @@ public class VideoService {
     }
 
     public VideoUrlResponse saveVideoFile(MultipartFile file) throws IOException {
-
         if (file == null || file.isEmpty()) {
             throw new IOException("업로드된 파일이 비어 있습니다.");
         }
@@ -67,7 +68,14 @@ public class VideoService {
                             .build()
             );
 
+            log.info("MinIO 업로드 성공: bucket={}, objectKey={}, contentType={}",
+                    bucketName,
+                    objectKey,
+                    contentType
+            );
+
         } catch (Exception e) {
+            log.error("MinIO 업로드 실패: {}", e.getMessage(), e);
             throw new IOException("MinIO 업로드 실패: " + e.getMessage(), e);
         }
 
@@ -82,7 +90,7 @@ public class VideoService {
         try {
             sendToFastApi(request);
         } catch (Exception e) {
-            System.out.println("FastAPI 전송 실패: " + e.getMessage());
+            log.error("FastAPI 분석 요청 실패: {}", e.getMessage(), e);
         }
 
         return new VideoUrlResponse(
@@ -117,11 +125,12 @@ public class VideoService {
                             .bucket(bucketName)
                             .build()
             );
+
+            log.info("MinIO bucket 생성 완료: {}", bucketName);
         }
     }
 
     private void sendToFastApi(VideoUrlRequest request) {
-
         String fastApiUrl = fastApiBaseUrl + "/VideoStorage/save";
 
         ResponseEntity<String> response =
@@ -131,6 +140,10 @@ public class VideoService {
                         String.class
                 );
 
-        System.out.println("FastAPI 응답: " + response.getBody());
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("FastAPI 서버 응답 실패: " + response.getStatusCode());
+        }
+
+        log.info("FastAPI 분석 요청 성공: {}", response.getBody());
     }
 }
