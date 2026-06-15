@@ -11,6 +11,8 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -22,18 +24,17 @@ public class InterviewAnswerService {
     private final InterviewRepository interviewRepository;
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final VideoService videoService;
+    private final InterviewAnswerAnalysisJobService interviewAnswerAnalysisJobService;
 
     /**
      * 질문별 답변 영상 업로드.
      *
      * 흐름:
-     * 1. interviewId로 전체 면접 조회
+     * 1. interviewId로 면접 세션 조회
      * 2. 영상 파일을 MinIO에 저장
-     * 3. interview_answer 테이블에 질문별 답변 row 저장
-     * 4. answerId와 videoObjectKey 반환
-     *
-     * 아직 분석은 시작하지 않는다.
-     * 분석 시작은 3번 단계에서 @Async로 붙인다.
+     * 3. interview_answer 테이블에 답변 row 저장
+     * 4. DB commit 이후 비동기 분석 시작
+     * 5. answerId와 videoObjectKey 반환
      */
     @Transactional
     public InterviewAnswerUploadResponse uploadAnswerVideo(
@@ -64,6 +65,15 @@ public class InterviewAnswerService {
                 .build();
 
         InterviewAnswerEntity saved = interviewAnswerRepository.save(answer);
+
+        Long answerId = saved.getId();
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                interviewAnswerAnalysisJobService.analyzeAnswerAsync(answerId);
+            }
+        });
 
         return InterviewAnswerUploadResponse.builder()
                 .answerId(saved.getId())
