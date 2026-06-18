@@ -4,6 +4,7 @@ import com.example.interviewfitbe.global.exception.BaseException;
 import com.example.interviewfitbe.global.exception.code.FastApiErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -28,9 +29,13 @@ public class SpeechAnalysisService {
     /**
      * FastAPI 스피치 분석 엔드포인트 호출.
      *
-     * FastAPI speech_router.py의 POST /analyze 에 해당.
-     * STT + Gemini 평가가 포함되어 처리 시간이 길어
-     * timeout을 5분으로 설정한다.
+     * api.py: api_router = APIRouter(prefix="/apis")
+     * api.py: api_router.include_router(speech_router, prefix="/speech")
+     * speech_router.py: @router.post("/analyze")
+     * 최종 경로: /apis/speech/analyze
+     *
+     * SpeechAnalyzeRequest가 pydantic 모델이라 FastAPI가 JSON 바디로 받으므로,
+     * 쿼리 파라미터 대신 body로 전송해야 한다.
      *
      * @param sourceType  "minio" | "youtube" | "local"
      * @param sourceValue MinIO 객체 키 또는 URL
@@ -44,20 +49,19 @@ public class SpeechAnalysisService {
             String jobCategory,
             Long interviewId
     ) {
+        Map<String, Object> requestBody = Map.of(
+                "source_type", sourceType,
+                "source_value", sourceValue,
+                "job_category", jobCategory,
+                "interview_id", interviewId
+        );
+
         try {
             Map<String, Object> response = fastApiWebClient.post()
-                    .uri(uriBuilder -> uriBuilder
-                            // main.py: app.include_router(speech_router, prefix="/speech")
-                            // speech_router.py: @router.post("/analyze")
-                            // 최종 경로: /speech/analyze
-                            .path("/speech/analyze")
-                            .queryParam("source_type", sourceType)
-                            .queryParam("source_value", sourceValue)
-                            .queryParam("job_category", jobCategory)
-                            .queryParam("interview_id", interviewId)
-                            .build())
+                    .uri("/apis/speech/analyze")
+                    .bodyValue(requestBody)
                     .retrieve()
-                    .bodyToMono(Map.class)
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                     .timeout(Duration.ofMinutes(5))  // STT + Gemini 처리 시간 고려
                     .block();
 
