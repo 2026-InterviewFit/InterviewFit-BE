@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -55,7 +56,7 @@ public class SpeechReportService {
                 SpeechReportRequest.class
         );
 
-        fillMissingMetadata(reportRequest, request);
+        reportRequest = fillMissingMetadata(reportRequest, request);
 
         return saveReport(reportRequest);
     }
@@ -84,14 +85,15 @@ public class SpeechReportService {
             jobCategory = interview.getJobRole().getName();
         }
 
-        SpeechAnalyzeRequest request = new SpeechAnalyzeRequest();
-        request.setSourceType("minio");
-        request.setSourceValue(loadedAnswer.getVideoObjectKey());
-        request.setJobCategory(jobCategory);
-        request.setInterviewId(interview.getId());
-        request.setInterviewAnswerId(loadedAnswer.getId());
-        request.setQuestionId(loadedAnswer.getQuestionId());
-        request.setOriginalQuestion(loadedAnswer.getQuestionText());
+        SpeechAnalyzeRequest request = SpeechAnalyzeRequest.builder()
+                .sourceType("minio")
+                .sourceValue(loadedAnswer.getVideoObjectKey())
+                .jobCategory(jobCategory)
+                .interviewId(interview.getId())
+                .interviewAnswerId(loadedAnswer.getId())
+                .questionId(loadedAnswer.getQuestionId())
+                .originalQuestion(loadedAnswer.getQuestionText())
+                .build();
 
         return analyzeAndSave(request);
     }
@@ -122,10 +124,14 @@ public class SpeechReportService {
                     .textScript(request.getTextScript())
                     .totalFillerCount(getTotalFillerCount(request))
                     .fillerDetailsJson(toJson(getFillerDetails(request)))
+                    .repeatedExpressionsJson(toJson(getRepeatedExpressions(request)))
                     .paceEvaluation(getPaceEvaluation(request))
                     .paceFeedback(getPaceFeedback(request))
                     .charactersPerSecond(getCharactersPerSecond(request))
+                    .volumeDbMean(getVolumeDbMean(request))
+                    .volumeDbStd(getVolumeDbStd(request))
                     .totalSilenceSeconds(getTotalSilenceSeconds(request))
+                    .pauseRatePercent(getPauseRatePercent(request))
                     .criticalSilenceCount(getCriticalSilenceCount(request))
                     .aiEvaluationJson(toJson(getAiEvaluation(request)))
                     .modelAnswer(request.getModelAnswer())
@@ -167,29 +173,33 @@ public class SpeechReportService {
         return fastApiResponse;
     }
 
-    private void fillMissingMetadata(
+    /**
+     * reportRequest에 빠진 메타데이터(클라이언트 요청 값)를 채운 새 객체를 반환한다.
+     *
+     * SpeechReportRequest가 불변(builder) 객체로 바뀌었으므로,
+     * setter로 직접 수정하는 대신 toBuilder()로 복사한 새 인스턴스를 만든다.
+     */
+    private SpeechReportRequest fillMissingMetadata(
             SpeechReportRequest reportRequest,
             SpeechAnalyzeRequest analyzeRequest
     ) {
-        if (reportRequest.getInterviewId() == null) {
-            reportRequest.setInterviewId(analyzeRequest.getInterviewId());
-        }
-
-        if (reportRequest.getInterviewAnswerId() == null) {
-            reportRequest.setInterviewAnswerId(analyzeRequest.getInterviewAnswerId());
-        }
-
-        if (reportRequest.getQuestionId() == null) {
-            reportRequest.setQuestionId(analyzeRequest.getQuestionId());
-        }
-
-        if (isBlank(reportRequest.getOriginalQuestion())) {
-            reportRequest.setOriginalQuestion(analyzeRequest.getOriginalQuestion());
-        }
-
-        if (isBlank(reportRequest.getJobCategory())) {
-            reportRequest.setJobCategory(analyzeRequest.getJobCategory());
-        }
+        return reportRequest.toBuilder()
+                .interviewId(reportRequest.getInterviewId() != null
+                        ? reportRequest.getInterviewId()
+                        : analyzeRequest.getInterviewId())
+                .interviewAnswerId(reportRequest.getInterviewAnswerId() != null
+                        ? reportRequest.getInterviewAnswerId()
+                        : analyzeRequest.getInterviewAnswerId())
+                .questionId(reportRequest.getQuestionId() != null
+                        ? reportRequest.getQuestionId()
+                        : analyzeRequest.getQuestionId())
+                .originalQuestion(isBlank(reportRequest.getOriginalQuestion())
+                        ? analyzeRequest.getOriginalQuestion()
+                        : reportRequest.getOriginalQuestion())
+                .jobCategory(isBlank(reportRequest.getJobCategory())
+                        ? analyzeRequest.getJobCategory()
+                        : reportRequest.getJobCategory())
+                .build();
     }
 
     private InterviewAnswerEntity findInterviewAnswerOrNull(Long interviewAnswerId) {
@@ -302,6 +312,14 @@ public class SpeechReportService {
         return request.getFillerWordAnalysis().getDetails();
     }
 
+    private List<SpeechReportRequest.RepeatedExpression> getRepeatedExpressions(SpeechReportRequest request) {
+        if (request.getRepeatedExpressions() == null) {
+            return Collections.emptyList();
+        }
+
+        return request.getRepeatedExpressions();
+    }
+
     private String getPaceEvaluation(SpeechReportRequest request) {
         if (request.getSpeechPaceAnalysis() == null) {
             return null;
@@ -326,12 +344,36 @@ public class SpeechReportService {
         return request.getSpeechPaceAnalysis().getCharactersPerSecond();
     }
 
+    private Double getVolumeDbMean(SpeechReportRequest request) {
+        if (request.getVolumeAnalysis() == null) {
+            return null;
+        }
+
+        return request.getVolumeAnalysis().getVolumeDbMean();
+    }
+
+    private Double getVolumeDbStd(SpeechReportRequest request) {
+        if (request.getVolumeAnalysis() == null) {
+            return null;
+        }
+
+        return request.getVolumeAnalysis().getVolumeDbStd();
+    }
+
     private Double getTotalSilenceSeconds(SpeechReportRequest request) {
         if (request.getSilenceAnalysis() == null) {
             return null;
         }
 
         return request.getSilenceAnalysis().getTotalSilenceSeconds();
+    }
+
+    private Double getPauseRatePercent(SpeechReportRequest request) {
+        if (request.getSilenceAnalysis() == null) {
+            return null;
+        }
+
+        return request.getSilenceAnalysis().getPauseRatePercent();
     }
 
     private Integer getCriticalSilenceCount(SpeechReportRequest request) {

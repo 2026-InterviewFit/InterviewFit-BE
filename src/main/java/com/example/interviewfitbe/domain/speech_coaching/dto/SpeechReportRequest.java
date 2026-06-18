@@ -2,16 +2,17 @@ package com.example.interviewfitbe.domain.speech_coaching.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.ToString;
+import lombok.extern.jackson.Jacksonized;
 
+import java.util.List;
 import java.util.Map;
 
 @Getter
-@Setter
-@NoArgsConstructor
+@Builder(toBuilder = true)
+@Jacksonized
 @ToString
 public class SpeechReportRequest {
 
@@ -19,48 +20,22 @@ public class SpeechReportRequest {
     @JsonAlias("interviewId")
     private Long interviewId;
 
-    /**
-     * 질문별 답변 영상 ID.
-     *
-     * speech_report.interview_answer_id 저장용.
-     */
     @JsonProperty("interview_answer_id")
     @JsonAlias("interviewAnswerId")
     private Long interviewAnswerId;
 
-    /**
-     * followup 연결용 질문 ID.
-     *
-     * Python/FE/Spring 내부 async job에서 question_id를 넘길 수 있으면 이 값을 사용한다.
-     */
     @JsonProperty("question_id")
     @JsonAlias("questionId")
     private Long questionId;
 
-    /**
-     * followup 생성용 원본 질문.
-     *
-     * questionId가 없을 때 이 값을 사용한다.
-     */
     @JsonProperty("original_question")
     @JsonAlias({"originalQuestion", "question"})
     private String originalQuestion;
 
-    /**
-     * followup 생성용 직무명.
-     *
-     * interviewId로 jobRole을 찾을 수 있으면 없어도 되지만,
-     * 단독 테스트나 fallback용으로 받는다.
-     */
     @JsonProperty("job_category")
     @JsonAlias({"jobCategory", "job"})
     private String jobCategory;
 
-    /**
-     * STT 결과 텍스트.
-     *
-     * followup의 answer로 사용된다.
-     */
     @JsonProperty("text_script")
     @JsonAlias("textScript")
     private String textScript;
@@ -68,66 +43,83 @@ public class SpeechReportRequest {
     @JsonProperty("filler_word_analysis")
     private FillerWordAnalysis fillerWordAnalysis;
 
+    @JsonProperty("repeated_expressions")
+    private List<RepeatedExpression> repeatedExpressions;
+
     @JsonProperty("speech_pace_analysis")
     private SpeechPaceAnalysis speechPaceAnalysis;
+
+    @JsonProperty("volume_analysis")
+    private VolumeAnalysis volumeAnalysis;
 
     @JsonProperty("silence_analysis")
     private SilenceAnalysis silenceAnalysis;
 
-    /**
-     * Gemini 평가 결과.
-     */
     @JsonProperty("ai_evaluation")
     private Map<String, Object> aiEvaluation;
 
-    /**
-     * 적정답안 예시.
-     */
     @JsonProperty("model_answer")
     private String modelAnswer;
 
+    // 필러워드 디테일
     @Getter
-    @Setter
-    @NoArgsConstructor
+    @Builder
+    @Jacksonized
     @ToString
     public static class FillerWordAnalysis {
-
-        /**
-         * 예:
-         * {"음": 3, "어": 2}
-         */
         private Map<String, Integer> details;
 
         @JsonProperty("total_count")
         private Integer totalCount;
     }
 
+    // 반복 표현 단건
     @Getter
-    @Setter
-    @NoArgsConstructor
+    @Builder
+    @Jacksonized
+    @ToString
+    public static class RepeatedExpression {
+        private String expression;
+        private Integer count;
+    }
+
+    // 말하기 속도
+    @Getter
+    @Builder
+    @Jacksonized
     @ToString
     public static class SpeechPaceAnalysis {
-
-        /**
-         * 예:
-         * "적절함" / "너무 느림" / "너무 빠름"
-         */
         private String evaluation;
-
         private String feedback;
 
         @JsonProperty("characters_per_second")
         private Double charactersPerSecond;
     }
 
+    // 음량 평균/표준편차
     @Getter
-    @Setter
-    @NoArgsConstructor
+    @Builder
+    @Jacksonized
+    @ToString
+    public static class VolumeAnalysis {
+        @JsonProperty("volume_db_mean")
+        private Double volumeDbMean;
+
+        @JsonProperty("volume_db_std")
+        private Double volumeDbStd;
+    }
+
+    // 침묵 구간 및 침묵 비율
+    @Getter
+    @Builder
+    @Jacksonized
     @ToString
     public static class SilenceAnalysis {
-
         @JsonProperty("total_silence_seconds")
         private Double totalSilenceSeconds;
+
+        @JsonProperty("pause_rate_percent")
+        private Double pauseRatePercent;
 
         @JsonProperty("critical_silence_count")
         private Integer criticalSilenceCount;
