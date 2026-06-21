@@ -1,4 +1,4 @@
-package com.example.interviewfitbe.global;
+package com.example.interviewfitbe.global.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
