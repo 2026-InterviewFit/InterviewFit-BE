@@ -10,6 +10,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class VideoService {
 
     private final MinioClient minioClient;
@@ -34,16 +36,6 @@ public class VideoService {
 
     @Value("${fastapi.base-url}")
     private String fastApiBaseUrl;
-
-    public VideoService(
-            MinioClient minioClient,
-            VideoRepository videoRepository,
-            InterviewRepository interviewRepository
-    ) {
-        this.minioClient = minioClient;
-        this.videoRepository = videoRepository;
-        this.interviewRepository = interviewRepository;
-    }
 
     public VideoUrlResponse saveVideoFile(MultipartFile file, Long interviewId) throws IOException {
 
@@ -79,17 +71,19 @@ public class VideoService {
             throw new IOException("MinIO 업로드 실패: " + e.getMessage(), e);
         }
 
-        VideoEntity video = new VideoEntity();
-        video.setOriginalFileName(originalFileName);
-        video.setObjectKey(objectKey);
-        video.setInterview(interview);
-        video.setUser(interview.getUser());
+        VideoEntity video = VideoEntity.builder()
+                .originalFileName(originalFileName)
+                .objectKey(objectKey)
+                .interview(interview)
+                .user(interview.getUser())
+                .build();
 
         videoRepository.save(video);
 
-        VideoUrlRequest request = new VideoUrlRequest();
-        request.setVideoUrl(objectKey);
-        request.setInterviewId(interviewId);
+        VideoUrlRequest request = VideoUrlRequest.builder()
+                .videoUrl(objectKey)
+                .interviewId(interviewId)
+                .build();
 
         try {
             sendToFastApi(request);
@@ -97,10 +91,10 @@ public class VideoService {
             log.warn("FastAPI 전송 실패: {}", e.getMessage());
         }
 
-        return new VideoUrlResponse(
-                "Video file saved to MinIO and DB",
-                objectKey
-        );
+        return VideoUrlResponse.builder()
+                .message("Video file saved to MinIO and DB")
+                .videoUrl(objectKey)
+                .build();
     }
 
     private void createBucketIfNotExists() throws Exception {
