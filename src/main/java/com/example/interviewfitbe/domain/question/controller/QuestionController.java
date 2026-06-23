@@ -17,7 +17,7 @@ public class QuestionController {
 
     @PostMapping("/create")
     public ResponseEntity<List<QuestionDto>> createQuestions(@RequestBody QuestionRequest request) {
-        List<QuestionDto> responses = this.questionService.createQuestions(request);
+        List<QuestionDto> responses = questionService.createQuestions(request);
         return ResponseEntity.ok(responses);
     }
 }

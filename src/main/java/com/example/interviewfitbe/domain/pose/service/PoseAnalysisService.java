@@ -22,20 +22,20 @@ public class PoseAnalysisService {
                 .build();
 
         try {
-            return this.fastApiWebClient.post()
-                    .uri("/pose/analyze")
+            return fastApiWebClient.post()
+                    .uri("/apis/pose/analyze")
                     .bodyValue(request)
                     .retrieve()
                     .bodyToFlux(PoseAnalysisResponse.class)
                     .collectList()
-                    .block();
+                    .toFuture() // 비동기
+                    .join(); // blocking
         } catch (WebClientResponseException e) {
             String body = e.getResponseBodyAsString();
 
             if (body.contains("FRAME_NOT_FOUND")) {
                 throw new BaseException(FastApiErrorCode.FRAME_NOT_FOUND);
             }
-
             throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
         }
     }
