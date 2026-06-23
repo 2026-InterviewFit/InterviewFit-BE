@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 public class PoseAnalysisResultDto {
     private Long id;
     private Long interviewId;
+    private Long interviewAnswerId;
     private Integer totalDuration;
     private Integer badCount;
     private Integer badDuration;

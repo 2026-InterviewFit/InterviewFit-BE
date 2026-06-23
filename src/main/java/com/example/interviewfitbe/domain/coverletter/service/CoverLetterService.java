@@ -13,7 +13,7 @@ public class CoverLetterService {
     public CoverLetterEntity getOrCreate(String content) {
         if (content == null || content.isBlank()) return null;
 
-        return this.coverLetterRepository.findByContent(content)
+        return coverLetterRepository.findByContent(content)
                 .orElseGet(() -> coverLetterRepository.save(
                         CoverLetterEntity.builder()
 //                                .user() // 나중에 유저 추가 필요

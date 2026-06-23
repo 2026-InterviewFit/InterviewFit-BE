@@ -6,7 +6,7 @@ import lombok.Getter;
 
 @AllArgsConstructor
 @Getter
-public enum PoseAnalysisResultErrorCode implements ErrorCode {
+public enum PoseErrorCode implements ErrorCode {
     POSE_ANALYSIS_RESULT_NOT_FOUND(404, "POSE_ANALYSIS_RESULT_NOT_FOUND", "자세 분석 결과가 존재하지 않습니다.");
 
     private final int status;
