@@ -1,4 +1,4 @@
-package com.example.interviewfitbe.domain.VideoStorage.controller;
+package com.example.interviewfitbe.domain.video_storage.controller;
 
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;

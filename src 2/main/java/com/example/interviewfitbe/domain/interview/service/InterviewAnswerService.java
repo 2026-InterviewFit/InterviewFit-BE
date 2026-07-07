@@ -1,6 +1,6 @@
 package com.example.interviewfitbe.domain.interview.service;
 
-import com.example.interviewfitbe.domain.VideoStorage.service.VideoService;
+import com.example.interviewfitbe.domain.video_storage.service.VideoService;
 import com.example.interviewfitbe.domain.interview.dto.InterviewAnswerUploadResponse;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;

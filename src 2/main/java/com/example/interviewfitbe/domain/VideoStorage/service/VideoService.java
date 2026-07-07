@@ -1,9 +1,9 @@
-package com.example.interviewfitbe.domain.VideoStorage.service;
+package com.example.interviewfitbe.domain.video_storage.service;
 
-import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlRequest;
-import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlResponse;
-import com.example.interviewfitbe.domain.VideoStorage.entity.VideoEntity;
-import com.example.interviewfitbe.domain.VideoStorage.repository.VideoRepository;
+import com.example.interviewfitbe.domain.video_storage.dto.VideoUrlRequest;
+import com.example.interviewfitbe.domain.video_storage.dto.VideoUrlResponse;
+import com.example.interviewfitbe.domain.video_storage.entity.VideoEntity;
+import com.example.interviewfitbe.domain.video_storage.repository.VideoRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;

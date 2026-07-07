@@ -1,7 +1,7 @@
-package com.example.interviewfitbe.domain.VideoStorage.controller;
+package com.example.interviewfitbe.domain.video_storage.controller;
 
-import com.example.interviewfitbe.domain.VideoStorage.dto.VideoUrlResponse;
-import com.example.interviewfitbe.domain.VideoStorage.service.VideoService;
+import com.example.interviewfitbe.domain.video_storage.dto.VideoUrlResponse;
+import com.example.interviewfitbe.domain.video_storage.service.VideoService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
