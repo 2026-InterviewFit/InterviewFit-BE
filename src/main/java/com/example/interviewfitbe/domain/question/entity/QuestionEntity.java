@@ -2,9 +2,13 @@ package com.example.interviewfitbe.domain.question.entity;
 
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -17,7 +21,11 @@ public class QuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_id")
+    private InterviewEntity interview;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_answer_id")
     private InterviewAnswerEntity interviewAnswer;
 
@@ -32,6 +40,14 @@ public class QuestionEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    public void linkInterview(InterviewEntity interview) {
+        this.interview = interview;
+    }
 
     public void linkInterviewAnswer(InterviewAnswerEntity interviewAnswer) {
         this.interviewAnswer = interviewAnswer;

@@ -8,6 +8,8 @@ import com.example.interviewfitbe.domain.pose.dto.statistics.PoseStatistics;
 import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.format.DateTimeFormatter;
+
 @Component
 public class PoseMapper {
     public PoseAnalysisResultDto toDto(PoseAnalysisResultEntity entity) {
@@ -24,7 +26,8 @@ public class PoseMapper {
                 .faceBadDuration(entity.getFaceBadDuration())
                 .badRatio(entity.getBadRatio())
                 .score(entity.getScore())
-                .grade(entity.getGrade())
+                .grade(entity.getGrade().name())
+                .createdAt(entity.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
                 .build();
     }
 

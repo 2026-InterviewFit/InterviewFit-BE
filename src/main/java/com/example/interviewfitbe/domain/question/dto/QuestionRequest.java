@@ -13,4 +13,8 @@ public class QuestionRequest {
     private Integer count;
     private Long jobRoleId;
     private String coverLetter;
+
+    public void updateCoverLetter(String coverLetter) {
+        this.coverLetter = coverLetter;
+    }
 }
