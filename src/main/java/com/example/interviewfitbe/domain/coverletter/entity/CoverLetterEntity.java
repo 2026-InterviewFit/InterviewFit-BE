@@ -3,6 +3,9 @@ package com.example.interviewfitbe.domain.coverletter.entity;
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -21,4 +24,8 @@ public class CoverLetterEntity {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 }

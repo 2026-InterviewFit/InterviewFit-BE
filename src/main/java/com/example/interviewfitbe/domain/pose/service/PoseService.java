@@ -43,18 +43,18 @@ public class PoseService {
     }
 
     // 나중에 삭제하기
-    public PoseAnalysisResultDto analyzeFullPosture(String videoObjectKey, InterviewEntity interviewEntity) {
+    public void analyzeFullPosture(String videoObjectKey, InterviewEntity interviewEntity) {
         List<PoseAnalysisResponse> responses = poseAnalysisService.analyzePosture(videoObjectKey);
         Integer totalDuration = responses.size();
         List<PoseBadLogEntity> logs = createBadLog(responses);
         if (logs.isEmpty()) {
-            return createEmptyBadLogResult(logs, totalDuration, interviewEntity, null);
+            createEmptyBadLogResult(logs, totalDuration, interviewEntity, null);
+            return;
         }
-        return analyzePosture(logs, totalDuration, interviewEntity, null);
+        analyzePosture(logs, totalDuration, interviewEntity, null);
     }
 
-    // 나중에 리턴값 없앨지 생각해보기
-    public PoseAnalysisResultDto analyzeFullPosture(String videoObjectKey, InterviewAnswerEntity interviewAnswer) {
+    public void analyzeFullPosture(String videoObjectKey, InterviewAnswerEntity interviewAnswer) {
         // 1. FastAPI 분석 결과 (전체 기준)
         List<PoseAnalysisResponse> responses = poseAnalysisService.analyzePosture(videoObjectKey);
         Integer totalDuration = responses.size();
@@ -64,20 +64,19 @@ public class PoseService {
 
         // 3. 분석
         if (logs.isEmpty()) {
-            return createEmptyBadLogResult(logs, totalDuration, interviewAnswer.getInterview(), interviewAnswer);
+            createEmptyBadLogResult(logs, totalDuration, interviewAnswer.getInterview(), interviewAnswer);
+        } else {
+            analyzePosture(logs, totalDuration, interviewAnswer.getInterview(), interviewAnswer);
         }
-        return analyzePosture(logs, totalDuration, interviewAnswer.getInterview(), interviewAnswer);
     }
 
-    private PoseAnalysisResultDto createEmptyBadLogResult(List<PoseBadLogEntity> logs, Integer totalDuration, InterviewEntity interviewEntity, InterviewAnswerEntity interviewAnswer) {
+    private void  createEmptyBadLogResult(List<PoseBadLogEntity> logs, Integer totalDuration, InterviewEntity interviewEntity, InterviewAnswerEntity interviewAnswer) {
         PoseAnalysisResultEntity saved = poseAnalysisResultRepository.save(
                 createEmptyResult(totalDuration, interviewEntity, interviewAnswer)
         );
 
         logs.forEach(entity -> entity.assignPoseAnalysisResult(saved));
         poseBadLogRepository.saveAll(logs);
-
-        return poseMapper.toDto(saved);
     }
 
     private List<PoseBadLogEntity> createBadLog(List<PoseAnalysisResponse> responses) {
@@ -103,7 +102,7 @@ public class PoseService {
         return logs;
     }
 
-    private PoseAnalysisResultDto analyzePosture(List<PoseBadLogEntity> logs, Integer totalDuration, InterviewEntity interview, InterviewAnswerEntity interviewAnswer) {
+    private void analyzePosture(List<PoseBadLogEntity> logs, Integer totalDuration, InterviewEntity interview, InterviewAnswerEntity interviewAnswer) {
         PoseStatistics stats = calculateStatistics(logs);
         PoseScoreResult result = calculateScoreResult(stats.getBadDuration(), totalDuration);
 
@@ -113,8 +112,6 @@ public class PoseService {
 
         logs.forEach(entity -> entity.assignPoseAnalysisResult(saved));
         poseBadLogRepository.saveAll(logs);
-
-        return poseMapper.toDto(saved);
     }
 
     private PoseStatistics calculateStatistics(List<PoseBadLogEntity> logs) {
@@ -184,10 +181,10 @@ public class PoseService {
     }
 
     private PoseGrade calculateGrade(int score) {
-        if (score >= 90) return PoseGrade.A;
-        else if (score >= 80) return PoseGrade.B;
-        else if (score >= 70) return PoseGrade.C;
-        else if (score >= 60) return PoseGrade.D;
+        if (score >= 85) return PoseGrade.A;
+        else if (score >= 75) return PoseGrade.B;
+        else if (score >= 65) return PoseGrade.C;
+        else if (score >= 50) return PoseGrade.D;
         else return PoseGrade.E;
     }
 

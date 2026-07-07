@@ -20,7 +20,7 @@ public class PoseController {
         return ResponseEntity.ok(results);
     }
 
-    @GetMapping("{id}")
+    @GetMapping("/{id}")
     public ResponseEntity<PoseAnalysisResultDto> getPostureAnalysis(@PathVariable Long id) {
         PoseAnalysisResultDto result = poseService.getPoseAnalysis(id);
         return ResponseEntity.ok(result);
