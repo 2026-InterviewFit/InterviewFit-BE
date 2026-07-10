@@ -20,9 +20,9 @@ public class PoseBadLogEntity {
     private PoseAnalysisResultEntity poseAnalysisResult;
 
     // 발생 시간 (초 단위 추천)
-    private Integer timestamp;
+    private Double timestamp;
 
-    // 어떤 문제인지 (어깨 / 얼굴 등)
+    // 어디 문제인지 (어깨 / 얼굴 등)
     @Enumerated(EnumType.STRING)
     private PoseIssueType issueType;
 

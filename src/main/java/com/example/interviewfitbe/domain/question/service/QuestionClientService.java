@@ -35,8 +35,14 @@ public class QuestionClientService {
             if (body.contains("QUESTION_GENERATION_FAILED")) {
                 throw new BaseException(QuestionErrorCode.QUESTION_GENERATION_FAILED);
             }
-            if (body.contains("INVALID_GEMINI_RESPONSE")) {
+            if (body.contains("INVALID_QUESTION_RESPONSE")) {
                 throw new BaseException(QuestionErrorCode.INVALID_QUESTION_RESPONSE);
+            }
+            if (body.contains("INVALID_QUESTION_COUNT")) {
+                throw new BaseException(QuestionErrorCode.INVALID_QUESTION_COUNT);
+            }
+            if (body.contains("INVALID_QUESTION_VALIDATION")) {
+                throw new BaseException(QuestionErrorCode.INVALID_QUESTION_VALIDATION);
             }
             throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
         }

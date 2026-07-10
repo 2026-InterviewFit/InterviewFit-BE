@@ -1,6 +1,5 @@
 package com.example.interviewfitbe.domain.pose.dto.statistics;
 
-import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,8 +9,11 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class PoseScoreResult {
-    private double badRatio;
-    private int score;
-    private PoseGrade grade;
+public class PoseNotDetectedStatistics {
+    // Not Detected 전체 집계
+    double notDetectedDuration;
+
+    // 부위 별 Not Detected 집계
+    double shoulderNotDetectedDuration;
+    double faceNotDetectedDuration;
 }
