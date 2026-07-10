@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PoseAnalysisResponse {
-    private Integer timestamp;
+    private Double timestamp;
 
     @JsonProperty("shoulder_tilt")
     private Double shoulderTilt;

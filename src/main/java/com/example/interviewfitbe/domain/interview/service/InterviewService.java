@@ -2,8 +2,6 @@ package com.example.interviewfitbe.domain.interview.service;
 
 import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
-import com.example.interviewfitbe.domain.eye_blinking.service.EyeBlinkingService;
-import com.example.interviewfitbe.domain.interview.dto.InterviewAnalyzeRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewReportResponse;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartResponse;
@@ -17,10 +15,8 @@ import com.example.interviewfitbe.domain.job.exception.JobRoleErrorCode;
 import com.example.interviewfitbe.domain.job.repository.JobRoleRepository;
 import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
 import com.example.interviewfitbe.domain.pose.repository.PoseAnalysisResultRepository;
-import com.example.interviewfitbe.domain.pose.service.PoseService;
 import com.example.interviewfitbe.domain.speech_coaching.entity.SpeechReportEntity;
 import com.example.interviewfitbe.domain.speech_coaching.repository.SpeechReportRepository;
-import com.example.interviewfitbe.domain.speech_coaching.service.SpeechReportService;
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import com.example.interviewfitbe.global.exception.BaseException;
@@ -34,10 +30,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Service
 public class InterviewService {
-
-    private final EyeBlinkingService eyeBlinkingService;
-    private final PoseService poseService;
-    private final SpeechReportService speechReportService;
 
     private final UserRepository userRepository;
     private final JobRoleRepository jobRoleRepository;
@@ -124,26 +116,6 @@ public class InterviewService {
                 .completed(completed)
                 .answers(answerReports)
                 .build();
-    }
-
-    /**
-     * 기존 통합 분석 API.
-     *
-     * 지금은 유지한다.
-     * 나중에는 질문별 answerId 기반 비동기 분석으로 바꿀 예정.
-     */
-    @Transactional
-    public void generateAnalysisResult(InterviewAnalyzeRequest request) {
-        InterviewEntity interview = createInterview(request);
-
-        // 1. 눈 깜빡임 분석 및 저장
-        this.eyeBlinkingService.analyzeAndSave(request.getVideoObjectKey(), interview);
-
-        // 2. 자세 분석 및 저장
-        this.poseService.analyzeFullPosture(request.getVideoObjectKey(), interview);
-
-        // 3. 말하기 분석 및 저장
-        // this.speechReportService.saveReport();
     }
 
     private InterviewReportResponse.AnswerReport toAnswerReport(InterviewAnswerEntity answer) {
@@ -248,20 +220,6 @@ public class InterviewService {
         }
 
         return "UPLOADED";
-    }
-
-    private InterviewEntity createInterview(InterviewAnalyzeRequest request) {
-        UserEntity user = findOrCreateUser(request.getUserId());
-
-        JobRoleEntity jobRole = this.jobRoleRepository.findById(request.getJobRoleId())
-                .orElseThrow(() -> new BaseException(JobRoleErrorCode.JOB_ROLE_NOT_FOUND));
-
-        InterviewEntity interview = InterviewEntity.builder()
-                .user(user)
-                .jobRole(jobRole)
-                .build();
-
-        return this.interviewRepository.save(interview);
     }
 
     /**

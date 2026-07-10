@@ -28,19 +28,26 @@ public class PoseAnalysisResultEntity {
     @JoinColumn(name = "interview_answer_id")
     private InterviewAnswerEntity interviewAnswer;
 
-    private Integer totalDuration;
+    private Double totalDuration;
 
     // 전체 BAD
     private Integer badCount;
-    private Integer badDuration;
+    private Double badDuration;
 
     // 부위별 BAD 구간 횟수 (BAD가 연속으로 나온다면 한 번으로 카운트)
     private Integer shoulderBadCount;
     private Integer faceBadCount;
 
     // 부위별 BAD 지속 시간
-    private Integer shoulderBadDuration;
-    private Integer faceBadDuration;
+    private Double shoulderBadDuration;
+    private Double faceBadDuration;
+
+    // 전체 Not Detected 지속 시간
+    private Double notDetectedDuration;
+
+    // 부위별 Not Detected 지속 시간
+    private Double shoulderNotDetectedDuration;
+    private Double faceNotDetectedDuration;
 
     // BAD 비율
     private Double badRatio;

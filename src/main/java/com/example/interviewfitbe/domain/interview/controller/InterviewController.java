@@ -1,6 +1,5 @@
 package com.example.interviewfitbe.domain.interview.controller;
 
-import com.example.interviewfitbe.domain.interview.dto.InterviewAnalyzeRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewAnswerUploadResponse;
 import com.example.interviewfitbe.domain.interview.dto.InterviewReportResponse;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartRequest;
@@ -34,16 +33,6 @@ public class InterviewController {
     ) {
         InterviewStartResponse response = interviewService.startInterview(request);
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * 기존 통합 분석 API.
-     * 지금 당장은 유지한다.
-     */
-    @PostMapping("/analyze")
-    public ResponseEntity<?> analyzeInterview(@RequestBody InterviewAnalyzeRequest request) {
-        this.interviewService.generateAnalysisResult(request);
-        return ResponseEntity.ok(null);
     }
 
     /**

@@ -1,4 +1,4 @@
-package com.example.interviewfitbe.config;
+package com.example.interviewfitbe.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;

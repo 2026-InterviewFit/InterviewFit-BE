@@ -88,19 +88,19 @@ public class InterviewReportResponse {
 
         private Long reportId;
 
-        private Integer totalDuration;
+        private Double totalDuration;
 
         private Integer badCount;
 
-        private Integer badDuration;
+        private Double badDuration;
 
         private Integer shoulderBadCount;
 
         private Integer faceBadCount;
 
-        private Integer shoulderBadDuration;
+        private Double shoulderBadDuration;
 
-        private Integer faceBadDuration;
+        private Double faceBadDuration;
 
         private Double badRatio;
 
