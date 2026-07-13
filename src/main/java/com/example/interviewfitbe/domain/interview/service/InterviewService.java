@@ -183,11 +183,15 @@ public class InterviewService {
                 .textScript(report.getTextScript())
                 .totalFillerCount(report.getTotalFillerCount())
                 .fillerDetailsJson(report.getFillerDetailsJson())
+                .repeatedExpressionsJson(report.getRepeatedExpressionsJson())  // 추가
                 .paceEvaluation(report.getPaceEvaluation())
                 .paceFeedback(report.getPaceFeedback())
                 .charactersPerSecond(report.getCharactersPerSecond())
                 .totalSilenceSeconds(report.getTotalSilenceSeconds())
+                .pauseRatePercent(report.getPauseRatePercent())               // 추가
                 .criticalSilenceCount(report.getCriticalSilenceCount())
+                .volumeDbMean(report.getVolumeDbMean())                       // 추가
+                .volumeDbStd(report.getVolumeDbStd())                         // 추가
                 .aiEvaluationJson(report.getAiEvaluationJson())
                 .modelAnswer(report.getModelAnswer())
                 .build();
