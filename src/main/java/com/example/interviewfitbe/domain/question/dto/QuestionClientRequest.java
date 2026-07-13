@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Getter
 @Builder
 @AllArgsConstructor
@@ -19,4 +21,7 @@ public class QuestionClientRequest {
 
     @JsonProperty("cover_letter")
     private String coverLetter;
+
+    @JsonProperty("previous_questions")
+    private List<String> previousQuestions;
 }
