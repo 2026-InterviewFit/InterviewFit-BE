@@ -46,12 +46,18 @@ public class PoseStatisticsCalculator {
             return 0.0;
         }
 
+        double firstTimestamp = timestamps.get(0);
         double lastTimestamp = timestamps.get(timestamps.size() - 1);
         double decimal = lastTimestamp % 1;
 
         double lastDuration = Math.abs(decimal) < TIMESTAMP_EPSILON
                 ? 1.0
                 : decimal;
+
+        // 0.0초는 포함하지 않음
+        if (Math.abs(firstTimestamp) < TIMESTAMP_EPSILON) {
+            return (timestamps.size() - 2) + lastDuration;
+        }
 
         return (timestamps.size() - 1) + lastDuration;
     }
