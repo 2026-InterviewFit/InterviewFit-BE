@@ -41,7 +41,7 @@ public class QuestionController {
             String coverLetter = pdfService.extractText(coverLetterFile);
             request.updateCoverLetter(coverLetter);
         }
-        List<QuestionDto> responses = questionService.createQuestions(request);
+        List<QuestionDto> responses = questionService.createQuestions(request.getUserId(), request);
         return ResponseEntity.ok(responses);
     }
 }

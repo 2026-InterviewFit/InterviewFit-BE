@@ -12,14 +12,14 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @Entity
-@Table(name = "cover_letter")
+@Table(name = "cover_letters")
 public class CoverLetterEntity {
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id") // 나중에 nullable = false로 변경 필요
+    @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user;
 
     @Column(nullable = false, columnDefinition = "TEXT")

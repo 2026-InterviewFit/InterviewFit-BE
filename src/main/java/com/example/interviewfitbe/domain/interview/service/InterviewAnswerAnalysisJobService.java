@@ -44,7 +44,7 @@ public class InterviewAnswerAnalysisJobService {
 
             eyeBlinkingService.analyzeAndSave(videoObjectKey, answer);
 
-            poseService.analyzeFullPosture(videoObjectKey, answer);
+            poseService.processPostureAnalysis(videoObjectKey, answer);
 
             speechReportService.analyzeAndSave(answer);
 

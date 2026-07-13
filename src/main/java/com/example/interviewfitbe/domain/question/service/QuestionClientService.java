@@ -10,16 +10,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Service
 public class QuestionClientService {
     private final WebClient fastApiWebClient;
 
-    public QuestionClientResponse createQuestions(Integer count, String jobType, String coverLetter) {
+    public QuestionClientResponse createQuestions(Integer count, String jobType, String coverLetter, List<String> previousQuestions) {
         QuestionClientRequest request = QuestionClientRequest.builder()
                 .count(count)
                 .jobType(jobType)
                 .coverLetter(coverLetter)
+                .previousQuestions(previousQuestions)
                 .build();
 
         try {
