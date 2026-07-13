@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.example.interviewfitbe.domain.eye_gaze.service.EyeGazeService;
 
 @Slf4j
 @Service
@@ -18,6 +19,7 @@ public class InterviewAnswerAnalysisJobService {
 
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final EyeBlinkingService eyeBlinkingService;
+    private final EyeGazeService eyeGazeService;
     private final PoseService poseService;
     private final SpeechReportService speechReportService;
     private final TransactionTemplate transactionTemplate;
@@ -43,6 +45,8 @@ public class InterviewAnswerAnalysisJobService {
             String videoObjectKey = answer.getVideoObjectKey();
 
             eyeBlinkingService.analyzeAndSave(videoObjectKey, answer);
+
+            eyeGazeService.analyzeAndSave(videoObjectKey, answer);
 
             poseService.processPostureAnalysis(videoObjectKey, answer);
 
