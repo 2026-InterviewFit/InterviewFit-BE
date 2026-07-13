@@ -122,6 +122,8 @@ public class InterviewReportResponse {
 
         private String fillerDetailsJson;
 
+        private String repeatedExpressionsJson;   // 추가
+
         private String paceEvaluation;
 
         private String paceFeedback;
@@ -130,10 +132,17 @@ public class InterviewReportResponse {
 
         private Double totalSilenceSeconds;
 
+        private Double pauseRatePercent;          // 추가
+
         private Integer criticalSilenceCount;
+
+        private Double volumeDbMean;              // 추가
+
+        private Double volumeDbStd;               // 추가
 
         private String aiEvaluationJson;
 
         private String modelAnswer;
+
     }
 }
