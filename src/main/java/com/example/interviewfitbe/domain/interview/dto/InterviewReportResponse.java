@@ -60,6 +60,11 @@ public class InterviewReportResponse {
 
         private EyeReport eye;
 
+        /**
+         * 시선 추적 분석 결과.
+         */
+        private GazeReport gaze;
+
         private PoseReport pose;
 
         private SpeechReport speech;
@@ -76,9 +81,49 @@ public class InterviewReportResponse {
 
         private Double blinkRate;
 
+        private Double durationSeconds;
+
         private Double score;
 
         private String feedback;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class GazeReport {
+
+        private Long reportId;
+
+        /**
+         * 정면 응시 비율.
+         */
+        private Double centerRatio;
+
+        /**
+         * 시선 이탈 비율.
+         */
+        private Double gazeAwayRatio;
+
+        /**
+         * 시선 이탈 횟수.
+         */
+        private Integer gazeAwayCount;
+
+        /**
+         * 시선 분석 점수.
+         */
+        private Double score;
+
+        /**
+         * 시선 분석 평가 문구.
+         */
+        private String evaluation;
+
+        /**
+         * 프레임별 상세 분석 JSON.
+         */
+        private String resultJson;
     }
 
     @Getter
@@ -122,7 +167,7 @@ public class InterviewReportResponse {
 
         private String fillerDetailsJson;
 
-        private String repeatedExpressionsJson;   // 추가
+        private String repeatedExpressionsJson;
 
         private String paceEvaluation;
 
@@ -132,17 +177,16 @@ public class InterviewReportResponse {
 
         private Double totalSilenceSeconds;
 
-        private Double pauseRatePercent;          // 추가
+        private Double pauseRatePercent;
 
         private Integer criticalSilenceCount;
 
-        private Double volumeDbMean;              // 추가
+        private Double volumeDbMean;
 
-        private Double volumeDbStd;               // 추가
+        private Double volumeDbStd;
 
         private String aiEvaluationJson;
 
         private String modelAnswer;
-
     }
 }

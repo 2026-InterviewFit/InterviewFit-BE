@@ -30,7 +30,6 @@ public class EyeBlinkingService {
 
     /**
      * FastAPI 눈 깜빡임 분석 호출 전담 서비스.
-     * PoseAnalysisService처럼 FastAPI 호출만 담당한다.
      */
     private final EyeBlinkingAnalysisService eyeBlinkingAnalysisService;
 
@@ -38,17 +37,9 @@ public class EyeBlinkingService {
     private String uploadDir;
 
     /**
-     * 통합 분석용 메서드.
+     * 면접 단위 눈 깜빡임 분석 저장 메서드.
      *
-     * InterviewService에서 호출한다.
-     *
-     * 흐름:
-     * InterviewService
-     * → createInterview()
-     * → eyeBlinkingService.analyzeAndSave(videoObjectKey, interview)
-     * → FastAPI 분석
-     * → eye_blinking_report 저장
-     * → interview_id 연결
+     * 예전 통합 흐름에서 InterviewEntity만 연결할 때 사용한다.
      */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
@@ -65,8 +56,9 @@ public class EyeBlinkingService {
         EyeBlinkingReport report = EyeBlinkingReport.builder()
                 .interview(interview)
                 .videoUrl(videoObjectKey)
-                .blinkCount(getInteger(analysisResult, "blink_count"))
-                .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute"))
+                .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
+                .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
+                .durationSeconds(getDouble(analysisResult, "duration_seconds", "durationSeconds"))
                 .score(getDouble(analysisResult, "score"))
                 .feedback(getString(analysisResult, "feedback", "evaluation"))
                 .resultJson(toJson(fastApiResponse))
@@ -102,8 +94,9 @@ public class EyeBlinkingService {
         EyeBlinkingReport report = EyeBlinkingReport.builder()
                 .interview(interview)
                 .videoUrl(request.getVideoUrl())
-                .blinkCount(getInteger(analysisResult, "blink_count"))
-                .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute"))
+                .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
+                .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
+                .durationSeconds(getDouble(analysisResult, "duration_seconds", "durationSeconds"))
                 .score(getDouble(analysisResult, "score"))
                 .feedback(getString(analysisResult, "feedback", "evaluation"))
                 .resultJson(toJson(fastApiResponse))
@@ -118,6 +111,12 @@ public class EyeBlinkingService {
         );
     }
 
+    /**
+     * 질문별 답변 영상 눈 깜빡임 분석 저장 메서드.
+     *
+     * 대시보드에서 answer.eye로 보여주려면 이 메서드처럼
+     * InterviewAnswerEntity까지 연결되어야 한다.
+     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
             String videoObjectKey,
@@ -134,8 +133,9 @@ public class EyeBlinkingService {
                 .interview(interviewAnswer.getInterview())
                 .interviewAnswer(interviewAnswer)
                 .videoUrl(videoObjectKey)
-                .blinkCount(getInteger(analysisResult, "blink_count"))
-                .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute"))
+                .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
+                .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
+                .durationSeconds(getDouble(analysisResult, "duration_seconds", "durationSeconds"))
                 .score(getDouble(analysisResult, "score"))
                 .feedback(getString(analysisResult, "feedback", "evaluation"))
                 .resultJson(toJson(fastApiResponse))
