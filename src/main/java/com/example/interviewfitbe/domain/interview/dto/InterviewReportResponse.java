@@ -76,6 +76,8 @@ public class InterviewReportResponse {
 
         private Double blinkRate;
 
+        private Double durationSeconds;
+
         private Double score;
 
         private String feedback;
