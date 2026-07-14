@@ -16,4 +16,8 @@ public interface EyeGazeReportRepository
     Optional<EyeGazeReport> findTopByInterviewIdOrderByCreatedAtDesc(
             Long interviewId
     );
+
+    Optional<EyeGazeReport> findTopByInterviewAnswerIdOrderByIdDesc(
+            Long interviewAnswerId
+    );
 }
