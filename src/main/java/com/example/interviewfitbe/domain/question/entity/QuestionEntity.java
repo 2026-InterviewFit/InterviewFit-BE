@@ -1,16 +1,18 @@
 package com.example.interviewfitbe.domain.question.entity;
 
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
+import com.example.interviewfitbe.domain.question.enums.QuestionType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @AllArgsConstructor
 @Entity
@@ -20,23 +22,37 @@ public class QuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_answer_id")
+    private InterviewAnswerEntity interviewAnswer;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
+
+    @Enumerated(EnumType.STRING)
+    private QuestionType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_role_id", nullable = false)
     private JobRoleEntity jobRole;
 
-    // 자기소개서 (null 허용)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;
 
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
     public void linkInterview(InterviewEntity interview) {
         this.interview = interview;
+    }
+
+    public void linkInterviewAnswer(InterviewAnswerEntity interviewAnswer) {
+        this.interviewAnswer = interviewAnswer;
     }
 }

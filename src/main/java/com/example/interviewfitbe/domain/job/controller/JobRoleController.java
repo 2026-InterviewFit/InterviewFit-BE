@@ -18,6 +18,6 @@ public class JobRoleController {
 
     @GetMapping("/all")
     public ResponseEntity<List<JobRoleDto>> getAllJobRoles() {
-        return ResponseEntity.ok(this.jobRoleService.getAllJobRoles());
+        return ResponseEntity.ok(jobRoleService.getAllJobRoles());
     }
 }

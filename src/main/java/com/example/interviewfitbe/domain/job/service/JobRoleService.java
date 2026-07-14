@@ -18,14 +18,14 @@ public class JobRoleService {
     private final JobRoleMapper jobRoleMapper;
 
     public List<JobRoleDto> getAllJobRoles() {
-        List<JobRoleEntity> entities = this.jobRoleRepository.findAll();
+        List<JobRoleEntity> entities = jobRoleRepository.findAll();
         return entities.stream()
-                .map(this.jobRoleMapper::toDto)
+                .map(jobRoleMapper::toDto)
                 .toList();
     }
 
     public JobRoleEntity getJobRoleEntity(Long jobId) {
-        return this.jobRoleRepository.findById(jobId)
+        return jobRoleRepository.findById(jobId)
                 .orElseThrow(() -> new BaseException(JobRoleErrorCode.JOB_ROLE_NOT_FOUND));
     }
 }

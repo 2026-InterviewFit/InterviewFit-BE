@@ -2,18 +2,18 @@ package com.example.interviewfitbe.domain.pose.dto.statistics;
 
 import lombok.*;
 
-@Setter
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor
 public class PoseStatistics {
-    // 전체 집계
+    // BAD 전체 집계
     int badCount;
-    int badDuration;
+    double badDuration;
 
-    // BAD
+    // 부위 별 BAD 집계
     int shoulderBadCount;
     int faceBadCount;
-
-    int shoulderBadDuration;
-    int faceBadDuration;
+    double shoulderBadDuration;
+    double faceBadDuration;
 }

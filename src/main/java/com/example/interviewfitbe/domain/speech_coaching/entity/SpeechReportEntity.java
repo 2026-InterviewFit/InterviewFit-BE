@@ -43,6 +43,10 @@ public class SpeechReportEntity {
     @Column(columnDefinition = "TEXT")
     private String fillerDetailsJson;
 
+    // 반복 표현 (JSON 저장)
+    @Column(columnDefinition = "TEXT")
+    private String repeatedExpressionsJson;
+
     private String paceEvaluation;
 
     @Column(columnDefinition = "TEXT")
@@ -50,7 +54,16 @@ public class SpeechReportEntity {
 
     private Double charactersPerSecond;
 
+    // 음량(데시벨) 평균
+    private Double volumeDbMean;
+
+    // 음량 표준편차 (음량 안정성)
+    private Double volumeDbStd;
+
     private Double totalSilenceSeconds;
+
+    // 침묵 비율(%)
+    private Double pauseRatePercent;
 
     private Integer criticalSilenceCount;
 

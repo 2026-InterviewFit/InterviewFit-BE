@@ -13,4 +13,5 @@ public class QuestionDto {
     private Long id;
     private String question;
     private String jobName;
+    private String createdAt;
 }

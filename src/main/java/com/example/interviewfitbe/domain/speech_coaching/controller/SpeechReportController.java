@@ -1,6 +1,6 @@
 package com.example.interviewfitbe.domain.speech_coaching.controller;
 
-import com.example.interviewfitbe.domain.speech_coaching.dto.SpeechReportRequest;
+import com.example.interviewfitbe.domain.speech_coaching.dto.SpeechAnalyzeRequest;
 import com.example.interviewfitbe.domain.speech_coaching.service.SpeechReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +9,16 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * 변경 전:
+ *   POST /api/speech/report  → FastAPI가 분석 완료 후 Spring에 Push
+ *
+ * 변경 후:
+ *   POST /api/speech/analyze → 클라이언트가 Spring에 요청
+ *                               Spring이 FastAPI를 직접 호출하고 DB에 저장
+ *
+ * EyeBlinkingController와 동일한 패턴.
+ */
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -18,26 +28,32 @@ public class SpeechReportController {
     private final SpeechReportService speechReportService;
 
     /**
-     * FastAPI(speech_service.py)에서 분석 완료된 리포트를 수신
-     * URL: POST http://localhost:8080/api/speech/report
+     * 스피치 분석 트리거 엔드포인트.
+     *
+     * 흐름:
+     * 클라이언트 → POST /api/speech/analyze
+     * → SpeechReportService.analyzeAndSave()
+     * → SpeechAnalysisService (WebClient로 FastAPI 호출)
+     * → FastAPI 분석 (STT + Gemini)
+     * → 결과 반환
+     * → DB 저장
+     * → 클라이언트에 reportId 응답
      */
-    @PostMapping("/report")
-    public ResponseEntity<?> receiveReport(@RequestBody SpeechReportRequest request) {
-        // 수정: jobCategory 필드가 삭제되었으므로 request에서는 불러올 수 없음.
-        // 대신 interviewId를 사용하여 어떤 면접의 결과인지 로그에 남김
-        log.info("FastAPI로부터 스피치 리포트 수신 - 면접 ID: {}", request.getInterviewId());
-        log.debug("수신 데이터: {}", request);
+    @PostMapping("/analyze")
+    public ResponseEntity<?> analyze(@RequestBody SpeechAnalyzeRequest request) {
+        log.info("스피치 분석 요청 - interviewId: {}, sourceType: {}",
+                request.getInterviewId(), request.getSourceType());
 
-        Long savedId = speechReportService.saveReport(request);
+        Long savedId = speechReportService.analyzeAndSave(request);
 
         return ResponseEntity.ok(Map.of(
-                "message", "리포트 저장 완료",
+                "message", "스피치 분석 및 저장 완료",
                 "reportId", savedId
         ));
     }
 
     /**
-     * 저장된 리포트 단건 조회
+     * 저장된 리포트 단건 조회 (기존 유지)
      */
     @GetMapping("/report/{id}")
     public ResponseEntity<?> getReport(@PathVariable Long id) {

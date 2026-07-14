@@ -7,10 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PoseAnalysisResultRepository extends JpaRepository<PoseAnalysisResultEntity, Long> {
-
     Optional<PoseAnalysisResultEntity> findTopByInterview_IdOrderByIdDesc(Long interviewId);
-
     Optional<PoseAnalysisResultEntity> findTopByInterviewAnswer_IdOrderByIdDesc(Long interviewAnswerId);
-
     List<PoseAnalysisResultEntity> findByInterview_IdOrderByIdAsc(Long interviewId);
 }

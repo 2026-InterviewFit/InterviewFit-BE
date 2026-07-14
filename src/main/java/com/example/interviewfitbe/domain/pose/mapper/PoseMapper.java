@@ -1,11 +1,20 @@
 package com.example.interviewfitbe.domain.pose.mapper;
 
-import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
+import com.example.interviewfitbe.domain.pose.dto.statistics.PoseLogs;
+import com.example.interviewfitbe.domain.pose.dto.statistics.PoseNotDetectedStatistics;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseScoreResult;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseStatistics;
 import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
+import com.example.interviewfitbe.domain.pose.entity.PoseBadLogEntity;
+import com.example.interviewfitbe.domain.pose.entity.PoseNotDetectedLogEntity;
+import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
+import com.example.interviewfitbe.domain.pose.enums.PoseIssueType;
 import org.springframework.stereotype.Component;
+
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Component
 public class PoseMapper {
@@ -13,6 +22,7 @@ public class PoseMapper {
         return PoseAnalysisResultDto.builder()
                 .id(entity.getId())
                 .interviewId(entity.getInterview().getId())
+                .interviewAnswerId(entity.getInterviewAnswer().getId())
                 .totalDuration(entity.getTotalDuration())
                 .badCount(entity.getBadCount())
                 .badDuration(entity.getBadDuration())
@@ -20,15 +30,20 @@ public class PoseMapper {
                 .faceBadCount(entity.getFaceBadCount())
                 .shoulderBadDuration(entity.getShoulderBadDuration())
                 .faceBadDuration(entity.getFaceBadDuration())
+                .notDetectedDuration(entity.getNotDetectedDuration())
+                .shoulderNotDetectedDuration(entity.getShoulderNotDetectedDuration())
+                .faceNotDetectedDuration(entity.getFaceNotDetectedDuration())
                 .badRatio(entity.getBadRatio())
                 .score(entity.getScore())
-                .grade(entity.getGrade())
+                .grade(entity.getGrade().name())
+                .createdAt(entity.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
                 .build();
     }
 
-    public PoseAnalysisResultEntity toEntity(Integer totalDuration, PoseStatistics stats, PoseScoreResult result, InterviewEntity interview) {
+    public PoseAnalysisResultEntity toEntity(Double totalDuration, PoseStatistics stats, PoseNotDetectedStatistics notDetectedStats, PoseScoreResult result, InterviewAnswerEntity interviewAnswer) {
         return PoseAnalysisResultEntity.builder()
-                .interview(interview)
+                .interview(interviewAnswer.getInterview())
+                .interviewAnswer(interviewAnswer)
                 .totalDuration(totalDuration)
                 .badCount(stats.getBadCount())
                 .badDuration(stats.getBadDuration())
@@ -36,9 +51,54 @@ public class PoseMapper {
                 .faceBadCount(stats.getFaceBadCount())
                 .shoulderBadDuration(stats.getShoulderBadDuration())
                 .faceBadDuration(stats.getFaceBadDuration())
+                .notDetectedDuration(notDetectedStats.getNotDetectedDuration())
+                .shoulderNotDetectedDuration(notDetectedStats.getShoulderNotDetectedDuration())
+                .faceNotDetectedDuration(notDetectedStats.getFaceNotDetectedDuration())
                 .badRatio(result.getBadRatio())
                 .score(result.getScore())
                 .grade(result.getGrade())
+                .build();
+    }
+
+    public PoseAnalysisResultEntity toEmptyResult(InterviewAnswerEntity interviewAnswer) {
+        return PoseAnalysisResultEntity.builder()
+                .interview(interviewAnswer.getInterview())
+                .interviewAnswer(interviewAnswer)
+                .totalDuration(0.0)
+                .badCount(0)
+                .badDuration(0.0)
+                .shoulderBadCount(0)
+                .faceBadCount(0)
+                .shoulderBadDuration(0.0)
+                .faceBadDuration(0.0)
+                .notDetectedDuration(0.0)
+                .shoulderNotDetectedDuration(0.0)
+                .faceNotDetectedDuration(0.0)
+                .badRatio(0.0)
+                .score(0)
+                .grade(PoseGrade.E)
+                .build();
+    }
+
+    public PoseBadLogEntity toBadLog(Double timestamp, PoseIssueType issueType, Double deviation) {
+        return PoseBadLogEntity.builder()
+                .timestamp(timestamp)
+                .issueType(issueType)
+                .deviation(deviation)
+                .build();
+    }
+
+    public PoseNotDetectedLogEntity toNotDetectedLog(Double timestamp, PoseIssueType issueType) {
+        return PoseNotDetectedLogEntity.builder()
+                .timestamp(timestamp)
+                .issueType(issueType)
+                .build();
+    }
+
+    public PoseLogs toPoseLogs(List<PoseBadLogEntity> badLogs, List<PoseNotDetectedLogEntity> notDetectedLogs) {
+        return PoseLogs.builder()
+                .badLogs(badLogs)
+                .notDetectedLogs(notDetectedLogs)
                 .build();
     }
 }

@@ -22,7 +22,7 @@ public class EyeBlinkingAnalysisService {
 
         try {
             Map<String, Object> response = this.fastApiWebClient.post()
-                    .uri("/api/v1/vision/blinks")
+                    .uri("/apis/eye-blinking/analyze")
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(Map.class)
