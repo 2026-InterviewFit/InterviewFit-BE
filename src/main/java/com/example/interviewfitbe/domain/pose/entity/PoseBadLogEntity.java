@@ -16,8 +16,8 @@ public class PoseBadLogEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pose_analysis_result_id")
-    private PoseAnalysisResultEntity poseAnalysisResult;
+    @JoinColumn(name = "pose_report_id")
+    private PoseReportEntity poseReport;
 
     // 발생 시간 (초 단위 추천)
     private Double timestamp;
@@ -30,7 +30,7 @@ public class PoseBadLogEntity {
     private Double deviation;
 
     // 연관관계 설정 메서드
-    public void assignPoseAnalysisResult(PoseAnalysisResultEntity poseAnalysisResult) {
-        this.poseAnalysisResult = poseAnalysisResult;
+    public void assignPoseAnalysisResult(PoseReportEntity poseReport) {
+        this.poseReport = poseReport;
     }
 }

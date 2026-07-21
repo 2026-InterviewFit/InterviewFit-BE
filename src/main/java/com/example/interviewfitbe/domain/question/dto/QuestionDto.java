@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class QuestionDto {
     private Long id;
+    private Long interviewId;
     private String question;
     private String jobName;
     private String createdAt;
