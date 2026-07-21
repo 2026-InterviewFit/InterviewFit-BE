@@ -11,7 +11,7 @@ public class PoseScoreCalculator {
             return PoseScoreResult.builder()
                     .badRatio(0.0)
                     .score(0)
-                    .grade(PoseGrade.E)
+                    .grade(PoseGrade.POOR)
                     .build();
         }
 
@@ -42,10 +42,10 @@ public class PoseScoreCalculator {
     }
 
     public PoseGrade calculateGrade(int score) {
-        if (score >= 85) return PoseGrade.A;
-        else if (score >= 75) return PoseGrade.B;
-        else if (score >= 65) return PoseGrade.C;
-        else if (score >= 50) return PoseGrade.D;
-        return PoseGrade.E;
+        if (score >= 85) return PoseGrade.EXCELLENT;
+        else if (score >= 75) return PoseGrade.GOOD;
+        else if (score >= 65) return PoseGrade.AVERAGE;
+        else if (score >= 50) return PoseGrade.NEEDS_IMPROVEMENT;
+        return PoseGrade.POOR;
     }
 }

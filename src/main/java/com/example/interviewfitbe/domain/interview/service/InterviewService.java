@@ -15,8 +15,8 @@ import com.example.interviewfitbe.domain.interview.repository.InterviewRepositor
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.job.exception.JobRoleErrorCode;
 import com.example.interviewfitbe.domain.job.repository.JobRoleRepository;
-import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
-import com.example.interviewfitbe.domain.pose.repository.PoseAnalysisResultRepository;
+import com.example.interviewfitbe.domain.pose.entity.PoseReportEntity;
+import com.example.interviewfitbe.domain.pose.repository.PoseReportRepository;
 import com.example.interviewfitbe.domain.speech_coaching.entity.SpeechReportEntity;
 import com.example.interviewfitbe.domain.speech_coaching.repository.SpeechReportRepository;
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
@@ -40,7 +40,7 @@ public class InterviewService {
 
     private final EyeBlinkingReportRepository eyeBlinkingReportRepository;
     private final EyeGazeReportRepository eyeGazeReportRepository;
-    private final PoseAnalysisResultRepository poseAnalysisResultRepository;
+    private final PoseReportRepository poseReportRepository;
     private final SpeechReportRepository speechReportRepository;
 
     /**
@@ -217,7 +217,7 @@ public class InterviewService {
     private InterviewReportResponse.PoseReport toPoseReport(
             InterviewAnswerEntity answer
     ) {
-        return poseAnalysisResultRepository
+        return poseReportRepository
                 .findTopByInterviewAnswer_IdOrderByIdDesc(answer.getId())
                 .map(this::toPoseReport)
                 .orElse(null);
@@ -227,7 +227,7 @@ public class InterviewService {
      * 자세 분석 Entity를 응답 DTO로 변환.
      */
     private InterviewReportResponse.PoseReport toPoseReport(
-            PoseAnalysisResultEntity report
+            PoseReportEntity report
     ) {
         return InterviewReportResponse.PoseReport.builder()
                 .reportId(report.getId())

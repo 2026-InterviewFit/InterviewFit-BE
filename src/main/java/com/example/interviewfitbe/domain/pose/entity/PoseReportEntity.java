@@ -1,6 +1,5 @@
 package com.example.interviewfitbe.domain.pose.entity;
 
-import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
 import jakarta.persistence.*;
@@ -14,19 +13,15 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @Entity
-@Table(name = "pose_analysis_results")
-public class PoseAnalysisResultEntity {
+@Table(name = "pose_reports")
+public class PoseReportEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_id")
+    @JoinColumn(name = "interview_id", nullable = false)
     private InterviewEntity interview;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_answer_id")
-    private InterviewAnswerEntity interviewAnswer;
 
     private Double totalDuration;
 
