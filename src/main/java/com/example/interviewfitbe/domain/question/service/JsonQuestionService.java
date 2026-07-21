@@ -1,7 +1,7 @@
 package com.example.interviewfitbe.domain.question.service;
 
 import com.example.interviewfitbe.domain.job.exception.JobRoleErrorCode;
-import com.example.interviewfitbe.domain.question.dto.QuestionClientResponse;
+import com.example.interviewfitbe.domain.question.dto.client.QuestionClientResponse;
 import com.example.interviewfitbe.domain.question.exception.JsonQuestionErrorCode;
 import com.example.interviewfitbe.global.exception.BaseException;
 import jakarta.annotation.PostConstruct;

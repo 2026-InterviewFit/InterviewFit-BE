@@ -24,6 +24,13 @@ public class JobRoleService {
                 .toList();
     }
 
+    public List<JobRoleDto> getAllJobRolesExceptEtc() {
+        List<JobRoleEntity> entities = jobRoleRepository.findAllByNameNot("기타");
+        return entities.stream()
+                .map(jobRoleMapper::toDto)
+                .toList();
+    }
+
     public JobRoleEntity getJobRoleEntity(Long jobId) {
         return jobRoleRepository.findById(jobId)
                 .orElseThrow(() -> new BaseException(JobRoleErrorCode.JOB_ROLE_NOT_FOUND));

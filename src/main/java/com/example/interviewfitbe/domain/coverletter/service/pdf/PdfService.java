@@ -1,6 +1,7 @@
-package com.example.interviewfitbe.domain.coverletter.service;
+package com.example.interviewfitbe.domain.coverletter.service.pdf;
 
 import com.example.interviewfitbe.domain.coverletter.exception.PdfErrorCode;
+import com.example.interviewfitbe.domain.coverletter.service.ocr.OcrService;
 import com.example.interviewfitbe.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.Loader;

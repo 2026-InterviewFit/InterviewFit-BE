@@ -1,23 +1,43 @@
 package com.example.interviewfitbe.domain.coverletter.controller;
 
+import com.example.interviewfitbe.domain.coverletter.dto.analysis.CoverLetterAnalysisRequest;
+import com.example.interviewfitbe.domain.coverletter.dto.analysis.CoverLetterAnalysisResponse;
 import com.example.interviewfitbe.domain.coverletter.dto.CoverLetterDto;
+import com.example.interviewfitbe.domain.coverletter.mapper.CoverLetterMapper;
 import com.example.interviewfitbe.domain.coverletter.service.CoverLetterService;
+import com.example.interviewfitbe.domain.coverletter.service.pdf.PdfService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RequestMapping("/api/coverletter")
 @RequiredArgsConstructor
 @RestController
 public class CoverLetterController {
     private final CoverLetterService coverLetterService;
+    private final PdfService pdfService;
+    private final CoverLetterMapper coverLetterMapper;
 
     @GetMapping("/{id}")
     public ResponseEntity<CoverLetterDto> getCoverLetter(@PathVariable Long id) {
-        CoverLetterDto result = coverLetterService.getCoverLetter(id);
+        CoverLetterDto result = coverLetterMapper.toDto(
+                coverLetterService.getCoverLetter(id)
+        );
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/analysis")
+    public ResponseEntity<CoverLetterAnalysisResponse> analyzeCoverLetter(
+            @RequestPart("request") CoverLetterAnalysisRequest request,
+            @RequestPart(value = "coverLetterFile", required = false) MultipartFile coverLetterFile
+    ) {
+        if (coverLetterFile != null && !coverLetterFile.isEmpty()) {
+            String coverLetter = pdfService.extractText(coverLetterFile);
+            request.updateCoverLetter(coverLetter);
+        }
+
+        CoverLetterAnalysisResponse response = coverLetterService.analyzeCoverLetter(request);
+        return ResponseEntity.ok(response);
     }
 }

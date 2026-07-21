@@ -1,6 +1,6 @@
-package com.example.interviewfitbe.domain.coverletter.service;
+package com.example.interviewfitbe.domain.coverletter.service.ocr;
 
-import com.example.interviewfitbe.domain.coverletter.dto.OcrResponse;
+import com.example.interviewfitbe.domain.coverletter.dto.ocr.OcrResponse;
 import com.example.interviewfitbe.domain.coverletter.exception.PdfErrorCode;
 import com.example.interviewfitbe.global.exception.BaseException;
 import com.example.interviewfitbe.global.exception.code.FastApiErrorCode;
