@@ -1,8 +1,6 @@
 package com.example.interviewfitbe.domain.question.entity;
 
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
-import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
-import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.question.enums.QuestionType;
 import jakarta.persistence.*;
@@ -22,18 +20,11 @@ public class QuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_id")
-    private InterviewEntity interview;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_answer_id")
-    private InterviewAnswerEntity interviewAnswer;
-
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private QuestionType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -47,12 +38,4 @@ public class QuestionEntity {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    public void linkInterview(InterviewEntity interview) {
-        this.interview = interview;
-    }
-
-    public void linkInterviewAnswer(InterviewAnswerEntity interviewAnswer) {
-        this.interviewAnswer = interviewAnswer;
-    }
 }

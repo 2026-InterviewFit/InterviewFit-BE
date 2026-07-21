@@ -13,7 +13,7 @@ import java.util.List;
 
 @Component
 public class QuestionMapper {
-    public QuestionDto toResponse(QuestionEntity entity) {
+    public QuestionDto toDto(QuestionEntity entity) {
         return QuestionDto.builder()
                 .id(entity.getId())
                 .question(entity.getQuestion())
@@ -22,15 +22,10 @@ public class QuestionMapper {
                 .build();
     }
 
-    public QuestionResponse toDto(QuestionEntity entity) {
+    public QuestionResponse toResponse(QuestionEntity entity) {
         return QuestionResponse.builder()
                 .id(entity.getId())
-                .interviewId(entity.getInterview().getId())
-                .interviewAnswerId(entity.getInterviewAnswer().getId())
                 .question(entity.getQuestion())
-                .jobName(entity.getJobRole().getName())
-                .coverLetterContent(entity.getCoverLetter().getContent())
-                .createdAt(entity.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
                 .build();
     }
 

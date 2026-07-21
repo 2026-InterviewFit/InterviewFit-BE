@@ -22,6 +22,7 @@ public class CoverLetterEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user;
 
+    // 자기소개서 전체 내용
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 

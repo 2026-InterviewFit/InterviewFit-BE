@@ -1,33 +1,48 @@
 package com.example.interviewfitbe.domain.question.service;
 
-import com.example.interviewfitbe.domain.question.dto.QuestionClientRequest;
-import com.example.interviewfitbe.domain.question.dto.QuestionClientResponse;
+import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
+import com.example.interviewfitbe.domain.coverletter.mapper.CoverLetterQuestionAnalysisMapper;
+import com.example.interviewfitbe.domain.question.dto.client.CoverLetterQuestionAnalysis2;
+import com.example.interviewfitbe.domain.question.dto.client.QuestionClientRequest;
+import com.example.interviewfitbe.domain.question.dto.client.QuestionClientResponse;
 import com.example.interviewfitbe.domain.question.exception.QuestionErrorCode;
 import com.example.interviewfitbe.global.exception.BaseException;
 import com.example.interviewfitbe.global.exception.code.FastApiErrorCode;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.Comparator;
 import java.util.List;
 
 @RequiredArgsConstructor
 @Service
 public class QuestionClientService {
     private final WebClient fastApiWebClient;
+    private final CoverLetterQuestionAnalysisMapper coverLetterQuestionAnalysisMapper;
 
-    public QuestionClientResponse createQuestions(Integer count, String jobType, String coverLetter, List<String> previousQuestions) {
+    public QuestionClientResponse createQuestions(int count, String jobName, List<CoverLetterQuestionAnalysisEntity> coverLetterQuestionAnalysis, List<String> previousQuestions) {
+        List<CoverLetterQuestionAnalysis2> analyses = coverLetterQuestionAnalysis.stream()
+                .map(coverLetterQuestionAnalysisMapper::toClient)
+                .sorted(Comparator.comparing(
+                        CoverLetterQuestionAnalysis2::getImportanceScore,
+                                Comparator.nullsLast(Float::compareTo)
+                        ).reversed()
+                )
+                .toList();
+
         QuestionClientRequest request = QuestionClientRequest.builder()
                 .count(count)
-                .jobType(jobType)
-                .coverLetter(coverLetter)
+                .jobName(jobName)
+                .analyses(analyses)
                 .previousQuestions(previousQuestions)
                 .build();
 
         try {
             return fastApiWebClient.post()
-                    .uri("/apis/question/create")
+                    .uri("/apis/question/one-to-one/create")
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(QuestionClientResponse.class)

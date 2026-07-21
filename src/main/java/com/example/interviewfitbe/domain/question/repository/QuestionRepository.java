@@ -9,5 +9,5 @@ import java.util.List;
 
 public interface QuestionRepository extends JpaRepository<QuestionEntity, Long> {
     List<QuestionEntity> findAllByOrderByCreatedAtDesc();
-    List<QuestionEntity> findByCoverLetterInAndType(List<CoverLetterEntity> coverLetters, QuestionType type);
+    List<QuestionEntity> findByCoverLetterInAndType(List<CoverLetterEntity> coverLetter, QuestionType type);
 }

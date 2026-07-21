@@ -20,4 +20,9 @@ public class JobRoleController {
     public ResponseEntity<List<JobRoleDto>> getAllJobRoles() {
         return ResponseEntity.ok(jobRoleService.getAllJobRoles());
     }
+
+    @GetMapping("/except-etc")
+    public ResponseEntity<List<JobRoleDto>> getJobRolesExceptEtc() {
+        return ResponseEntity.ok(jobRoleService.getAllJobRolesExceptEtc());
+    }
 }

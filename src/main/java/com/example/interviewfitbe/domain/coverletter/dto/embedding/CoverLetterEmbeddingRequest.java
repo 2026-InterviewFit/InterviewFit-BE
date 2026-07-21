@@ -1,4 +1,4 @@
-package com.example.interviewfitbe.domain.coverletter.dto;
+package com.example.interviewfitbe.domain.coverletter.dto.embedding;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +11,6 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class CoverLetterEmbeddingResponse {
-    private List<Double> embedding;
+public class CoverLetterEmbeddingRequest {
+    private List<String> contents;
 }
