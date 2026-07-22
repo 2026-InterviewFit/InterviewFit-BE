@@ -125,7 +125,7 @@ public class PoseService {
             return;
         }
 
-        badLogs.forEach(log -> log.assignPoseAnalysisResult(poseReport));
+        badLogs.forEach(log -> log.assignPoseReport(poseReport));
         poseBadLogRepository.saveAll(badLogs);
     }
 
@@ -134,7 +134,7 @@ public class PoseService {
             return;
         }
 
-        notDetectedLogs.forEach(log -> log.assignPoseAnalysisResult(poseReport));
+        notDetectedLogs.forEach(log -> log.assignPoseReport(poseReport));
         poseNotDetectedLogRepository.saveAll(notDetectedLogs);
     }
 }
