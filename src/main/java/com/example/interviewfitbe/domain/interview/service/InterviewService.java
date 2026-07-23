@@ -15,8 +15,8 @@ import com.example.interviewfitbe.domain.interview.repository.InterviewRepositor
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.job.exception.JobRoleErrorCode;
 import com.example.interviewfitbe.domain.job.repository.JobRoleRepository;
-import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
-import com.example.interviewfitbe.domain.pose.repository.PoseAnalysisResultRepository;
+import com.example.interviewfitbe.domain.pose.entity.PoseReportEntity;
+import com.example.interviewfitbe.domain.pose.repository.PoseReportRepository;
 import com.example.interviewfitbe.domain.speech_coaching.entity.SpeechReportEntity;
 import com.example.interviewfitbe.domain.speech_coaching.repository.SpeechReportRepository;
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
@@ -40,12 +40,9 @@ public class InterviewService {
 
     private final EyeBlinkingReportRepository eyeBlinkingReportRepository;
     private final EyeGazeReportRepository eyeGazeReportRepository;
-    private final PoseAnalysisResultRepository poseAnalysisResultRepository;
+    private final PoseReportRepository poseReportRepository;
     private final SpeechReportRepository speechReportRepository;
 
-    /**
-     * 면접 시작 API에서 호출하는 메서드.
-     */
     @Transactional
     public InterviewStartResponse startInterview(InterviewStartRequest request) {
         if (request.getJobRoleId() == null) {
@@ -56,19 +53,14 @@ public class InterviewService {
 
         JobRoleEntity jobRole = jobRoleRepository
                 .findById(request.getJobRoleId())
-                .orElseThrow(
-                        () -> new BaseException(
-                                JobRoleErrorCode.JOB_ROLE_NOT_FOUND
-                        )
-                );
+                .orElseThrow(() -> new BaseException(JobRoleErrorCode.JOB_ROLE_NOT_FOUND));
 
         InterviewEntity interview = InterviewEntity.builder()
                 .user(user)
                 .jobRole(jobRole)
                 .build();
 
-        InterviewEntity savedInterview =
-                interviewRepository.save(interview);
+        InterviewEntity savedInterview = interviewRepository.save(interview);
 
         return InterviewStartResponse.builder()
                 .interviewId(savedInterview.getId())
@@ -79,25 +71,16 @@ public class InterviewService {
                 .build();
     }
 
-    /**
-     * 대시보드 면접 분석 결과 조회.
-     *
-     * eye / gaze / pose / speech 결과를 답변별로 반환한다.
-     */
     @Transactional(readOnly = true)
     public InterviewReportResponse getInterviewReport(Long interviewId) {
         InterviewEntity interview = interviewRepository
                 .findById(interviewId)
-                .orElseThrow(
-                        () -> new IllegalArgumentException(
-                                "해당 면접을 찾을 수 없습니다. interviewId="
-                                        + interviewId
-                        )
-                );
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "해당 면접을 찾을 수 없습니다. interviewId=" + interviewId
+                ));
 
         List<InterviewAnswerEntity> answers =
-                interviewAnswerRepository
-                        .findByInterview_IdOrderByAnswerOrderAsc(interviewId);
+                interviewAnswerRepository.findByInterview_IdOrderByAnswerOrderAsc(interviewId);
 
         List<InterviewReportResponse.AnswerReport> answerReports =
                 answers.stream()
@@ -109,11 +92,7 @@ public class InterviewService {
         boolean completed =
                 !answers.isEmpty()
                         && answers.stream()
-                        .allMatch(
-                                answer ->
-                                        answer.getAnalysisStatus()
-                                                == AnalysisStatus.DONE
-                        );
+                        .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
 
         JobRoleEntity jobRole = interview.getJobRole();
 
@@ -130,9 +109,6 @@ public class InterviewService {
                 .build();
     }
 
-    /**
-     * 답변별 분석 결과 DTO 생성.
-     */
     private InterviewReportResponse.AnswerReport toAnswerReport(
             InterviewAnswerEntity answer
     ) {
@@ -151,23 +127,26 @@ public class InterviewService {
                 .build();
     }
 
-    /**
-     * 눈 깜빡임 결과 조회.
-     */
     private InterviewReportResponse.EyeReport toEyeReport(
             InterviewAnswerEntity answer
     ) {
         return eyeBlinkingReportRepository
-                .findTopByInterviewAnswer_IdOrderByCreatedAtDesc(
-                        answer.getId()
-                )
+                .findTopByInterviewAnswer_IdOrderByCreatedAtDesc(answer.getId())
                 .map(this::toEyeReport)
-                .orElse(null);
+                .orElseGet(() -> {
+                    Long interviewId = answer.getInterviewIdSafely();
+
+                    if (interviewId == null) {
+                        return null;
+                    }
+
+                    return eyeBlinkingReportRepository
+                            .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
+                            .map(this::toEyeReport)
+                            .orElse(null);
+                });
     }
 
-    /**
-     * 눈 깜빡임 Entity를 응답 DTO로 변환.
-     */
     private InterviewReportResponse.EyeReport toEyeReport(
             EyeBlinkingReport report
     ) {
@@ -175,28 +154,23 @@ public class InterviewService {
                 .reportId(report.getId())
                 .blinkCount(report.getBlinkCount())
                 .blinkRate(report.getBlinkRate())
+                .durationSeconds(report.getDurationSeconds())
                 .score(report.getScore())
                 .feedback(report.getFeedback())
                 .build();
     }
 
-    /**
-     * 시선 추적 결과 조회.
-     */
     private InterviewReportResponse.GazeReport toGazeReport(
             InterviewAnswerEntity answer
     ) {
         return eyeGazeReportRepository
-                .findTopByInterviewAnswerIdOrderByIdDesc(
-                        answer.getId()
+                .findTopByInterviewIdOrderByCreatedAtDesc(
+                        answer.getInterview().getId()
                 )
                 .map(this::toGazeReport)
                 .orElse(null);
     }
 
-    /**
-     * 시선 추적 Entity를 응답 DTO로 변환.
-     */
     private InterviewReportResponse.GazeReport toGazeReport(
             EyeGazeReport report
     ) {
@@ -211,23 +185,23 @@ public class InterviewService {
                 .build();
     }
 
-    /**
-     * 자세 분석 결과 조회.
-     */
     private InterviewReportResponse.PoseReport toPoseReport(
             InterviewAnswerEntity answer
     ) {
-        return poseAnalysisResultRepository
-                .findTopByInterviewAnswer_IdOrderByIdDesc(answer.getId())
+        Long interviewId = answer.getInterviewIdSafely();
+
+        if (interviewId == null) {
+            return null;
+        }
+
+        return poseReportRepository
+                .findTopByInterview_IdOrderByIdDesc(interviewId)
                 .map(this::toPoseReport)
                 .orElse(null);
     }
 
-    /**
-     * 자세 분석 Entity를 응답 DTO로 변환.
-     */
     private InterviewReportResponse.PoseReport toPoseReport(
-            PoseAnalysisResultEntity report
+            PoseReportEntity report
     ) {
         return InterviewReportResponse.PoseReport.builder()
                 .reportId(report.getId())
@@ -240,31 +214,30 @@ public class InterviewService {
                 .faceBadDuration(report.getFaceBadDuration())
                 .badRatio(report.getBadRatio())
                 .score(report.getScore())
-                .grade(
-                        report.getGrade() == null
-                                ? null
-                                : report.getGrade().name()
-                )
+                .grade(report.getGrade() == null ? null : report.getGrade().name())
                 .build();
     }
 
-    /**
-     * 음성 분석 결과 조회.
-     */
     private InterviewReportResponse.SpeechReport toSpeechReport(
             InterviewAnswerEntity answer
     ) {
         return speechReportRepository
-                .findTopByInterviewAnswer_IdOrderByCreatedAtDesc(
-                        answer.getId()
-                )
+                .findTopByInterviewAnswer_IdOrderByCreatedAtDesc(answer.getId())
                 .map(this::toSpeechReport)
-                .orElse(null);
+                .orElseGet(() -> {
+                    Long interviewId = answer.getInterviewIdSafely();
+
+                    if (interviewId == null) {
+                        return null;
+                    }
+
+                    return speechReportRepository
+                            .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
+                            .map(this::toSpeechReport)
+                            .orElse(null);
+                });
     }
 
-    /**
-     * 음성 분석 Entity를 응답 DTO로 변환.
-     */
     private InterviewReportResponse.SpeechReport toSpeechReport(
             SpeechReportEntity report
     ) {
@@ -273,21 +246,13 @@ public class InterviewService {
                 .textScript(report.getTextScript())
                 .totalFillerCount(report.getTotalFillerCount())
                 .fillerDetailsJson(report.getFillerDetailsJson())
-                .repeatedExpressionsJson(
-                        report.getRepeatedExpressionsJson()
-                )
+                .repeatedExpressionsJson(report.getRepeatedExpressionsJson())
                 .paceEvaluation(report.getPaceEvaluation())
                 .paceFeedback(report.getPaceFeedback())
-                .charactersPerSecond(
-                        report.getCharactersPerSecond()
-                )
-                .totalSilenceSeconds(
-                        report.getTotalSilenceSeconds()
-                )
+                .charactersPerSecond(report.getCharactersPerSecond())
+                .totalSilenceSeconds(report.getTotalSilenceSeconds())
                 .pauseRatePercent(report.getPauseRatePercent())
-                .criticalSilenceCount(
-                        report.getCriticalSilenceCount()
-                )
+                .criticalSilenceCount(report.getCriticalSilenceCount())
                 .volumeDbMean(report.getVolumeDbMean())
                 .volumeDbStd(report.getVolumeDbStd())
                 .aiEvaluationJson(report.getAiEvaluationJson())
@@ -295,9 +260,6 @@ public class InterviewService {
                 .build();
     }
 
-    /**
-     * 면접 전체 분석 상태 계산.
-     */
     private String determineOverallStatus(
             List<InterviewAnswerEntity> answers
     ) {
@@ -306,33 +268,21 @@ public class InterviewService {
         }
 
         boolean hasFailed = answers.stream()
-                .anyMatch(
-                        answer ->
-                                answer.getAnalysisStatus()
-                                        == AnalysisStatus.FAILED
-                );
+                .anyMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.FAILED);
 
         if (hasFailed) {
             return "FAILED";
         }
 
         boolean allDone = answers.stream()
-                .allMatch(
-                        answer ->
-                                answer.getAnalysisStatus()
-                                        == AnalysisStatus.DONE
-                );
+                .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
 
         if (allDone) {
             return "DONE";
         }
 
         boolean hasRunning = answers.stream()
-                .anyMatch(
-                        answer ->
-                                answer.getAnalysisStatus()
-                                        == AnalysisStatus.RUNNING
-                );
+                .anyMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.RUNNING);
 
         if (hasRunning) {
             return "RUNNING";
@@ -341,28 +291,19 @@ public class InterviewService {
         return "UPLOADED";
     }
 
-    /**
-     * userId가 있으면 기존 사용자를 조회하고,
-     * 없으면 임시 사용자를 생성한다.
-     */
     private UserEntity findOrCreateUser(Long userId) {
         if (userId != null) {
             return userRepository.findById(userId)
-                    .orElseThrow(
-                            () -> new IllegalArgumentException(
-                                    "해당 유저를 찾을 수 없습니다. userId="
-                                            + userId
-                            )
-                    );
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "해당 유저를 찾을 수 없습니다. userId=" + userId
+                    ));
         }
 
-        String tempEmail =
-                "temp_"
-                        + UUID.randomUUID()
-                        + "@interviewfit.local";
+        Long tempKakaoId = Math.abs(UUID.randomUUID().getMostSignificantBits());
 
         UserEntity tempUser = UserEntity.builder()
-                .email(tempEmail)
+                .kakaoId(tempKakaoId)
+                .email(null)
                 .name("임시 사용자")
                 .build();
 
