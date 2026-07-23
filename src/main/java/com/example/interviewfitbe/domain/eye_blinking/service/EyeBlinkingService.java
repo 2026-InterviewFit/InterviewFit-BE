@@ -2,7 +2,11 @@ package com.example.interviewfitbe.domain.eye_blinking.service;
 
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeRequest;
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeResponse;
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingBadLog;
 import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
+import com.example.interviewfitbe.domain.eye_blinking.enums.EyeBlinkingEventType;
+import com.example.interviewfitbe.domain.eye_blinking.enums.EyeBlinkingEventType;
+import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingBadLogRepository;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
@@ -17,6 +21,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,21 +31,20 @@ import java.util.UUID;
 public class EyeBlinkingService {
 
     private final EyeBlinkingReportRepository eyeBlinkingReportRepository;
+    private final EyeBlinkingBadLogRepository eyeBlinkingBadLogRepository;
     private final InterviewRepository interviewRepository;
     private final ObjectMapper objectMapper;
 
-    /**
-     * FastAPI 눈 깜빡임 분석 호출 전담 서비스.
+    /*
+     * FastAPI 눈 깜빡임 분석 호출 전담 서비스
      */
     private final EyeBlinkingAnalysisService eyeBlinkingAnalysisService;
 
     @Value("${app.upload-dir}")
     private String uploadDir;
 
-    /**
-     * 면접 단위 눈 깜빡임 분석 저장 메서드.
-     *
-     * 예전 통합 흐름에서 InterviewEntity만 연결할 때 사용한다.
+    /*
+     * 면접 단위 눈 깜빡임 분석 저장 메서드
      */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
@@ -55,16 +60,18 @@ public class EyeBlinkingService {
 
         EyeBlinkingReport report = EyeBlinkingReport.builder()
                 .interview(interview)
-                .videoUrl(videoObjectKey)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
                 .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
                 .durationSeconds(getDouble(analysisResult, "duration_seconds", "durationSeconds"))
+                .notDetectedCount(getInteger(analysisResult, "not_detected_count", "notDetectedCount"))
+                .notDetectedRatio(getDouble(analysisResult, "not_detected_ratio", "notDetectedRatio"))
                 .score(getDouble(analysisResult, "score"))
                 .feedback(getString(analysisResult, "feedback", "evaluation"))
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
         EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
                 "눈 깜빡임 분석 및 저장 완료",
@@ -73,12 +80,8 @@ public class EyeBlinkingService {
         );
     }
 
-    /**
-     * eye-blink 단독 분석 API용 메서드.
-     *
-     * /api/eye-blinking/analyze 에서 videoUrl만 받아 분석할 때 사용한다.
-     * interviewId가 있으면 interview_id를 연결하고,
-     * 없으면 단독 테스트로 보고 null 저장을 허용한다.
+    /*
+     * eye-blink 단독 분석 API용 메서드
      */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(EyeBlinkingAnalyzeRequest request) {
@@ -93,16 +96,18 @@ public class EyeBlinkingService {
 
         EyeBlinkingReport report = EyeBlinkingReport.builder()
                 .interview(interview)
-                .videoUrl(request.getVideoUrl())
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
                 .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
                 .durationSeconds(getDouble(analysisResult, "duration_seconds", "durationSeconds"))
+                .notDetectedCount(getInteger(analysisResult, "not_detected_count", "notDetectedCount"))
+                .notDetectedRatio(getDouble(analysisResult, "not_detected_ratio", "notDetectedRatio"))
                 .score(getDouble(analysisResult, "score"))
                 .feedback(getString(analysisResult, "feedback", "evaluation"))
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
         EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
                 "눈 깜빡임 분석 및 저장 완료",
@@ -111,11 +116,8 @@ public class EyeBlinkingService {
         );
     }
 
-    /**
-     * 질문별 답변 영상 눈 깜빡임 분석 저장 메서드.
-     *
-     * 대시보드에서 answer.eye로 보여주려면 이 메서드처럼
-     * InterviewAnswerEntity까지 연결되어야 한다.
+    /*
+     * 질문별 답변 구간 눈 깜빡임 분석 저장 메서드
      */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
@@ -129,19 +131,23 @@ public class EyeBlinkingService {
 
         Map<String, Object> analysisResult = extractAnalysisResult(fastApiResponse);
 
+        InterviewEntity interview = interviewAnswer.getInterviewSafely();
+
         EyeBlinkingReport report = EyeBlinkingReport.builder()
-                .interview(interviewAnswer.getInterview())
+                .interview(interview)
                 .interviewAnswer(interviewAnswer)
-                .videoUrl(videoObjectKey)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
                 .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
                 .durationSeconds(getDouble(analysisResult, "duration_seconds", "durationSeconds"))
+                .notDetectedCount(getInteger(analysisResult, "not_detected_count", "notDetectedCount"))
+                .notDetectedRatio(getDouble(analysisResult, "not_detected_ratio", "notDetectedRatio"))
                 .score(getDouble(analysisResult, "score"))
                 .feedback(getString(analysisResult, "feedback", "evaluation"))
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
         EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
                 "질문별 눈 깜빡임 분석 및 저장 완료",
@@ -150,11 +156,8 @@ public class EyeBlinkingService {
         );
     }
 
-    /**
-     * eye-blink 단독 테스트용 multipart 업로드 API에서 사용한다.
-     *
-     * 최종 통합 흐름에서는 이 방식보다
-     * /videos/upload → videoObjectKey → 통합 분석 흐름을 우선 사용한다.
+    /*
+     * eye-blink 단독 테스트용 multipart 업로드 API에서 사용
      */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeUploadedVideoAndSave(
@@ -178,10 +181,6 @@ public class EyeBlinkingService {
         }
     }
 
-    /**
-     * interviewId가 있으면 실제 InterviewEntity를 조회한다.
-     * interviewId가 없으면 단독 테스트로 보고 null 저장을 허용한다.
-     */
     private InterviewEntity findInterviewOrNull(Long interviewId) {
         if (interviewId == null) {
             return null;
@@ -193,28 +192,6 @@ public class EyeBlinkingService {
                 ));
     }
 
-    /**
-     * FastAPI 응답이 두 형태 모두 올 수 있어서 대응한다.
-     *
-     * 1. 직접 결과 형태:
-     * {
-     *   "blink_count": 3,
-     *   "blink_rate": 20.0,
-     *   "score": 80,
-     *   "feedback": "..."
-     * }
-     *
-     * 2. wrapper 형태:
-     * {
-     *   "status": "success",
-     *   "result": {
-     *     "blink_count": 3,
-     *     "blink_rate": 20.0,
-     *     "score": 80,
-     *     "feedback": "..."
-     *   }
-     * }
-     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> extractAnalysisResult(Map<String, Object> fastApiResponse) {
         Object result = fastApiResponse.get("result");
@@ -226,10 +203,6 @@ public class EyeBlinkingService {
         return fastApiResponse;
     }
 
-    /**
-     * 단독 테스트용 로컬 저장 메서드.
-     * 팀원 VideoService의 MinIO 저장 흐름을 대체하지 않는다.
-     */
     private String saveVideoFile(MultipartFile file) {
         try {
             if (file == null || file.isEmpty()) {
@@ -272,27 +245,43 @@ public class EyeBlinkingService {
         }
     }
 
-    private Integer getInteger(Map<String, Object> map, String... keys) {
+    private Integer getInteger(Map<?, ?> map, String... keys) {
         Object value = getFirstValue(map, keys);
 
         if (value == null) {
             return null;
         }
 
-        return ((Number) value).intValue();
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
-    private Double getDouble(Map<String, Object> map, String... keys) {
+    private Double getDouble(Map<?, ?> map, String... keys) {
         Object value = getFirstValue(map, keys);
 
         if (value == null) {
             return null;
         }
 
-        return ((Number) value).doubleValue();
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
-    private String getString(Map<String, Object> map, String... keys) {
+    private String getString(Map<?, ?> map, String... keys) {
         Object value = getFirstValue(map, keys);
 
         if (value == null) {
@@ -302,12 +291,97 @@ public class EyeBlinkingService {
         return value.toString();
     }
 
-    private Object getFirstValue(Map<String, Object> map, String... keys) {
-        for (String key : keys) {
-            Object value = map.get(key);
+    @SuppressWarnings("unchecked")
+    private void saveBadLogs(Map<String, Object> analysisResult, EyeBlinkingReport report) {
+        Object value = getFirstValue(
+                analysisResult,
+                "bad_logs",
+                "badLogs",
+                "eye_blinking_bad_logs",
+                "eyeBlinkingBadLogs"
+        );
 
-            if (value != null) {
-                return value;
+        if (!(value instanceof List<?> logs) || logs.isEmpty()) {
+            return;
+        }
+
+        List<EyeBlinkingBadLog> entities = new ArrayList<>();
+
+        for (Object item : logs) {
+            if (!(item instanceof Map<?, ?> logMap)) {
+                continue;
+            }
+
+            Double timestamp = getDouble(
+                    logMap,
+                    "timestamp",
+                    "time",
+                    "start_time",
+                    "startTime"
+            );
+
+            if (timestamp == null) {
+                continue;
+            }
+
+            EyeBlinkingEventType eventType = toEyeBlinkEventType(getFirstValue(
+                    logMap,
+                    "event_type",
+                    "eventType",
+                    "type"
+            ));
+
+            Double duration = getDouble(
+                    logMap,
+                    "duration",
+                    "duration_seconds",
+                    "durationSeconds"
+            );
+
+            Double blinkRateLocal = getDouble(
+                    logMap,
+                    "blink_rate_local",
+                    "blinkRateLocal",
+                    "local_blink_rate",
+                    "localBlinkRate"
+            );
+
+            EyeBlinkingBadLog badLog = EyeBlinkingBadLog.builder()
+                    .eyeBlinkingReport(report)
+                    .timestamp(timestamp)
+                    .duration(duration)
+                    .eventType(eventType)
+                    .blinkRateLocal(blinkRateLocal)
+                    .build();
+
+            entities.add(badLog);
+        }
+
+        if (!entities.isEmpty()) {
+            eyeBlinkingBadLogRepository.saveAll(entities);
+        }
+    }
+
+    private EyeBlinkingEventType toEyeBlinkEventType(Object value) {
+        if (value == null) {
+            return EyeBlinkingEventType.LONG_CLOSED;
+        }
+
+        try {
+            return EyeBlinkingEventType.valueOf(value.toString());
+        } catch (IllegalArgumentException e) {
+            return EyeBlinkingEventType.LONG_CLOSED;
+        }
+    }
+
+    private Object getFirstValue(Map<?, ?> map, String... keys) {
+        for (String key : keys) {
+            if (map.containsKey(key)) {
+                Object value = map.get(key);
+
+                if (value != null) {
+                    return value;
+                }
             }
         }
 

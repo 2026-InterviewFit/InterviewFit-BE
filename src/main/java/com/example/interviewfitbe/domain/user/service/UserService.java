@@ -13,20 +13,21 @@ public class UserService {
     private final UserRepository userRepository;
 
     /**
-     * 새로운 사용자 등록
+     * 카카오 로그인 / 회원가입 처리
+     * 카카오 고유 ID를 기준으로 이미 가입된 유저가 있으면 반환하고, 없으면 새로 가입시킵니다.
      */
     @Transactional
-    public Long registerUser(String email, String name) {
-        if (userRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("이미 존재하는 이메일입니다: " + email);
-        }
-
-        UserEntity user = UserEntity.builder()
-                .email(email)
-                .name(name)
-                .build();
-
-        return userRepository.save(user).getId();
+    public UserEntity processKakaoLogin(Long kakaoId, String email, String name) {
+        return userRepository.findByKakaoId(kakaoId)
+                .orElseGet(() -> {
+                    // 신규 회원가입
+                    UserEntity newUser = UserEntity.builder()
+                            .kakaoId(kakaoId)
+                            .email(email != null ? email : "kakao_" + kakaoId + "@placeholder.com") // 이메일이 없을 경우 대비
+                            .name(name != null ? name : "카카오사용자")
+                            .build();
+                    return userRepository.save(newUser);
+                });
     }
 
     /**

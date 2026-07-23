@@ -9,16 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-/**
- * 변경 전:
- *   POST /api/speech/report  → FastAPI가 분석 완료 후 Spring에 Push
- *
- * 변경 후:
- *   POST /api/speech/analyze → 클라이언트가 Spring에 요청
- *                               Spring이 FastAPI를 직접 호출하고 DB에 저장
- *
- * EyeBlinkingController와 동일한 패턴.
- */
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -27,36 +17,51 @@ public class SpeechReportController {
 
     private final SpeechReportService speechReportService;
 
+
     /**
-     * 스피치 분석 트리거 엔드포인트.
-     *
-     * 흐름:
-     * 클라이언트 → POST /api/speech/analyze
-     * → SpeechReportService.analyzeAndSave()
-     * → SpeechAnalysisService (WebClient로 FastAPI 호출)
-     * → FastAPI 분석 (STT + Gemini)
-     * → 결과 반환
-     * → DB 저장
-     * → 클라이언트에 reportId 응답
+     * 클라이언트 요청
+     * → Spring
+     * → FastAPI 분석
+     * → SpeechReport + AiEvaluation 저장
      */
     @PostMapping("/analyze")
-    public ResponseEntity<?> analyze(@RequestBody SpeechAnalyzeRequest request) {
-        log.info("스피치 분석 요청 - interviewId: {}, sourceType: {}",
-                request.getInterviewId(), request.getSourceType());
+    public ResponseEntity<?> analyze(
+            @RequestBody SpeechAnalyzeRequest request
+    ) {
 
-        Long savedId = speechReportService.analyzeAndSave(request);
+        log.info(
+                "스피치 분석 요청 - interviewId: {}, answerId: {}, sourceType: {}",
+                request.getInterviewId(),
+                request.getInterviewAnswerId(),
+                request.getSourceType()
+        );
 
-        return ResponseEntity.ok(Map.of(
-                "message", "스피치 분석 및 저장 완료",
-                "reportId", savedId
-        ));
+
+        Long savedId =
+                speechReportService.analyzeAndSave(request);
+
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "message",
+                        "스피치 분석 및 저장 완료",
+                        "reportId",
+                        savedId
+                )
+        );
     }
 
+
     /**
-     * 저장된 리포트 단건 조회 (기존 유지)
+     * 저장된 리포트 조회
      */
     @GetMapping("/report/{id}")
-    public ResponseEntity<?> getReport(@PathVariable Long id) {
-        return ResponseEntity.ok(speechReportService.getReport(id));
+    public ResponseEntity<?> getReport(
+            @PathVariable Long id
+    ) {
+
+        return ResponseEntity.ok(
+                speechReportService.getReport(id)
+        );
     }
 }

@@ -7,6 +7,8 @@ import com.example.interviewfitbe.domain.question.enums.QuestionType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -37,6 +39,7 @@ public class QuestionEntity {
     @JoinColumn(name = "job_role_id", nullable = false)
     private JobRoleEntity jobRole;
 
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;

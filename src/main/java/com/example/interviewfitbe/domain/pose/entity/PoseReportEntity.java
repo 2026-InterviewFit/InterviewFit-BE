@@ -1,11 +1,12 @@
 package com.example.interviewfitbe.domain.pose.entity;
 
-import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -14,19 +15,16 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @Entity
-@Table(name = "pose_analysis_results")
-public class PoseAnalysisResultEntity {
+@Table(name = "pose_reports")
+public class PoseReportEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_id")
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_id", nullable = false)
     private InterviewEntity interview;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_answer_id")
-    private InterviewAnswerEntity interviewAnswer;
 
     private Double totalDuration;
 

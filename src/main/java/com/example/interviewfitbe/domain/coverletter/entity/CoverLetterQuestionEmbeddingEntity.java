@@ -2,6 +2,8 @@ package com.example.interviewfitbe.domain.coverletter.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -14,7 +16,8 @@ public class CoverLetterQuestionEmbeddingEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_question_id", nullable = false)
     private CoverLetterQuestionEntity coverLetterQuestion;
 
