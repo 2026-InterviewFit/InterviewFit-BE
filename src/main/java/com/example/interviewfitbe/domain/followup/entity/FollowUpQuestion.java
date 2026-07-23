@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.followup.entity;
 
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import jakarta.persistence.*;
@@ -20,22 +21,38 @@ public class FollowUpQuestion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * 어떤 면접 세션에서 생성된 꼬리질문인지 연결한다.
-     * 한 면접에서 여러 꼬리질문이 생성될 수 있으므로 ManyToOne으로 둔다.
+    /*
+     * 어떤 면접에서 생성된 꼬리질문인지.
+     * 단독 테스트 또는 임시 생성 가능성을 고려해 nullable 허용.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    /**
-     * 어떤 원본 질문에서 파생된 꼬리질문인지 연결한다.
-     * 팀원 question 도메인과 연결하면 나중에
-     * '원본 질문 → 사용자 답변 → 꼬리질문' 흐름을 추적하기 쉽다.
+    /*
+     * 원본 질문.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "question_id")
-    private QuestionEntity question;
+    @JoinColumn(name = "source_question_id")
+    private QuestionEntity sourceQuestion;
+
+    /*
+     * 어떤 답변을 보고 생성된 꼬리질문인지.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_answer_id")
+    private InterviewAnswerEntity sourceAnswer;
+
+    /*
+     * 꼬리질문을 questions 테이블에 따로 저장하지 않기로 했으면
+     * 이 필드는 없어도 됨.
+     *
+     * 다만 기존 표에 generated_question_id가 있었으므로
+     * 확장 가능성 때문에 nullable로 남김.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "generated_question_id")
+    private QuestionEntity generatedQuestion;
 
     private String job;
 
@@ -45,11 +62,18 @@ public class FollowUpQuestion {
     @Column(columnDefinition = "TEXT")
     private String answer;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String followUpQuestion;
 
     private String interviewStyle;
 
+    @Column(columnDefinition = "TEXT")
+    private String retrievedContextJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String resultJson;
+
     @CreationTimestamp
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 }
