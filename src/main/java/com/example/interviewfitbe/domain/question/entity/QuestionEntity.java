@@ -23,19 +23,27 @@ public class QuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OnDelete(action = OnDeleteAction.CASCADE)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_role_id", nullable = false)
     private JobRoleEntity jobRole;
 
-
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String question;
+
+    @Enumerated(EnumType.STRING)
+    private QuestionType type;
+
+    private Integer questionOrder;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -43,5 +51,9 @@ public class QuestionEntity {
 
     public void assignInterview(InterviewEntity interview) {
         this.interview = interview;
+    }
+
+    public void assignOrder(Integer questionOrder) {
+        this.questionOrder = questionOrder;
     }
 }
