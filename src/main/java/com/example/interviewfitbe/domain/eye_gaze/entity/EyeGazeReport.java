@@ -1,14 +1,14 @@
 package com.example.interviewfitbe.domain.eye_gaze.entity;
 
-import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
+import com.example.interviewfitbe.domain.eye_gaze.enums.EyeGazeGrade;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "eye_gaze_report")
+@Table(name = "eye_gaze_reports")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -20,15 +20,11 @@ public class EyeGazeReport {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_id")
+    @JoinColumn(name = "interview_id", nullable = false)
     private InterviewEntity interview;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_answer_id")
-    private InterviewAnswerEntity interviewAnswer;
-
-    @Column(name = "video_url", nullable = false, length = 1000)
-    private String videoUrl;
+    @Column(name = "duration_seconds")
+    private Double durationSeconds;
 
     @Column(name = "center_ratio")
     private Double centerRatio;
@@ -39,8 +35,18 @@ public class EyeGazeReport {
     @Column(name = "gaze_away_count")
     private Integer gazeAwayCount;
 
+    @Column(name = "not_detected_count")
+    private Integer notDetectedCount;
+
+    @Column(name = "not_detected_ratio")
+    private Double notDetectedRatio;
+
     @Column(name = "score")
     private Double score;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "grade")
+    private EyeGazeGrade grade;
 
     @Column(name = "evaluation", columnDefinition = "TEXT")
     private String evaluation;
@@ -53,6 +59,8 @@ public class EyeGazeReport {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 }

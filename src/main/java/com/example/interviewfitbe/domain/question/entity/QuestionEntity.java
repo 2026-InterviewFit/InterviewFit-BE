@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.question.entity;
 
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.question.enums.QuestionType;
 import jakarta.persistence.*;
@@ -18,9 +19,14 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "questions")
 public class QuestionEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_id")
+    private InterviewEntity interview;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;

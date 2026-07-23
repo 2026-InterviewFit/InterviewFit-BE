@@ -164,7 +164,9 @@ public class InterviewService {
             InterviewAnswerEntity answer
     ) {
         return eyeGazeReportRepository
-                .findTopByInterviewAnswerIdOrderByIdDesc(answer.getId())
+                .findTopByInterviewIdOrderByCreatedAtDesc(
+                        answer.getInterview().getId()
+                )
                 .map(this::toGazeReport)
                 .orElse(null);
     }
