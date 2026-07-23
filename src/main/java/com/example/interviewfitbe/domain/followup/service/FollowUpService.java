@@ -4,7 +4,9 @@ import com.example.interviewfitbe.domain.followup.dto.FollowUpCreateRequest;
 import com.example.interviewfitbe.domain.followup.dto.FollowUpCreateResponse;
 import com.example.interviewfitbe.domain.followup.entity.FollowUpQuestion;
 import com.example.interviewfitbe.domain.followup.repository.FollowUpQuestionRepository;
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
+import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.job.service.JobRoleService;
@@ -21,6 +23,7 @@ public class FollowUpService {
 
     private final FollowUpQuestionRepository followUpQuestionRepository;
     private final InterviewRepository interviewRepository;
+    private final InterviewAnswerRepository interviewAnswerRepository;
     private final QuestionRepository questionRepository;
     private final JobRoleService jobRoleService;
     private final FollowUpAnalysisService followUpAnalysisService;
@@ -30,26 +33,29 @@ public class FollowUpService {
         validateRequest(request);
 
         InterviewEntity interview = findInterviewOrNull(request.getInterviewId());
-        QuestionEntity question = findQuestionOrNull(request.getQuestionId());
+        QuestionEntity sourceQuestion = findQuestion(request.getQuestionId());
+        InterviewAnswerEntity sourceAnswer = findAnswerOrNull(request.getSourceAnswerId());
 
-        String jobName = resolveJobName(request, interview, question);
-        String originalQuestion = resolveOriginalQuestion(request, question);
+        String jobName = resolveJobName(request, interview, sourceQuestion);
+        String originalQuestion = resolveOriginalQuestion(request, sourceQuestion);
+        String answerText = resolveAnswerText(request, sourceAnswer);
         String interviewStyle = resolveInterviewStyle(request.getInterviewStyle());
 
         String followUpQuestion = followUpAnalysisService.createFollowUpQuestion(
                 jobName,
                 originalQuestion,
-                request.getAnswer(),
+                answerText,
                 interviewStyle
         );
 
         FollowUpQuestion saved = followUpQuestionRepository.save(
                 FollowUpQuestion.builder()
                         .interview(interview)
-                        .sourceQuestion(question)
+                        .sourceQuestion(sourceQuestion)
+                        .sourceAnswer(sourceAnswer)
                         .job(jobName)
                         .originalQuestion(originalQuestion)
-                        .answer(request.getAnswer())
+                        .answer(answerText)
                         .followUpQuestion(followUpQuestion)
                         .interviewStyle(interviewStyle)
                         .build()
@@ -63,17 +69,18 @@ public class FollowUpService {
     }
 
     private void validateRequest(FollowUpCreateRequest request) {
-        if (request.getAnswer() == null || request.getAnswer().isBlank()) {
-            throw new IllegalArgumentException("answer 값이 필요합니다.");
+        if (request.getQuestionId() == null) {
+            throw new IllegalArgumentException("questionId는 필수입니다.");
         }
 
-        boolean hasOriginalQuestion =
-                request.getOriginalQuestion() != null && !request.getOriginalQuestion().isBlank();
+        boolean hasAnswerText =
+                request.getAnswer() != null && !request.getAnswer().isBlank();
+        boolean hasAnswerId = request.getSourceAnswerId() != null;
 
-        boolean hasQuestionId = request.getQuestionId() != null;
-
-        if (!hasOriginalQuestion && !hasQuestionId) {
-            throw new IllegalArgumentException("originalQuestion 또는 questionId 값이 필요합니다.");
+        if (!hasAnswerText && !hasAnswerId) {
+            throw new IllegalArgumentException(
+                    "answer 텍스트 또는 sourceAnswerId 중 하나는 필수입니다."
+            );
         }
     }
 
@@ -88,14 +95,21 @@ public class FollowUpService {
                 ));
     }
 
-    private QuestionEntity findQuestionOrNull(Long questionId) {
-        if (questionId == null) {
-            return null;
-        }
-
+    private QuestionEntity findQuestion(Long questionId) {
         return questionRepository.findById(questionId)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "해당 질문 정보를 찾을 수 없습니다. questionId=" + questionId
+                ));
+    }
+
+    private InterviewAnswerEntity findAnswerOrNull(Long answerId) {
+        if (answerId == null) {
+            return null;
+        }
+
+        return interviewAnswerRepository.findById(answerId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "해당 답변 정보를 찾을 수 없습니다. sourceAnswerId=" + answerId
                 ));
     }
 
@@ -121,7 +135,9 @@ public class FollowUpService {
             return request.getJob();
         }
 
-        throw new IllegalArgumentException("interviewId, questionId, jobRoleId 또는 job 값이 필요합니다.");
+        throw new IllegalArgumentException(
+                "interviewId, questionId, jobRoleId 또는 job 값이 필요합니다."
+        );
     }
 
     private String resolveOriginalQuestion(
@@ -136,7 +152,24 @@ public class FollowUpService {
             return question.getQuestion();
         }
 
-        throw new IllegalArgumentException("originalQuestion 또는 questionId 값이 필요합니다.");
+        throw new IllegalArgumentException("원본 질문을 찾을 수 없습니다.");
+    }
+
+    private String resolveAnswerText(
+            FollowUpCreateRequest request,
+            InterviewAnswerEntity sourceAnswer
+    ) {
+        if (request.getAnswer() != null && !request.getAnswer().isBlank()) {
+            return request.getAnswer();
+        }
+
+        if (sourceAnswer != null
+                && sourceAnswer.getAnswerText() != null
+                && !sourceAnswer.getAnswerText().isBlank()) {
+            return sourceAnswer.getAnswerText();
+        }
+
+        throw new IllegalArgumentException("answer 텍스트가 필요합니다.");
     }
 
     private String resolveInterviewStyle(String interviewStyle) {

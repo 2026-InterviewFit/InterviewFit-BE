@@ -19,30 +19,39 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "questions")
 public class QuestionEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 어떤 면접에서 출제된 질문인지
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String question;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private QuestionType type;
-
+    // 직무 기반 질문이면 연결
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_role_id", nullable = false)
+    @JoinColumn(name = "job_role_id")
     private JobRoleEntity jobRole;
 
+    // 자기소개서 기반 질문이면 연결
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String question;
+
+    @Enumerated(EnumType.STRING)
+    private QuestionType type;
+
+    // 면접에서 몇 번째 질문인지
+    private Integer questionOrder;
+
+    // 전체 면접 영상 기준 질문이 화면에 표시된 시각
+    private Double shownAt;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -50,5 +59,13 @@ public class QuestionEntity {
 
     public void assignInterview(InterviewEntity interview) {
         this.interview = interview;
+    }
+
+    public void assignOrder(Integer questionOrder) {
+        this.questionOrder = questionOrder;
+    }
+
+    public void assignShownAt(Double shownAt) {
+        this.shownAt = shownAt;
     }
 }

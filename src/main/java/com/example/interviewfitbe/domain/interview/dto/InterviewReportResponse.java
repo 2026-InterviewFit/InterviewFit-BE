@@ -14,28 +14,20 @@ import java.util.List;
 public class InterviewReportResponse {
 
     private Long interviewId;
-
     private Long userId;
-
     private Long jobRoleId;
-
     private String jobCategory;
-
     private String jobName;
-
     private LocalDateTime createdAt;
-
-    /**
-     * 전체 분석 상태.
-     *
-     * EMPTY / UPLOADED / RUNNING / DONE / FAILED
-     */
     private String analysisStatus;
+    private boolean completed;
 
     /**
-     * 모든 답변 분석이 DONE이면 true.
+     * eye/pose는 interview 단위 리포트.
+     * gaze/speech는 아직 답변별. 팀원 리팩토링 이후 최상위로 이동 예정.
      */
-    private boolean completed;
+    private EyeReport eye;
+    private PoseReport pose;
 
     private List<AnswerReport> answers;
 
@@ -45,28 +37,17 @@ public class InterviewReportResponse {
     public static class AnswerReport {
 
         private Long answerId;
-
         private Long questionId;
-
         private String questionText;
-
-        private String videoObjectKey;
-
+        private String answerText;
         private Integer answerOrder;
-
+        private Double startTime;
+        private Double endTime;
         private AnalysisStatus analysisStatus;
-
         private String errorMessage;
 
-        private EyeReport eye;
-
-        /**
-         * 시선 추적 분석 결과.
-         */
+        // 팀원 리팩토링 대기중
         private GazeReport gaze;
-
-        private PoseReport pose;
-
         private SpeechReport speech;
     }
 
@@ -74,17 +55,14 @@ public class InterviewReportResponse {
     @Builder
     @AllArgsConstructor
     public static class EyeReport {
-
         private Long reportId;
-
-        private Integer blinkCount;
-
-        private Double blinkRate;
-
         private Double durationSeconds;
-
+        private Integer blinkCount;
+        private Double blinkRate;
+        private Integer notDetectedCount;
+        private Double notDetectedRatio;
         private Double score;
-
+        private String grade;
         private String feedback;
     }
 
@@ -92,37 +70,12 @@ public class InterviewReportResponse {
     @Builder
     @AllArgsConstructor
     public static class GazeReport {
-
         private Long reportId;
-
-        /**
-         * 정면 응시 비율.
-         */
         private Double centerRatio;
-
-        /**
-         * 시선 이탈 비율.
-         */
         private Double gazeAwayRatio;
-
-        /**
-         * 시선 이탈 횟수.
-         */
         private Integer gazeAwayCount;
-
-        /**
-         * 시선 분석 점수.
-         */
         private Double score;
-
-        /**
-         * 시선 분석 평가 문구.
-         */
         private String evaluation;
-
-        /**
-         * 프레임별 상세 분석 JSON.
-         */
         private String resultJson;
     }
 
@@ -130,27 +83,16 @@ public class InterviewReportResponse {
     @Builder
     @AllArgsConstructor
     public static class PoseReport {
-
         private Long reportId;
-
         private Double totalDuration;
-
         private Integer badCount;
-
         private Double badDuration;
-
         private Integer shoulderBadCount;
-
         private Integer faceBadCount;
-
         private Double shoulderBadDuration;
-
         private Double faceBadDuration;
-
         private Double badRatio;
-
         private Integer score;
-
         private String grade;
     }
 
@@ -158,35 +100,20 @@ public class InterviewReportResponse {
     @Builder
     @AllArgsConstructor
     public static class SpeechReport {
-
         private Long reportId;
-
         private String textScript;
-
         private Integer totalFillerCount;
-
         private String fillerDetailsJson;
-
         private String repeatedExpressionsJson;
-
         private String paceEvaluation;
-
         private String paceFeedback;
-
         private Double charactersPerSecond;
-
         private Double totalSilenceSeconds;
-
         private Double pauseRatePercent;
-
         private Integer criticalSilenceCount;
-
         private Double volumeDbMean;
-
         private Double volumeDbStd;
-
         private String aiEvaluationJson;
-
         private String modelAnswer;
     }
 }
