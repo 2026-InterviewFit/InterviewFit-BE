@@ -7,5 +7,8 @@ import java.util.List;
 
 public interface EyeBlinkingBadLogRepository extends JpaRepository<EyeBlinkingBadLogEntity, Long> {
 
-    List<EyeBlinkingBadLogEntity> findByEyeBlinkingReport_IdOrderByTimestampAsc(Long eyeBlinkingReportId);
+
+    List<EyeBlinkingBadLogEntity> findByEyeBlinkingReportEntity_IdOrderByTimestampAsc(
+            Long eyeBlinkingReportId
+    );
 }
