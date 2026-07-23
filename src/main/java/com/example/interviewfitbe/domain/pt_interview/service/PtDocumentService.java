@@ -222,7 +222,9 @@ public class PtDocumentService {
              *
              * 추후 Gemini 전체 요약 연결 예정
              */
-            document.completeAnalysis(null);
+            document.completeAnalysis(
+                    response.summary()
+            );
 
             log.info(
                     "PT 발표자료 분석 완료: documentId={}, objectKey={}, totalSlides={}",

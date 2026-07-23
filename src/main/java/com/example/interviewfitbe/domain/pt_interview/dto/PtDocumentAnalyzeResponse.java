@@ -15,6 +15,9 @@ public record PtDocumentAnalyzeResponse(
         @JsonProperty("total_slides")
         Integer totalSlides,
 
+        String summary,
+
         List<PtSlideAnalyzeResult> slides
+
 ) {
 }
