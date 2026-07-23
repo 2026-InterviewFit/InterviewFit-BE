@@ -19,56 +19,23 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "questions")
 public class QuestionEntity {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /*
-     * Interview 삭제 시 해당 면접 질문도 같이 삭제.
-     */
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    /*
-     * 직무 기반 질문이면 연결.
-     * JobRole 삭제 시 질문까지 같이 삭제되면 위험하므로 cascade 걸지 않음.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_role_id")
     private JobRoleEntity jobRole;
 
-    /*
-     * 자기소개서 기반 질문이면 연결.
-     * CoverLetter 삭제 시 질문도 삭제하고 싶으면 CASCADE,
-     * 질문을 남기고 싶으면 SET_NULL.
-     *
-     * 여기서는 기존 의도대로 SET_NULL 유지.
-     */
+
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String question;
-
-    @Enumerated(EnumType.STRING)
-    private QuestionType type;
-
-    /*
-     * 면접에서 몇 번째 질문인지.
-     * 예: 1, 2, 3
-     */
-    private Integer questionOrder;
-
-    /*
-     * 전체 면접 영상 기준 질문이 화면에 표시된 시각.
-     * 단위: 초
-     */
-    private Double shownAt;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -76,13 +43,5 @@ public class QuestionEntity {
 
     public void assignInterview(InterviewEntity interview) {
         this.interview = interview;
-    }
-
-    public void assignOrder(Integer questionOrder) {
-        this.questionOrder = questionOrder;
-    }
-
-    public void assignShownAt(Double shownAt) {
-        this.shownAt = shownAt;
     }
 }
