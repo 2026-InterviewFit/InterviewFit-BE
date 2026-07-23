@@ -1,6 +1,5 @@
 package com.example.interviewfitbe.domain.speech_coaching.entity;
 
-import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,32 +20,35 @@ public class SpeechReportEntity {
     private Long id;
 
     /**
-     * 기존에는 OneToOne이었지만,
-     * 질문별 답변마다 speech 결과가 생길 수 있으므로 ManyToOne으로 변경한다.
+     * 면접 하나당 하나의 스피치 리포트
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_id", nullable = false, unique = true)
     private InterviewEntity interview;
 
     /**
-     * 질문별 답변 영상과 연결.
+     * 전체 STT 결과
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_answer_id")
-    private InterviewAnswerEntity interviewAnswer;
-
     @Column(columnDefinition = "TEXT")
     private String textScript;
 
+    /**
+     * 필러 분석
+     */
     private Integer totalFillerCount;
 
     @Column(columnDefinition = "TEXT")
     private String fillerDetailsJson;
 
-    // 반복 표현 (JSON 저장)
+    /**
+     * 반복 표현 분석
+     */
     @Column(columnDefinition = "TEXT")
     private String repeatedExpressionsJson;
 
+    /**
+     * 말하기 속도 분석
+     */
     private String paceEvaluation;
 
     @Column(columnDefinition = "TEXT")
@@ -54,25 +56,16 @@ public class SpeechReportEntity {
 
     private Double charactersPerSecond;
 
-    // 음량(데시벨) 평균
-    private Double volumeDbMean;
-
-    // 음량 표준편차 (음량 안정성)
-    private Double volumeDbStd;
-
+    /**
+     * 침묵 분석
+     */
     private Double totalSilenceSeconds;
 
-    // 침묵 비율(%)
     private Double pauseRatePercent;
 
     private Integer criticalSilenceCount;
 
-    @Column(columnDefinition = "TEXT")
-    private String aiEvaluationJson;
-
-    @Column(columnDefinition = "TEXT")
-    private String modelAnswer;
-
     @CreationTimestamp
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 }

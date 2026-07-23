@@ -7,7 +7,6 @@ import com.example.interviewfitbe.domain.coverletter.service.question.CoverLette
 import com.example.interviewfitbe.domain.coverletter.service.question.CoverLetterQuestionService;
 import com.example.interviewfitbe.domain.coverletter.service.CoverLetterService;
 import com.example.interviewfitbe.domain.coverletter.service.embedding.CoverLetterQuestionEmbeddingService;
-import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.job.service.JobRoleService;
 import com.example.interviewfitbe.domain.question.dto.*;
@@ -40,21 +39,6 @@ public class QuestionService {
     private final QuestionMapper questionMapper;
 
     private final UserService userService;
-
-    @Transactional
-    public void assignInterview(Long questionId, InterviewEntity interview) {
-        QuestionEntity question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new BaseException(QuestionErrorCode.QUESTION_NOT_FOUND));
-
-        question.assignInterview(interview);
-    }
-
-    @Transactional
-    public void assignInterviewToQuestions(List<Long> questionIds, InterviewEntity interview) {
-        List<QuestionEntity> questions = questionRepository.findAllById(questionIds);
-
-        questions.forEach(question -> question.assignInterview(interview));
-    }
 
     public List<QuestionDto> getAllQuestions() {
         return questionRepository.findAllByOrderByCreatedAtDesc().stream()

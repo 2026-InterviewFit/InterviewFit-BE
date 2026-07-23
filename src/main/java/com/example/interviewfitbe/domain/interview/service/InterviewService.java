@@ -170,7 +170,9 @@ public class InterviewService {
 
     private InterviewReportResponse.GazeReport toGazeReport(InterviewAnswerEntity answer) {
         return eyeGazeReportRepository
-                .findTopByInterviewAnswerIdOrderByIdDesc(answer.getId())
+                .findTopByInterviewIdOrderByCreatedAtDesc(
+                        answer.getInterview().getId()
+                )
                 .map(this::toGazeReport)
                 .orElse(null);
     }
