@@ -21,24 +21,36 @@ public class FollowUpAnswerEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 어떤 면접에서 나온 꼬리질문 답변인지
+    /*
+     * 어떤 면접에서 나온 꼬리질문 답변인지.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    // 어떤 꼬리질문에 대한 답변인지
+    /*
+     * 어떤 꼬리질문에 대한 답변인지.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "follow_up_question_id", nullable = false)
-    private FollowUpQuestion followUpQuestion;
+    private FollowUpQuestionEntity followUpQuestion;
 
-    // 꼬리질문 답변 텍스트
+    /*
+     * 꼬리질문 답변 텍스트.
+     */
     @Column(columnDefinition = "TEXT")
     private String answerText;
 
-    // 전체 면접 영상 기준 꼬리질문 답변 시작 시각
+    /*
+     * 전체 면접 영상 기준 꼬리질문 답변 시작 시각.
+     * 단위: 초
+     */
     private Double startTime;
 
-    // 전체 면접 영상 기준 꼬리질문 답변 종료 시각
+    /*
+     * 전체 면접 영상 기준 꼬리질문 답변 종료 시각.
+     * 단위: 초
+     */
     private Double endTime;
 
     @Builder.Default

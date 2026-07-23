@@ -15,23 +15,29 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class FollowUpQuestion {
+public class FollowUpQuestionEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 어떤 면접에서 생성된 꼬리질문인지
+    /*
+     * 어떤 면접에서 생성된 꼬리질문인지.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    // 어떤 원 질문에서 파생된 꼬리질문인지
+    /*
+     * 어떤 원 질문에서 파생된 꼬리질문인지.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_question_id", nullable = false)
     private QuestionEntity sourceQuestion;
 
-    // 어떤 원 답변을 보고 생성된 꼬리질문인지
+    /*
+     * 어떤 원 답변을 보고 생성된 꼬리질문인지.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_answer_id")
     private InterviewAnswerEntity sourceAnswer;

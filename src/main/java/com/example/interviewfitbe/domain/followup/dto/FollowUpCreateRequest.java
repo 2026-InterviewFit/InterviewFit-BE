@@ -11,27 +11,34 @@ import lombok.Setter;
 @NoArgsConstructor
 public class FollowUpCreateRequest {
 
+    private Long interviewId;
+
+    /*
+     * source_question_id.
+     * FE에서 questionId로 보내도 받게 alias 처리.
+     */
+    @JsonProperty("source_question_id")
+    @JsonAlias({"sourceQuestionId", "questionId"})
+    private Long sourceQuestionId;
+
+    /*
+     * source_answer_id.
+     */
+    @JsonProperty("source_answer_id")
+    @JsonAlias({"sourceAnswerId", "answerId"})
+    private Long sourceAnswerId;
+
     private Long jobRoleId;
 
     private String job;
-
-    /**
-     * 원본 질문 ID.
-     */
-    private Long questionId;
-
-    /**
-     * 원본 답변 ID (있으면 answer 텍스트 자동 조회).
-     */
-    private Long sourceAnswerId;
 
     @JsonProperty("original_question")
     @JsonAlias({"originalQuestion", "question"})
     private String originalQuestion;
 
-    /**
-     * 답변 텍스트.
-     * sourceAnswerId가 있으면 생략 가능 (DB에서 answerText 조회).
+    /*
+     * 원 답변 텍스트.
+     * sourceAnswerId가 있으면 DB의 answerText로 대체 가능.
      */
     private String answer;
 
@@ -39,7 +46,11 @@ public class FollowUpCreateRequest {
     @JsonAlias("interviewStyle")
     private String interviewStyle = "normal";
 
-    private Long userId;
+    @JsonProperty("retrieved_context_json")
+    @JsonAlias("retrievedContextJson")
+    private String retrievedContextJson;
 
-    private Long interviewId;
+    @JsonProperty("result_json")
+    @JsonAlias("resultJson")
+    private String resultJson;
 }

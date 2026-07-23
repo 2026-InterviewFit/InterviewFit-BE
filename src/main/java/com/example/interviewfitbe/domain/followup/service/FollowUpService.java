@@ -2,7 +2,7 @@ package com.example.interviewfitbe.domain.followup.service;
 
 import com.example.interviewfitbe.domain.followup.dto.FollowUpCreateRequest;
 import com.example.interviewfitbe.domain.followup.dto.FollowUpCreateResponse;
-import com.example.interviewfitbe.domain.followup.entity.FollowUpQuestion;
+import com.example.interviewfitbe.domain.followup.entity.FollowUpQuestionEntity;
 import com.example.interviewfitbe.domain.followup.repository.FollowUpQuestionRepository;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
@@ -33,54 +33,71 @@ public class FollowUpService {
         validateRequest(request);
 
         InterviewEntity interview = findInterviewOrNull(request.getInterviewId());
-        QuestionEntity sourceQuestion = findQuestion(request.getQuestionId());
+        QuestionEntity sourceQuestion = findQuestion(request.getSourceQuestionId());
         InterviewAnswerEntity sourceAnswer = findAnswerOrNull(request.getSourceAnswerId());
+
+        if (interview == null && sourceQuestion.getInterview() != null) {
+            interview = sourceQuestion.getInterview();
+        }
+
+        if (interview == null && sourceAnswer != null) {
+            interview = sourceAnswer.getInterviewSafely();
+        }
 
         String jobName = resolveJobName(request, interview, sourceQuestion);
         String originalQuestion = resolveOriginalQuestion(request, sourceQuestion);
         String answerText = resolveAnswerText(request, sourceAnswer);
         String interviewStyle = resolveInterviewStyle(request.getInterviewStyle());
 
-        String followUpQuestion = followUpAnalysisService.createFollowUpQuestion(
+        String generatedFollowUpQuestion = followUpAnalysisService.createFollowUpQuestion(
                 jobName,
                 originalQuestion,
                 answerText,
                 interviewStyle
         );
 
-        FollowUpQuestion saved = followUpQuestionRepository.save(
-                FollowUpQuestion.builder()
+        FollowUpQuestionEntity saved = followUpQuestionRepository.save(
+                FollowUpQuestionEntity.builder()
                         .interview(interview)
                         .sourceQuestion(sourceQuestion)
                         .sourceAnswer(sourceAnswer)
                         .job(jobName)
                         .originalQuestion(originalQuestion)
                         .answer(answerText)
-                        .followUpQuestion(followUpQuestion)
+                        .followUpQuestion(generatedFollowUpQuestion)
                         .interviewStyle(interviewStyle)
+                        .retrievedContextJson(request.getRetrievedContextJson())
+                        .resultJson(request.getResultJson())
                         .build()
         );
 
-        return new FollowUpCreateResponse(
-                "꼬리질문 생성 및 저장 완료",
-                saved.getId(),
-                followUpQuestion
-        );
+        return FollowUpCreateResponse.builder()
+                .message("꼬리질문 생성 및 저장 완료")
+                .followUpQuestionId(saved.getId())
+                .interviewId(interview == null ? null : interview.getId())
+                .sourceQuestionId(sourceQuestion.getId())
+                .sourceAnswerId(sourceAnswer == null ? null : sourceAnswer.getId())
+                .job(saved.getJob())
+                .originalQuestion(saved.getOriginalQuestion())
+                .answer(saved.getAnswer())
+                .followUpQuestion(saved.getFollowUpQuestion())
+                .interviewStyle(saved.getInterviewStyle())
+                .build();
     }
 
     private void validateRequest(FollowUpCreateRequest request) {
-        if (request.getQuestionId() == null) {
-            throw new IllegalArgumentException("questionId는 필수입니다.");
+        if (request.getSourceQuestionId() == null) {
+            throw new IllegalArgumentException("sourceQuestionId 또는 source_question_id 값은 필수입니다.");
         }
 
         boolean hasAnswerText =
                 request.getAnswer() != null && !request.getAnswer().isBlank();
-        boolean hasAnswerId = request.getSourceAnswerId() != null;
+
+        boolean hasAnswerId =
+                request.getSourceAnswerId() != null;
 
         if (!hasAnswerText && !hasAnswerId) {
-            throw new IllegalArgumentException(
-                    "answer 텍스트 또는 sourceAnswerId 중 하나는 필수입니다."
-            );
+            throw new IllegalArgumentException("answer 텍스트 또는 sourceAnswerId 값 중 하나는 필수입니다.");
         }
     }
 
@@ -95,35 +112,35 @@ public class FollowUpService {
                 ));
     }
 
-    private QuestionEntity findQuestion(Long questionId) {
-        return questionRepository.findById(questionId)
+    private QuestionEntity findQuestion(Long sourceQuestionId) {
+        return questionRepository.findById(sourceQuestionId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "해당 질문 정보를 찾을 수 없습니다. questionId=" + questionId
+                        "해당 원 질문 정보를 찾을 수 없습니다. sourceQuestionId=" + sourceQuestionId
                 ));
     }
 
-    private InterviewAnswerEntity findAnswerOrNull(Long answerId) {
-        if (answerId == null) {
+    private InterviewAnswerEntity findAnswerOrNull(Long sourceAnswerId) {
+        if (sourceAnswerId == null) {
             return null;
         }
 
-        return interviewAnswerRepository.findById(answerId)
+        return interviewAnswerRepository.findById(sourceAnswerId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "해당 답변 정보를 찾을 수 없습니다. sourceAnswerId=" + answerId
+                        "해당 원 답변 정보를 찾을 수 없습니다. sourceAnswerId=" + sourceAnswerId
                 ));
     }
 
     private String resolveJobName(
             FollowUpCreateRequest request,
             InterviewEntity interview,
-            QuestionEntity question
+            QuestionEntity sourceQuestion
     ) {
         if (interview != null && interview.getJobRole() != null) {
             return interview.getJobRole().getName();
         }
 
-        if (question != null && question.getJobRole() != null) {
-            return question.getJobRole().getName();
+        if (sourceQuestion != null && sourceQuestion.getJobRole() != null) {
+            return sourceQuestion.getJobRole().getName();
         }
 
         if (request.getJobRoleId() != null) {
@@ -135,24 +152,24 @@ public class FollowUpService {
             return request.getJob();
         }
 
-        throw new IllegalArgumentException(
-                "interviewId, questionId, jobRoleId 또는 job 값이 필요합니다."
-        );
+        return "일반";
     }
 
     private String resolveOriginalQuestion(
             FollowUpCreateRequest request,
-            QuestionEntity question
+            QuestionEntity sourceQuestion
     ) {
         if (request.getOriginalQuestion() != null && !request.getOriginalQuestion().isBlank()) {
             return request.getOriginalQuestion();
         }
 
-        if (question != null && question.getQuestion() != null && !question.getQuestion().isBlank()) {
-            return question.getQuestion();
+        if (sourceQuestion != null
+                && sourceQuestion.getQuestion() != null
+                && !sourceQuestion.getQuestion().isBlank()) {
+            return sourceQuestion.getQuestion();
         }
 
-        throw new IllegalArgumentException("원본 질문을 찾을 수 없습니다.");
+        throw new IllegalArgumentException("originalQuestion 또는 sourceQuestionId로 원 질문을 찾을 수 없습니다.");
     }
 
     private String resolveAnswerText(
@@ -169,7 +186,7 @@ public class FollowUpService {
             return sourceAnswer.getAnswerText();
         }
 
-        throw new IllegalArgumentException("answer 텍스트가 필요합니다.");
+        throw new IllegalArgumentException("answer 텍스트를 찾을 수 없습니다.");
     }
 
     private String resolveInterviewStyle(String interviewStyle) {

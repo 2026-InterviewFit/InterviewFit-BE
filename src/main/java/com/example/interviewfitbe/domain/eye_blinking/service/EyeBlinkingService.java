@@ -5,7 +5,6 @@ import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeResp
 import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingBadLog;
 import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
 import com.example.interviewfitbe.domain.eye_blinking.enums.EyeBlinkingEventType;
-import com.example.interviewfitbe.domain.eye_blinking.enums.EyeBlinkingEventType;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingBadLogRepository;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
@@ -34,18 +33,11 @@ public class EyeBlinkingService {
     private final EyeBlinkingBadLogRepository eyeBlinkingBadLogRepository;
     private final InterviewRepository interviewRepository;
     private final ObjectMapper objectMapper;
-
-    /*
-     * FastAPI 눈 깜빡임 분석 호출 전담 서비스
-     */
     private final EyeBlinkingAnalysisService eyeBlinkingAnalysisService;
 
     @Value("${app.upload-dir}")
     private String uploadDir;
 
-    /*
-     * 면접 단위 눈 깜빡임 분석 저장 메서드
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
             String videoObjectKey,
@@ -70,6 +62,8 @@ public class EyeBlinkingService {
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
+        report.assignGrade();
+
         EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
@@ -80,9 +74,6 @@ public class EyeBlinkingService {
         );
     }
 
-    /*
-     * eye-blink 단독 분석 API용 메서드
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(EyeBlinkingAnalyzeRequest request) {
         validateVideoUrl(request.getVideoUrl());
@@ -106,6 +97,8 @@ public class EyeBlinkingService {
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
+        report.assignGrade();
+
         EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
@@ -116,9 +109,6 @@ public class EyeBlinkingService {
         );
     }
 
-    /*
-     * 질문별 답변 구간 눈 깜빡임 분석 저장 메서드
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
             String videoObjectKey,
@@ -146,6 +136,8 @@ public class EyeBlinkingService {
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
+        report.assignGrade();
+
         EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
@@ -156,9 +148,6 @@ public class EyeBlinkingService {
         );
     }
 
-    /*
-     * eye-blink 단독 테스트용 multipart 업로드 API에서 사용
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeUploadedVideoAndSave(
             MultipartFile file,
@@ -291,7 +280,6 @@ public class EyeBlinkingService {
         return value.toString();
     }
 
-    @SuppressWarnings("unchecked")
     private void saveBadLogs(Map<String, Object> analysisResult, EyeBlinkingReport report) {
         Object value = getFirstValue(
                 analysisResult,
