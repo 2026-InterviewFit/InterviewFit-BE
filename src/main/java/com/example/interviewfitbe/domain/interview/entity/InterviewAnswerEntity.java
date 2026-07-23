@@ -24,9 +24,6 @@ public class InterviewAnswerEntity {
     /*
      * Question이 Interview와 Answer 사이를 관리하므로
      * interview_id는 nullable 허용.
-     *
-     * answer -> question -> interview 로 면접을 찾을 수 있음.
-     * 다만 기존 코드 호환과 조회 편의를 위해 컬럼 자체는 남겨둠.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
@@ -34,7 +31,6 @@ public class InterviewAnswerEntity {
 
     /*
      * 어떤 질문에 대한 답변인지 연결.
-     * 답변은 반드시 질문에 종속되므로 nullable=false.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
@@ -42,7 +38,6 @@ public class InterviewAnswerEntity {
 
     /*
      * 몇 번째 답변인지.
-     * 예: Q1 = 1, Q2 = 2, Q3 = 3
      */
     @Column(nullable = false)
     private Integer answerOrder;
@@ -60,21 +55,15 @@ public class InterviewAnswerEntity {
     private Double endTime;
 
     /*
-     * STT 결과 또는 사용자의 답변 텍스트.
+     * STT 결과 또는 답변 텍스트.
      */
     @Column(columnDefinition = "TEXT")
     private String answerText;
 
-    /*
-     * 분석 상태.
-     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AnalysisStatus analysisStatus;
 
-    /*
-     * 분석 실패 시 에러 메시지.
-     */
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
@@ -126,6 +115,31 @@ public class InterviewAnswerEntity {
             return this.question.getInterview();
         }
 
+        return null;
+    }
+
+    /*
+     * 기존 서비스 코드 호환용.
+     * 기존 answer.questionId 대신 question.id를 반환.
+     */
+    public Long getQuestionId() {
+        return this.question == null ? null : this.question.getId();
+    }
+
+    /*
+     * 기존 서비스 코드 호환용.
+     * 기존 answer.questionText 대신 question.question을 반환.
+     */
+    public String getQuestionText() {
+        return this.question == null ? null : this.question.getQuestion();
+    }
+
+    /*
+     * 기존 서비스 코드 호환용.
+     * 이제 영상은 answer가 아니라 videos/interview에서 관리하므로 null 반환.
+     * 이후 서비스 흐름에서 제거 예정.
+     */
+    public String getVideoObjectKey() {
         return null;
     }
 }

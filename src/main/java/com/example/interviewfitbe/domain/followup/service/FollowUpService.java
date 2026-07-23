@@ -25,18 +25,6 @@ public class FollowUpService {
     private final JobRoleService jobRoleService;
     private final FollowUpAnalysisService followUpAnalysisService;
 
-    /**
-     * 꼬리질문 생성 및 저장.
-     *
-     * followup은 eye-blink/pose/speech처럼 videoObjectKey 기반이 아니다.
-     * 원본 질문 + 사용자 답변 텍스트 기반으로 생성한다.
-     *
-     * 호출 시점:
-     * 1. 사용자가 질문에 답변
-     * 2. 팀원 STT 기능으로 answer 텍스트 추출
-     * 3. FE 또는 BE가 /api/followup/create 호출
-     * 4. 생성된 꼬리질문을 DB 저장 후 FE에 반환
-     */
     @Transactional
     public FollowUpCreateResponse createAndSave(FollowUpCreateRequest request) {
         validateRequest(request);
@@ -58,7 +46,7 @@ public class FollowUpService {
         FollowUpQuestion saved = followUpQuestionRepository.save(
                 FollowUpQuestion.builder()
                         .interview(interview)
-                        .question(question)
+                        .sourceQuestion(question)
                         .job(jobName)
                         .originalQuestion(originalQuestion)
                         .answer(request.getAnswer())
@@ -89,10 +77,6 @@ public class FollowUpService {
         }
     }
 
-    /**
-     * interviewId가 있으면 InterviewEntity를 조회한다.
-     * 없으면 단독 테스트용으로 null 허용.
-     */
     private InterviewEntity findInterviewOrNull(Long interviewId) {
         if (interviewId == null) {
             return null;
@@ -104,10 +88,6 @@ public class FollowUpService {
                 ));
     }
 
-    /**
-     * questionId가 있으면 QuestionEntity를 조회한다.
-     * 없으면 originalQuestion 문자열만으로도 followup 생성 가능하므로 null 허용.
-     */
     private QuestionEntity findQuestionOrNull(Long questionId) {
         if (questionId == null) {
             return null;
@@ -119,14 +99,6 @@ public class FollowUpService {
                 ));
     }
 
-    /**
-     * 직무명 결정 우선순위:
-     *
-     * 1. interview.jobRole.name
-     * 2. question.jobRole.name
-     * 3. jobRoleId로 job_role 조회
-     * 4. request.job 문자열
-     */
     private String resolveJobName(
             FollowUpCreateRequest request,
             InterviewEntity interview,
@@ -152,12 +124,6 @@ public class FollowUpService {
         throw new IllegalArgumentException("interviewId, questionId, jobRoleId 또는 job 값이 필요합니다.");
     }
 
-    /**
-     * 원본 질문 결정 우선순위:
-     *
-     * 1. request.originalQuestion
-     * 2. question.question
-     */
     private String resolveOriginalQuestion(
             FollowUpCreateRequest request,
             QuestionEntity question

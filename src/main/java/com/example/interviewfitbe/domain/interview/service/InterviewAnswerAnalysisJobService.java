@@ -1,16 +1,12 @@
 package com.example.interviewfitbe.domain.interview.service;
 
-import com.example.interviewfitbe.domain.eye_blinking.service.EyeBlinkingService;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
-import com.example.interviewfitbe.domain.pose.service.PoseService;
-import com.example.interviewfitbe.domain.speech_coaching.service.SpeechReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import com.example.interviewfitbe.domain.eye_gaze.service.EyeGazeService;
 
 @Slf4j
 @Service
@@ -18,86 +14,30 @@ import com.example.interviewfitbe.domain.eye_gaze.service.EyeGazeService;
 public class InterviewAnswerAnalysisJobService {
 
     private final InterviewAnswerRepository interviewAnswerRepository;
-    private final EyeBlinkingService eyeBlinkingService;
-    private final EyeGazeService eyeGazeService;
-    private final PoseService poseService;
-    private final SpeechReportService speechReportService;
     private final TransactionTemplate transactionTemplate;
 
-    /**
-     * 질문별 답변 영상 분석 Job.
+    /*
+     * 기존 구조:
+     * answer.videoObjectKey 기준으로 답변별 영상 분석
      *
-     * 흐름:
-     * 1. interview_answer 상태를 RUNNING으로 변경
-     * 2. eye 분석 실행 및 저장
-     * 3. pose 분석 실행 및 저장
-     * 4. speech 분석 실행 및 저장
-     * 5. 성공 시 DONE
-     * 6. 실패 시 FAILED
+     * 수정 구조:
+     * 전체 면접 영상은 videos 테이블에 1개 저장
+     * answer는 startTime/endTime만 저장
+     *
+     * 따라서 video 조회 흐름이 완성되기 전까지는
+     * 여기서 바로 eye/pose/speech 분석을 호출하면 안 됨.
      */
     @Async("analysisExecutor")
     public void analyzeAnswerAsync(Long answerId) {
-        log.info("질문별 답변 분석 시작: answerId={}", answerId);
+        log.info("답변 분석 Job 호출됨. 현재 전체 영상 기반 구조로 전환 중이므로 자동 분석은 보류: answerId={}", answerId);
 
-        InterviewAnswerEntity answer = markRunning(answerId);
-
-        try {
-            String videoObjectKey = answer.getVideoObjectKey();
-
-            eyeBlinkingService.analyzeAndSave(videoObjectKey, answer);
-
-            eyeGazeService.analyzeAndSave(videoObjectKey, answer);
-
-            poseService.processPostureAnalysis(videoObjectKey, answer);
-
-            speechReportService.analyzeAndSave(answer);
-
-            markDone(answerId);
-
-            log.info("질문별 답변 분석 완료: answerId={}", answerId);
-
-        } catch (Exception e) {
-            log.error("질문별 답변 분석 실패: answerId={}, error={}", answerId, e.getMessage(), e);
-            markFailed(answerId, e.getMessage());
-        }
-    }
-
-    private InterviewAnswerEntity markRunning(Long answerId) {
-        return transactionTemplate.execute(status -> {
-            InterviewAnswerEntity answer = interviewAnswerRepository.findWithInterviewById(answerId)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "해당 답변 영상을 찾을 수 없습니다. answerId=" + answerId
-                    ));
-
-            answer.markRunning();
-
-            return interviewAnswerRepository.save(answer);
-        });
-    }
-
-    private void markDone(Long answerId) {
         transactionTemplate.executeWithoutResult(status -> {
             InterviewAnswerEntity answer = interviewAnswerRepository.findById(answerId)
                     .orElseThrow(() -> new IllegalArgumentException(
-                            "해당 답변 영상을 찾을 수 없습니다. answerId=" + answerId
+                            "해당 답변을 찾을 수 없습니다. answerId=" + answerId
                     ));
 
-            answer.markDone();
-
-            interviewAnswerRepository.save(answer);
-        });
-    }
-
-    private void markFailed(Long answerId, String errorMessage) {
-        transactionTemplate.executeWithoutResult(status -> {
-            InterviewAnswerEntity answer = interviewAnswerRepository.findById(answerId)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "해당 답변 영상을 찾을 수 없습니다. answerId=" + answerId
-                    ));
-
-            answer.markFailed(errorMessage);
-
-            interviewAnswerRepository.save(answer);
+            answer.markUploaded();
         });
     }
 }
