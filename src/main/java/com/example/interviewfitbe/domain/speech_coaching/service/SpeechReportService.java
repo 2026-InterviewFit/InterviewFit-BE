@@ -66,6 +66,38 @@ public class SpeechReportService {
      *
      * InterviewAnswerAnalysisJobService에서 호출한다.
      */
+//    @Transactional
+//    public Long analyzeAndSave(InterviewAnswerEntity interviewAnswer) {
+//        if (interviewAnswer == null || interviewAnswer.getId() == null) {
+//            throw new IllegalArgumentException("interviewAnswer 정보가 필요합니다.");
+//        }
+//
+//        InterviewAnswerEntity loadedAnswer = interviewAnswerRepository.findWithInterviewById(interviewAnswer.getId())
+//                .orElseThrow(() -> new EntityNotFoundException(
+//                        "해당 답변 영상을 찾을 수 없습니다. id=" + interviewAnswer.getId()
+//                ));
+//
+//        InterviewEntity interview = loadedAnswer.getInterview();
+//
+//        String jobCategory = "일반";
+//
+//        if (interview.getJobRole() != null && interview.getJobRole().getName() != null) {
+//            jobCategory = interview.getJobRole().getName();
+//        }
+//
+//        SpeechAnalyzeRequest request = SpeechAnalyzeRequest.builder()
+//                .sourceType("minio")
+//                .sourceValue(loadedAnswer.getVideoObjectKey())
+//                .jobCategory(jobCategory)
+//                .interviewId(interview.getId())
+//                .interviewAnswerId(loadedAnswer.getId())
+//                .questionId(loadedAnswer.getQuestionId())
+//                .originalQuestion(loadedAnswer.getQuestionText())
+//                .build();
+//
+//        return analyzeAndSave(request);
+//    }
+
     @Transactional
     public Long analyzeAndSave(InterviewAnswerEntity interviewAnswer) {
         if (interviewAnswer == null || interviewAnswer.getId() == null) {
@@ -74,10 +106,14 @@ public class SpeechReportService {
 
         InterviewAnswerEntity loadedAnswer = interviewAnswerRepository.findWithInterviewById(interviewAnswer.getId())
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "해당 답변 영상을 찾을 수 없습니다. id=" + interviewAnswer.getId()
+                        "해당 답변 정보를 찾을 수 없습니다. id=" + interviewAnswer.getId()
                 ));
 
-        InterviewEntity interview = loadedAnswer.getInterview();
+        InterviewEntity interview = loadedAnswer.getInterviewSafely();
+
+        if (interview == null) {
+            throw new IllegalStateException("답변에 연결된 면접 정보를 찾을 수 없습니다. answerId=" + loadedAnswer.getId());
+        }
 
         String jobCategory = "일반";
 
@@ -85,17 +121,15 @@ public class SpeechReportService {
             jobCategory = interview.getJobRole().getName();
         }
 
-        SpeechAnalyzeRequest request = SpeechAnalyzeRequest.builder()
-                .sourceType("minio")
-                .sourceValue(loadedAnswer.getVideoObjectKey())
-                .jobCategory(jobCategory)
-                .interviewId(interview.getId())
-                .interviewAnswerId(loadedAnswer.getId())
-                .questionId(loadedAnswer.getQuestionId())
-                .originalQuestion(loadedAnswer.getQuestionText())
-                .build();
-
-        return analyzeAndSave(request);
+        /*
+         * 현재 전체 영상 기반 구조로 바뀌었으므로
+         * answer.videoObjectKey는 사용하지 않는다.
+         *
+         * 실제 분석 연결은 videos 테이블에서 interview_id로 objectKey를 조회하는 흐름이 붙은 뒤 처리.
+         */
+        throw new UnsupportedOperationException(
+                "현재 speech 질문별 분석은 전체 영상 기반 구조로 전환 중입니다. videos 테이블 연동 후 다시 연결해야 합니다."
+        );
     }
 
     /**
