@@ -21,12 +21,6 @@ public class InterviewController {
     private final InterviewService interviewService;
     private final InterviewAnswerService interviewAnswerService;
 
-    /**
-     * 면접 시작 API.
-     *
-     * FE에서 직무 선택 후 면접 시작 버튼을 누르면 먼저 이 API를 호출한다.
-     * 응답으로 받은 interviewId를 이후 질문별 영상 업로드 API에 사용한다.
-     */
     @PostMapping("/start")
     public ResponseEntity<InterviewStartResponse> startInterview(
             @RequestBody InterviewStartRequest request
@@ -37,35 +31,28 @@ public class InterviewController {
 
     /**
      * 질문별 답변 영상 업로드 API.
-     *
-     * FE에서 질문 하나의 답변이 끝날 때마다 호출한다.
      */
     @PostMapping("/{interviewId}/answers")
     public ResponseEntity<InterviewAnswerUploadResponse> uploadInterviewAnswer(
             @PathVariable Long interviewId,
             @RequestPart("file") MultipartFile file,
-            @RequestParam(value = "questionId", required = false) Long questionId,
-            @RequestParam(value = "questionText", required = false) String questionText,
-            @RequestParam("answerOrder") Integer answerOrder
+            @RequestParam("questionId") Long questionId,
+            @RequestParam("answerOrder") Integer answerOrder,
+            @RequestParam(value = "startTime", required = false) Double startTime,
+            @RequestParam(value = "endTime", required = false) Double endTime
     ) throws IOException {
         InterviewAnswerUploadResponse response =
                 interviewAnswerService.uploadAnswerVideo(
                         interviewId,
                         file,
                         questionId,
-                        questionText,
-                        answerOrder
+                        answerOrder,
+                        startTime,
+                        endTime
                 );
-
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * 면접 분석 결과 조회 API.
-     *
-     * 대시보드에서 날짜/회차 클릭 시 이 API를 호출해서
-     * eye / pose / speech 결과를 가져온다.
-     */
     @GetMapping("/{interviewId}/report")
     public ResponseEntity<InterviewReportResponse> getInterviewReport(
             @PathVariable Long interviewId

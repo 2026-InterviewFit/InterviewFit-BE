@@ -21,48 +21,33 @@ public class InterviewAnswerEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /*
-     * Question이 Interview와 Answer 사이를 관리하므로
-     * interview_id는 nullable 허용.
-     */
+    // Question이 Interview와 Answer 사이를 관리하므로 nullable 허용
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    /*
-     * 어떤 질문에 대한 답변인지 연결.
-     */
+    // 어떤 원 질문에 대한 답변인지
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
     private QuestionEntity question;
 
-    /*
-     * 몇 번째 답변인지.
-     */
     @Column(nullable = false)
     private Integer answerOrder;
 
-    /*
-     * 전체 면접 영상 기준 답변 시작 시각.
-     * 단위: 초
-     */
+    // 전체 면접 영상 기준 답변 시작 시각
     private Double startTime;
 
-    /*
-     * 전체 면접 영상 기준 답변 종료 시각.
-     * 단위: 초
-     */
+    // 전체 면접 영상 기준 답변 종료 시각
     private Double endTime;
 
-    /*
-     * STT 결과 또는 답변 텍스트.
-     */
+    // STT 결과 또는 사용자의 답변 텍스트
     @Column(columnDefinition = "TEXT")
     private String answerText;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private AnalysisStatus analysisStatus;
+    private AnalysisStatus analysisStatus = AnalysisStatus.UPLOADED;
 
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
@@ -73,6 +58,15 @@ public class InterviewAnswerEntity {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    public void updateTimestamp(Double startTime, Double endTime) {
+        this.startTime = startTime;
+        this.endTime = endTime;
+    }
+
+    public void updateAnswerText(String answerText) {
+        this.answerText = answerText;
+    }
 
     public void markUploaded() {
         this.analysisStatus = AnalysisStatus.UPLOADED;
@@ -118,27 +112,17 @@ public class InterviewAnswerEntity {
         return null;
     }
 
-    /*
-     * 기존 서비스 코드 호환용.
-     * 기존 answer.questionId 대신 question.id를 반환.
-     */
+    // 기존 코드 호환용
     public Long getQuestionId() {
         return this.question == null ? null : this.question.getId();
     }
 
-    /*
-     * 기존 서비스 코드 호환용.
-     * 기존 answer.questionText 대신 question.question을 반환.
-     */
+    // 기존 코드 호환용
     public String getQuestionText() {
         return this.question == null ? null : this.question.getQuestion();
     }
 
-    /*
-     * 기존 서비스 코드 호환용.
-     * 이제 영상은 answer가 아니라 videos/interview에서 관리하므로 null 반환.
-     * 이후 서비스 흐름에서 제거 예정.
-     */
+    // 기존 코드 호환용. 최종 구조에서는 영상은 videos/interview에서 관리함.
     public String getVideoObjectKey() {
         return null;
     }

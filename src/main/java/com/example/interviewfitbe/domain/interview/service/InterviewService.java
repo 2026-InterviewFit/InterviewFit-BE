@@ -43,6 +43,9 @@ public class InterviewService {
     private final PoseReportRepository poseReportRepository;
     private final SpeechReportRepository speechReportRepository;
 
+    /**
+     * 면접 시작 API에서 호출하는 메서드.
+     */
     @Transactional
     public InterviewStartResponse startInterview(InterviewStartRequest request) {
         if (request.getJobRoleId() == null) {
@@ -71,6 +74,12 @@ public class InterviewService {
                 .build();
     }
 
+    /**
+     * 대시보드 면접 분석 결과 조회.
+     *
+     * eye/pose는 interview 단위로 하나만 조회.
+     * gaze/speech는 팀원 리팩토링 대기중이라 답변 기반 조회 유지.
+     */
     @Transactional(readOnly = true)
     public InterviewReportResponse getInterviewReport(Long interviewId) {
         InterviewEntity interview = interviewRepository
@@ -82,6 +91,20 @@ public class InterviewService {
         List<InterviewAnswerEntity> answers =
                 interviewAnswerRepository.findByInterview_IdOrderByAnswerOrderAsc(interviewId);
 
+        // eye는 interview 단위 (사용자 담당)
+        InterviewReportResponse.EyeReport eyeReport =
+                eyeBlinkingReportRepository
+                        .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
+                        .map(this::toEyeReport)
+                        .orElse(null);
+
+        // pose는 interview 단위 (팀원이 이미 리팩토링 완료)
+        InterviewReportResponse.PoseReport poseReport =
+                poseReportRepository
+                        .findTopByInterview_IdOrderByIdDesc(interviewId)
+                        .map(this::toPoseReport)
+                        .orElse(null);
+
         List<InterviewReportResponse.AnswerReport> answerReports =
                 answers.stream()
                         .map(this::toAnswerReport)
@@ -89,10 +112,9 @@ public class InterviewService {
 
         String overallStatus = determineOverallStatus(answers);
 
-        boolean completed =
-                !answers.isEmpty()
-                        && answers.stream()
-                        .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
+        boolean completed = !answers.isEmpty()
+                && answers.stream()
+                .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
 
         JobRoleEntity jobRole = interview.getJobRole();
 
@@ -105,64 +127,48 @@ public class InterviewService {
                 .createdAt(interview.getCreatedAt())
                 .analysisStatus(overallStatus)
                 .completed(completed)
+                .eye(eyeReport)
+                .pose(poseReport)
                 .answers(answerReports)
                 .build();
     }
 
-    private InterviewReportResponse.AnswerReport toAnswerReport(
-            InterviewAnswerEntity answer
-    ) {
+    /**
+     * 답변별 로그.
+     * gaze/speech는 팀원 리팩토링 대기중이라 여기서 조회.
+     * eye/pose는 상위 InterviewReportResponse로 이동.
+     */
+    private InterviewReportResponse.AnswerReport toAnswerReport(InterviewAnswerEntity answer) {
         return InterviewReportResponse.AnswerReport.builder()
                 .answerId(answer.getId())
-                .questionId(answer.getQuestionId())
-                .questionText(answer.getQuestionText())
-                .videoObjectKey(answer.getVideoObjectKey())
+                .questionId(answer.getQuestion() == null ? null : answer.getQuestion().getId())
+                .questionText(answer.getQuestion() == null ? null : answer.getQuestion().getQuestion())
+                .answerText(answer.getAnswerText())
                 .answerOrder(answer.getAnswerOrder())
+                .startTime(answer.getStartTime())
+                .endTime(answer.getEndTime())
                 .analysisStatus(answer.getAnalysisStatus())
                 .errorMessage(answer.getErrorMessage())
-                .eye(toEyeReport(answer))
                 .gaze(toGazeReport(answer))
-                .pose(toPoseReport(answer))
                 .speech(toSpeechReport(answer))
                 .build();
     }
 
-    private InterviewReportResponse.EyeReport toEyeReport(
-            InterviewAnswerEntity answer
-    ) {
-        return eyeBlinkingReportRepository
-                .findTopByInterviewAnswer_IdOrderByCreatedAtDesc(answer.getId())
-                .map(this::toEyeReport)
-                .orElseGet(() -> {
-                    Long interviewId = answer.getInterviewIdSafely();
-
-                    if (interviewId == null) {
-                        return null;
-                    }
-
-                    return eyeBlinkingReportRepository
-                            .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
-                            .map(this::toEyeReport)
-                            .orElse(null);
-                });
-    }
-
-    private InterviewReportResponse.EyeReport toEyeReport(
-            EyeBlinkingReport report
-    ) {
+    private InterviewReportResponse.EyeReport toEyeReport(EyeBlinkingReport report) {
         return InterviewReportResponse.EyeReport.builder()
                 .reportId(report.getId())
+                .durationSeconds(report.getDurationSeconds())
                 .blinkCount(report.getBlinkCount())
                 .blinkRate(report.getBlinkRate())
-                .durationSeconds(report.getDurationSeconds())
+                .notDetectedCount(report.getNotDetectedCount())
+                .notDetectedRatio(report.getNotDetectedRatio())
                 .score(report.getScore())
+                .grade(report.getGrade() == null ? null : report.getGrade().name())
                 .feedback(report.getFeedback())
                 .build();
     }
 
-    private InterviewReportResponse.GazeReport toGazeReport(
-            InterviewAnswerEntity answer
-    ) {
+    private InterviewReportResponse.GazeReport toGazeReport(InterviewAnswerEntity answer) {
         return eyeGazeReportRepository
                 .findTopByInterviewIdOrderByCreatedAtDesc(
                         answer.getInterview().getId()
@@ -171,9 +177,7 @@ public class InterviewService {
                 .orElse(null);
     }
 
-    private InterviewReportResponse.GazeReport toGazeReport(
-            EyeGazeReport report
-    ) {
+    private InterviewReportResponse.GazeReport toGazeReport(EyeGazeReport report) {
         return InterviewReportResponse.GazeReport.builder()
                 .reportId(report.getId())
                 .centerRatio(report.getCenterRatio())
@@ -185,24 +189,7 @@ public class InterviewService {
                 .build();
     }
 
-    private InterviewReportResponse.PoseReport toPoseReport(
-            InterviewAnswerEntity answer
-    ) {
-        Long interviewId = answer.getInterviewIdSafely();
-
-        if (interviewId == null) {
-            return null;
-        }
-
-        return poseReportRepository
-                .findTopByInterview_IdOrderByIdDesc(interviewId)
-                .map(this::toPoseReport)
-                .orElse(null);
-    }
-
-    private InterviewReportResponse.PoseReport toPoseReport(
-            PoseReportEntity report
-    ) {
+    private InterviewReportResponse.PoseReport toPoseReport(PoseReportEntity report) {
         return InterviewReportResponse.PoseReport.builder()
                 .reportId(report.getId())
                 .totalDuration(report.getTotalDuration())
@@ -218,29 +205,14 @@ public class InterviewService {
                 .build();
     }
 
-    private InterviewReportResponse.SpeechReport toSpeechReport(
-            InterviewAnswerEntity answer
-    ) {
+    private InterviewReportResponse.SpeechReport toSpeechReport(InterviewAnswerEntity answer) {
         return speechReportRepository
                 .findTopByInterviewAnswer_IdOrderByCreatedAtDesc(answer.getId())
                 .map(this::toSpeechReport)
-                .orElseGet(() -> {
-                    Long interviewId = answer.getInterviewIdSafely();
-
-                    if (interviewId == null) {
-                        return null;
-                    }
-
-                    return speechReportRepository
-                            .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
-                            .map(this::toSpeechReport)
-                            .orElse(null);
-                });
+                .orElse(null);
     }
 
-    private InterviewReportResponse.SpeechReport toSpeechReport(
-            SpeechReportEntity report
-    ) {
+    private InterviewReportResponse.SpeechReport toSpeechReport(SpeechReportEntity report) {
         return InterviewReportResponse.SpeechReport.builder()
                 .reportId(report.getId())
                 .textScript(report.getTextScript())
@@ -260,34 +232,17 @@ public class InterviewService {
                 .build();
     }
 
-    private String determineOverallStatus(
-            List<InterviewAnswerEntity> answers
-    ) {
-        if (answers.isEmpty()) {
-            return "EMPTY";
-        }
-
+    private String determineOverallStatus(List<InterviewAnswerEntity> answers) {
+        if (answers.isEmpty()) return "EMPTY";
         boolean hasFailed = answers.stream()
                 .anyMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.FAILED);
-
-        if (hasFailed) {
-            return "FAILED";
-        }
-
+        if (hasFailed) return "FAILED";
         boolean allDone = answers.stream()
                 .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
-
-        if (allDone) {
-            return "DONE";
-        }
-
+        if (allDone) return "DONE";
         boolean hasRunning = answers.stream()
                 .anyMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.RUNNING);
-
-        if (hasRunning) {
-            return "RUNNING";
-        }
-
+        if (hasRunning) return "RUNNING";
         return "UPLOADED";
     }
 
@@ -298,15 +253,11 @@ public class InterviewService {
                             "해당 유저를 찾을 수 없습니다. userId=" + userId
                     ));
         }
-
-        Long tempKakaoId = Math.abs(UUID.randomUUID().getMostSignificantBits());
-
+        String tempEmail = "temp_" + UUID.randomUUID() + "@interviewfit.local";
         UserEntity tempUser = UserEntity.builder()
-                .kakaoId(tempKakaoId)
-                .email(null)
+                .email(tempEmail)
                 .name("임시 사용자")
                 .build();
-
         return userRepository.save(tempUser);
     }
 }

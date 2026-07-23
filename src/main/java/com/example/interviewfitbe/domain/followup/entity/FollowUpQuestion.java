@@ -21,38 +21,20 @@ public class FollowUpQuestion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /*
-     * 어떤 면접에서 생성된 꼬리질문인지.
-     * 단독 테스트 또는 임시 생성 가능성을 고려해 nullable 허용.
-     */
+    // 어떤 면접에서 생성된 꼬리질문인지
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    /*
-     * 원본 질문.
-     */
+    // 어떤 원 질문에서 파생된 꼬리질문인지
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "source_question_id")
+    @JoinColumn(name = "source_question_id", nullable = false)
     private QuestionEntity sourceQuestion;
 
-    /*
-     * 어떤 답변을 보고 생성된 꼬리질문인지.
-     */
+    // 어떤 원 답변을 보고 생성된 꼬리질문인지
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_answer_id")
     private InterviewAnswerEntity sourceAnswer;
-
-    /*
-     * 꼬리질문을 questions 테이블에 따로 저장하지 않기로 했으면
-     * 이 필드는 없어도 됨.
-     *
-     * 다만 기존 표에 generated_question_id가 있었으므로
-     * 확장 가능성 때문에 nullable로 남김.
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "generated_question_id")
-    private QuestionEntity generatedQuestion;
 
     private String job;
 
