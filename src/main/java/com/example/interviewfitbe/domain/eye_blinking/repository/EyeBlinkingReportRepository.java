@@ -1,16 +1,16 @@
 package com.example.interviewfitbe.domain.eye_blinking.repository;
 
-import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReportEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface EyeBlinkingReportRepository extends JpaRepository<EyeBlinkingReport, Long> {
+public interface EyeBlinkingReportRepository extends JpaRepository<EyeBlinkingReportEntity, Long> {
 
-    Optional<EyeBlinkingReport> findTopByInterview_IdOrderByCreatedAtDesc(Long interviewId);
+    Optional<EyeBlinkingReportEntity> findTopByInterview_IdOrderByCreatedAtDesc(Long interviewId);
 
-    Optional<EyeBlinkingReport> findTopByInterviewAnswer_IdOrderByCreatedAtDesc(Long interviewAnswerId);
+    Optional<EyeBlinkingReportEntity> findTopByInterviewAnswer_IdOrderByCreatedAtDesc(Long interviewAnswerId);
 
-    List<EyeBlinkingReport> findByInterview_IdOrderByCreatedAtAsc(Long interviewId);
+    List<EyeBlinkingReportEntity> findByInterview_IdOrderByCreatedAtAsc(Long interviewId);
 }

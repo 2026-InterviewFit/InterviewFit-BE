@@ -1,6 +1,6 @@
 package com.example.interviewfitbe.domain.interview.service;
 
-import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReportEntity;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
 import com.example.interviewfitbe.domain.eye_gaze.entity.EyeGazeReport;
 import com.example.interviewfitbe.domain.eye_gaze.repository.EyeGazeReportRepository;
@@ -9,8 +9,6 @@ import com.example.interviewfitbe.domain.interview.dto.InterviewStartRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartResponse;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
-import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
-import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
@@ -146,7 +144,7 @@ public class InterviewService {
     }
 
     private InterviewReportResponse.EyeReport toEyeReport(
-            EyeBlinkingReport report
+            EyeBlinkingReportEntity report
     ) {
         return InterviewReportResponse.EyeReport.builder()
                 .reportId(report.getId())

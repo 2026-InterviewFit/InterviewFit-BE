@@ -5,6 +5,8 @@ import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -22,22 +24,21 @@ public class FollowUpAnswerEntity {
     private Long id;
 
     /*
-     * 어떤 면접에서 나온 꼬리질문 답변인지.
+     * Interview 삭제 시 해당 면접의 꼬리질문 답변도 같이 삭제.
      */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
     /*
-     * 어떤 꼬리질문에 대한 답변인지.
+     * FollowUpQuestion 삭제 시 해당 꼬리질문 답변도 같이 삭제.
      */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "follow_up_question_id", nullable = false)
     private FollowUpQuestionEntity followUpQuestion;
 
-    /*
-     * 꼬리질문 답변 텍스트.
-     */
     @Column(columnDefinition = "TEXT")
     private String answerText;
 

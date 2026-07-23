@@ -2,8 +2,8 @@ package com.example.interviewfitbe.domain.eye_blinking.service;
 
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeRequest;
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeResponse;
-import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingBadLog;
-import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingBadLogEntity;
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReportEntity;
 import com.example.interviewfitbe.domain.eye_blinking.enums.EyeBlinkingEventType;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingBadLogRepository;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
@@ -50,7 +50,7 @@ public class EyeBlinkingService {
 
         Map<String, Object> analysisResult = extractAnalysisResult(fastApiResponse);
 
-        EyeBlinkingReport report = EyeBlinkingReport.builder()
+        EyeBlinkingReportEntity report = EyeBlinkingReportEntity.builder()
                 .interview(interview)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
                 .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
@@ -64,7 +64,7 @@ public class EyeBlinkingService {
 
         report.assignGrade();
 
-        EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        EyeBlinkingReportEntity saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
@@ -85,7 +85,7 @@ public class EyeBlinkingService {
 
         Map<String, Object> analysisResult = extractAnalysisResult(fastApiResponse);
 
-        EyeBlinkingReport report = EyeBlinkingReport.builder()
+        EyeBlinkingReportEntity report = EyeBlinkingReportEntity.builder()
                 .interview(interview)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
                 .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
@@ -99,7 +99,7 @@ public class EyeBlinkingService {
 
         report.assignGrade();
 
-        EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        EyeBlinkingReportEntity saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
@@ -123,7 +123,7 @@ public class EyeBlinkingService {
 
         InterviewEntity interview = interviewAnswer.getInterviewSafely();
 
-        EyeBlinkingReport report = EyeBlinkingReport.builder()
+        EyeBlinkingReportEntity report = EyeBlinkingReportEntity.builder()
                 .interview(interview)
                 .interviewAnswer(interviewAnswer)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
@@ -138,7 +138,7 @@ public class EyeBlinkingService {
 
         report.assignGrade();
 
-        EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        EyeBlinkingReportEntity saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
@@ -280,7 +280,7 @@ public class EyeBlinkingService {
         return value.toString();
     }
 
-    private void saveBadLogs(Map<String, Object> analysisResult, EyeBlinkingReport report) {
+    private void saveBadLogs(Map<String, Object> analysisResult, EyeBlinkingReportEntity report) {
         Object value = getFirstValue(
                 analysisResult,
                 "bad_logs",
@@ -293,7 +293,7 @@ public class EyeBlinkingService {
             return;
         }
 
-        List<EyeBlinkingBadLog> entities = new ArrayList<>();
+        List<EyeBlinkingBadLogEntity> entities = new ArrayList<>();
 
         for (Object item : logs) {
             if (!(item instanceof Map<?, ?> logMap)) {
@@ -334,8 +334,8 @@ public class EyeBlinkingService {
                     "localBlinkRate"
             );
 
-            EyeBlinkingBadLog badLog = EyeBlinkingBadLog.builder()
-                    .eyeBlinkingReport(report)
+            EyeBlinkingBadLogEntity badLog = EyeBlinkingBadLogEntity.builder()
+                    .eyeBlinkingReportEntity(report)
                     .timestamp(timestamp)
                     .duration(duration)
                     .eventType(eventType)

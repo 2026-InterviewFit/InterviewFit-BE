@@ -25,18 +25,16 @@ public class QuestionEntity {
     private Long id;
 
     /*
-     * 어떤 면접에서 출제된 질문인지.
-     * interview_id는 nullable 허용.
-     * 면접이 삭제되어도 질문 데이터는 남길 수 있도록 SET_NULL.
+     * Interview 삭제 시 해당 면접 질문도 같이 삭제.
      */
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
     /*
      * 직무 기반 질문이면 연결.
-     * 기본 질문이나 임시 질문은 jobRole이 없을 수 있음.
+     * JobRole 삭제 시 질문까지 같이 삭제되면 위험하므로 cascade 걸지 않음.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_role_id")
@@ -44,8 +42,10 @@ public class QuestionEntity {
 
     /*
      * 자기소개서 기반 질문이면 연결.
-     * cover_letter_id는 nullable 허용.
-     * 자기소개서가 삭제되어도 질문 자체는 남길 수 있도록 SET_NULL.
+     * CoverLetter 삭제 시 질문도 삭제하고 싶으면 CASCADE,
+     * 질문을 남기고 싶으면 SET_NULL.
+     *
+     * 여기서는 기존 의도대로 SET_NULL 유지.
      */
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ManyToOne(fetch = FetchType.LAZY)
