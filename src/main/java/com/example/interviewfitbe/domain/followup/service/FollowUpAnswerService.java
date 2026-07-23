@@ -3,7 +3,8 @@ package com.example.interviewfitbe.domain.followup.service;
 import com.example.interviewfitbe.domain.followup.dto.FollowUpAnswerCreateRequest;
 import com.example.interviewfitbe.domain.followup.dto.FollowUpAnswerCreateResponse;
 import com.example.interviewfitbe.domain.followup.entity.FollowUpAnswerEntity;
-import com.example.interviewfitbe.domain.followup.entity.FollowUpQuestion;
+import com.example.interviewfitbe.domain.followup.entity.FollowUpQuestionEntity;
+import com.example.interviewfitbe.domain.followup.entity.FollowUpQuestionEntity;
 import com.example.interviewfitbe.domain.followup.repository.FollowUpAnswerRepository;
 import com.example.interviewfitbe.domain.followup.repository.FollowUpQuestionRepository;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
@@ -26,11 +27,10 @@ public class FollowUpAnswerService {
     public FollowUpAnswerCreateResponse create(FollowUpAnswerCreateRequest request) {
         validateRequest(request);
 
-        FollowUpQuestion followUpQuestion = followUpQuestionRepository
+        FollowUpQuestionEntity followUpQuestion = followUpQuestionRepository
                 .findById(request.getFollowUpQuestionId())
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "해당 꼬리질문을 찾을 수 없습니다. followUpQuestionId="
-                                + request.getFollowUpQuestionId()
+                        "해당 꼬리질문을 찾을 수 없습니다. followUpQuestionId=" + request.getFollowUpQuestionId()
                 ));
 
         InterviewEntity interview = resolveInterview(request, followUpQuestion);
@@ -49,8 +49,8 @@ public class FollowUpAnswerService {
         return FollowUpAnswerCreateResponse.builder()
                 .message("꼬리질문 답변 저장 완료")
                 .followUpAnswerId(saved.getId())
-                .followUpQuestionId(followUpQuestion.getId())
                 .interviewId(interview == null ? null : interview.getId())
+                .followUpQuestionId(followUpQuestion.getId())
                 .answerText(saved.getAnswerText())
                 .startTime(saved.getStartTime())
                 .endTime(saved.getEndTime())
@@ -60,17 +60,13 @@ public class FollowUpAnswerService {
 
     private void validateRequest(FollowUpAnswerCreateRequest request) {
         if (request.getFollowUpQuestionId() == null) {
-            throw new IllegalArgumentException("followUpQuestionId는 필수입니다.");
-        }
-
-        if (request.getAnswerText() == null || request.getAnswerText().isBlank()) {
-            throw new IllegalArgumentException("answerText는 필수입니다.");
+            throw new IllegalArgumentException("followUpQuestionId 또는 follow_up_question_id 값은 필수입니다.");
         }
     }
 
     private InterviewEntity resolveInterview(
             FollowUpAnswerCreateRequest request,
-            FollowUpQuestion followUpQuestion
+            FollowUpQuestionEntity followUpQuestion
     ) {
         if (request.getInterviewId() != null) {
             return interviewRepository.findById(request.getInterviewId())

@@ -6,6 +6,8 @@ import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -15,24 +17,25 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class EyeBlinkingReport {
+public class EyeBlinkingReportEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /*
-     * 전체 면접 기준 분석 결과.
-     * 단독 테스트나 임시 분석을 위해 nullable 허용.
+     * Interview 삭제 시 눈깜빡임 리포트도 같이 삭제.
      */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
     /*
-     * 질문별 답변 구간에 대한 분석 결과일 경우 연결.
+     * Answer 삭제 시 해당 답변 기준 눈깜빡임 리포트도 같이 삭제.
      * 전체 면접 영상 분석 결과라면 null 가능.
      */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_answer_id")
     private InterviewAnswerEntity interviewAnswer;

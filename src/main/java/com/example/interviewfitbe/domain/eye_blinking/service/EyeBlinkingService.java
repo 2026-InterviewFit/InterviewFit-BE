@@ -2,9 +2,8 @@ package com.example.interviewfitbe.domain.eye_blinking.service;
 
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeRequest;
 import com.example.interviewfitbe.domain.eye_blinking.dto.EyeBlinkingAnalyzeResponse;
-import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingBadLog;
-import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReport;
-import com.example.interviewfitbe.domain.eye_blinking.enums.EyeBlinkingEventType;
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingBadLogEntity;
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReportEntity;
 import com.example.interviewfitbe.domain.eye_blinking.enums.EyeBlinkingEventType;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingBadLogRepository;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
@@ -34,18 +33,11 @@ public class EyeBlinkingService {
     private final EyeBlinkingBadLogRepository eyeBlinkingBadLogRepository;
     private final InterviewRepository interviewRepository;
     private final ObjectMapper objectMapper;
-
-    /*
-     * FastAPI 눈 깜빡임 분석 호출 전담 서비스
-     */
     private final EyeBlinkingAnalysisService eyeBlinkingAnalysisService;
 
     @Value("${app.upload-dir}")
     private String uploadDir;
 
-    /*
-     * 면접 단위 눈 깜빡임 분석 저장 메서드
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
             String videoObjectKey,
@@ -58,7 +50,7 @@ public class EyeBlinkingService {
 
         Map<String, Object> analysisResult = extractAnalysisResult(fastApiResponse);
 
-        EyeBlinkingReport report = EyeBlinkingReport.builder()
+        EyeBlinkingReportEntity report = EyeBlinkingReportEntity.builder()
                 .interview(interview)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
                 .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
@@ -70,7 +62,9 @@ public class EyeBlinkingService {
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
-        EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        report.assignGrade();
+
+        EyeBlinkingReportEntity saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
@@ -80,9 +74,6 @@ public class EyeBlinkingService {
         );
     }
 
-    /*
-     * eye-blink 단독 분석 API용 메서드
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(EyeBlinkingAnalyzeRequest request) {
         validateVideoUrl(request.getVideoUrl());
@@ -94,7 +85,7 @@ public class EyeBlinkingService {
 
         Map<String, Object> analysisResult = extractAnalysisResult(fastApiResponse);
 
-        EyeBlinkingReport report = EyeBlinkingReport.builder()
+        EyeBlinkingReportEntity report = EyeBlinkingReportEntity.builder()
                 .interview(interview)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
                 .blinkRate(getDouble(analysisResult, "blink_rate", "blinks_per_minute", "blinkRate"))
@@ -106,7 +97,9 @@ public class EyeBlinkingService {
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
-        EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        report.assignGrade();
+
+        EyeBlinkingReportEntity saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
@@ -116,9 +109,6 @@ public class EyeBlinkingService {
         );
     }
 
-    /*
-     * 질문별 답변 구간 눈 깜빡임 분석 저장 메서드
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeAndSave(
             String videoObjectKey,
@@ -133,7 +123,7 @@ public class EyeBlinkingService {
 
         InterviewEntity interview = interviewAnswer.getInterviewSafely();
 
-        EyeBlinkingReport report = EyeBlinkingReport.builder()
+        EyeBlinkingReportEntity report = EyeBlinkingReportEntity.builder()
                 .interview(interview)
                 .interviewAnswer(interviewAnswer)
                 .blinkCount(getInteger(analysisResult, "blink_count", "blinkCount"))
@@ -146,7 +136,9 @@ public class EyeBlinkingService {
                 .resultJson(toJson(fastApiResponse))
                 .build();
 
-        EyeBlinkingReport saved = eyeBlinkingReportRepository.save(report);
+        report.assignGrade();
+
+        EyeBlinkingReportEntity saved = eyeBlinkingReportRepository.save(report);
         saveBadLogs(analysisResult, saved);
 
         return new EyeBlinkingAnalyzeResponse(
@@ -156,9 +148,6 @@ public class EyeBlinkingService {
         );
     }
 
-    /*
-     * eye-blink 단독 테스트용 multipart 업로드 API에서 사용
-     */
     @Transactional
     public EyeBlinkingAnalyzeResponse analyzeUploadedVideoAndSave(
             MultipartFile file,
@@ -291,8 +280,7 @@ public class EyeBlinkingService {
         return value.toString();
     }
 
-    @SuppressWarnings("unchecked")
-    private void saveBadLogs(Map<String, Object> analysisResult, EyeBlinkingReport report) {
+    private void saveBadLogs(Map<String, Object> analysisResult, EyeBlinkingReportEntity report) {
         Object value = getFirstValue(
                 analysisResult,
                 "bad_logs",
@@ -305,7 +293,7 @@ public class EyeBlinkingService {
             return;
         }
 
-        List<EyeBlinkingBadLog> entities = new ArrayList<>();
+        List<EyeBlinkingBadLogEntity> entities = new ArrayList<>();
 
         for (Object item : logs) {
             if (!(item instanceof Map<?, ?> logMap)) {
@@ -346,8 +334,8 @@ public class EyeBlinkingService {
                     "localBlinkRate"
             );
 
-            EyeBlinkingBadLog badLog = EyeBlinkingBadLog.builder()
-                    .eyeBlinkingReport(report)
+            EyeBlinkingBadLogEntity badLog = EyeBlinkingBadLogEntity.builder()
+                    .eyeBlinkingReportEntity(report)
                     .timestamp(timestamp)
                     .duration(duration)
                     .eventType(eventType)

@@ -8,6 +8,8 @@ import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRep
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
 import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import com.example.interviewfitbe.domain.question.repository.QuestionRepository;
+import com.example.interviewfitbe.domain.video_storage.dto.VideoUrlResponse;
+import com.example.interviewfitbe.domain.video_storage.entity.VideoType;
 import com.example.interviewfitbe.domain.video_storage.service.VideoService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -29,17 +31,6 @@ public class InterviewAnswerService {
     private final VideoService videoService;
     private final InterviewAnswerAnalysisJobService interviewAnswerAnalysisJobService;
 
-    /**
-     * 질문별 답변 영상 업로드.
-     *
-     * 흐름:
-     * 1. interviewId로 면접 세션 조회
-     * 2. questionId로 QuestionEntity 조회 (필수)
-     * 3. 영상 파일을 MinIO에 저장
-     * 4. interview_answers 테이블에 답변 row 저장
-     * 5. DB commit 이후 비동기 분석 시작 (videoObjectKey를 파라미터로 전달)
-     * 6. answerId와 videoObjectKey 반환
-     */
     @Transactional
     public InterviewAnswerUploadResponse uploadAnswerVideo(
             Long interviewId,
@@ -49,12 +40,16 @@ public class InterviewAnswerService {
             Double startTime,
             Double endTime
     ) throws IOException {
-        if (answerOrder == null || answerOrder <= 0) {
-            throw new IllegalArgumentException("answerOrder는 1 이상이어야 합니다.");
+        if (interviewId == null) {
+            throw new IllegalArgumentException("interviewId는 필수입니다.");
         }
 
         if (questionId == null) {
             throw new IllegalArgumentException("questionId는 필수입니다.");
+        }
+
+        if (answerOrder == null || answerOrder <= 0) {
+            throw new IllegalArgumentException("answerOrder는 1 이상이어야 합니다.");
         }
 
         InterviewEntity interview = interviewRepository.findById(interviewId)
@@ -67,8 +62,17 @@ public class InterviewAnswerService {
                         "해당 질문을 찾을 수 없습니다. questionId=" + questionId
                 ));
 
-        // MinIO에 영상 저장
-        String videoObjectKey = videoService.uploadVideoToMinio(file);
+        /*
+         * 배예은 VideoService를 사용해서
+         * MinIO 업로드 + videos 테이블 저장까지 같이 처리.
+         */
+        VideoUrlResponse videoResponse = videoService.saveVideoFile(
+                interviewId,
+                file,
+                VideoType.INTERVIEW_FULL
+        );
+
+        String videoObjectKey = videoResponse.getVideoUrl();
 
         InterviewAnswerEntity answer = InterviewAnswerEntity.builder()
                 .interview(interview)
@@ -80,12 +84,8 @@ public class InterviewAnswerService {
                 .build();
 
         InterviewAnswerEntity saved = interviewAnswerRepository.save(answer);
-
         Long answerId = saved.getId();
 
-        // 트랜잭션 커밋 후 비동기 분석 시작
-        // videoObjectKey는 InterviewAnswerEntity에 저장하지 않고 파라미터로 넘김
-        // TODO: 배예은의 VideoEntity 완성 후 VideoEntity FK로 연결 예정
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

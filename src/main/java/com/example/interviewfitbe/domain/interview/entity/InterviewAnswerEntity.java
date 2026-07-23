@@ -5,6 +5,8 @@ import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -21,12 +23,21 @@ public class InterviewAnswerEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Question이 Interview와 Answer 사이를 관리하므로 nullable 허용
+    /*
+     * Interview 삭제 시 해당 면접 답변도 같이 삭제.
+     *
+     * Question이 Interview와 Answer 사이를 관리하므로
+     * interview_id 자체는 nullable 허용.
+     */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    // 어떤 원 질문에 대한 답변인지
+    /*
+     * Question 삭제 시 해당 질문의 답변도 같이 삭제.
+     */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
     private QuestionEntity question;
@@ -34,13 +45,21 @@ public class InterviewAnswerEntity {
     @Column(nullable = false)
     private Integer answerOrder;
 
-    // 전체 면접 영상 기준 답변 시작 시각
+    /*
+     * 전체 면접 영상 기준 답변 시작 시각.
+     * 단위: 초
+     */
     private Double startTime;
 
-    // 전체 면접 영상 기준 답변 종료 시각
+    /*
+     * 전체 면접 영상 기준 답변 종료 시각.
+     * 단위: 초
+     */
     private Double endTime;
 
-    // STT 결과 또는 사용자의 답변 텍스트
+    /*
+     * STT 결과 또는 사용자의 답변 텍스트.
+     */
     @Column(columnDefinition = "TEXT")
     private String answerText;
 
@@ -112,17 +131,24 @@ public class InterviewAnswerEntity {
         return null;
     }
 
-    // 기존 코드 호환용
+    /*
+     * 기존 코드 호환용.
+     */
     public Long getQuestionId() {
         return this.question == null ? null : this.question.getId();
     }
 
-    // 기존 코드 호환용
+    /*
+     * 기존 코드 호환용.
+     */
     public String getQuestionText() {
         return this.question == null ? null : this.question.getQuestion();
     }
 
-    // 기존 코드 호환용. 최종 구조에서는 영상은 videos/interview에서 관리함.
+    /*
+     * 기존 코드 호환용.
+     * 최종 구조에서는 영상은 videos/interview에서 관리함.
+     */
     public String getVideoObjectKey() {
         return null;
     }

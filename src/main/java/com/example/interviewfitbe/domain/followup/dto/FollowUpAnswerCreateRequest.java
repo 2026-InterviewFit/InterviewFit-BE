@@ -11,11 +11,11 @@ import lombok.Setter;
 @NoArgsConstructor
 public class FollowUpAnswerCreateRequest {
 
+    private Long interviewId;
+
     @JsonProperty("follow_up_question_id")
     @JsonAlias("followUpQuestionId")
     private Long followUpQuestionId;
-
-    private Long interviewId;
 
     @JsonProperty("answer_text")
     @JsonAlias({"answerText", "answer"})

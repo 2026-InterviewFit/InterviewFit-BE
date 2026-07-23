@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface FollowUpAnswerRepository extends JpaRepository<FollowUpAnswerEntity, Long> {
 
-    List<FollowUpAnswerEntity> findByFollowUpQuestion_IdOrderByCreatedAtAsc(Long followUpQuestionId);
-
     List<FollowUpAnswerEntity> findByInterview_IdOrderByCreatedAtAsc(Long interviewId);
+
+    List<FollowUpAnswerEntity> findByFollowUpQuestion_IdOrderByCreatedAtAsc(Long followUpQuestionId);
 }

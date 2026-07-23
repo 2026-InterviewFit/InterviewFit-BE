@@ -6,6 +6,8 @@ import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -15,23 +17,32 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class FollowUpQuestion {
+public class FollowUpQuestionEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 어떤 면접에서 생성된 꼬리질문인지
+    /*
+     * Interview 삭제 시 해당 면접의 꼬리질문도 같이 삭제.
+     */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
-    // 어떤 원 질문에서 파생된 꼬리질문인지
+    /*
+     * 원 질문 삭제 시 해당 질문 기반 꼬리질문도 같이 삭제.
+     */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_question_id", nullable = false)
     private QuestionEntity sourceQuestion;
 
-    // 어떤 원 답변을 보고 생성된 꼬리질문인지
+    /*
+     * 원 답변 삭제 시 해당 답변 기반 꼬리질문도 같이 삭제.
+     */
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_answer_id")
     private InterviewAnswerEntity sourceAnswer;
