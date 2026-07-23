@@ -22,7 +22,7 @@ public class PoseReportEntity {
     private Long id;
 
     @OnDelete(action = OnDeleteAction.CASCADE)
-    @ManyToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id", nullable = false)
     private InterviewEntity interview;
 
