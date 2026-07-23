@@ -1,7 +1,6 @@
 package com.example.interviewfitbe.domain.question.entity;
 
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
-import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.question.enums.QuestionType;
 import jakarta.persistence.*;
@@ -23,11 +22,6 @@ public class QuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OnDelete(action = OnDeleteAction.SET_NULL)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_id")
-    private InterviewEntity interview;
-
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
 
@@ -39,7 +33,7 @@ public class QuestionEntity {
     @JoinColumn(name = "job_role_id", nullable = false)
     private JobRoleEntity jobRole;
 
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cover_letter_id")
     private CoverLetterEntity coverLetter;
@@ -47,8 +41,4 @@ public class QuestionEntity {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    public void assignInterview(InterviewEntity interview) {
-        this.interview = interview;
-    }
 }
