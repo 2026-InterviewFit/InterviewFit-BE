@@ -16,112 +16,218 @@ import java.util.Map;
 @ToString
 public class SpeechReportRequest {
 
+    /**
+     * 면접 ID
+     */
     @JsonProperty("interview_id")
     @JsonAlias("interviewId")
     private Long interviewId;
 
+
+    /**
+     * 질문 답변 ID
+     * AiEvaluation 저장용
+     */
     @JsonProperty("interview_answer_id")
     @JsonAlias("interviewAnswerId")
     private Long interviewAnswerId;
 
+
+    /**
+     * 질문 ID
+     */
     @JsonProperty("question_id")
     @JsonAlias("questionId")
     private Long questionId;
 
+
+    /**
+     * 원본 질문
+     */
     @JsonProperty("original_question")
     @JsonAlias({"originalQuestion", "question"})
     private String originalQuestion;
 
+
+    /**
+     * 직무
+     */
     @JsonProperty("job_category")
     @JsonAlias({"jobCategory", "job"})
     private String jobCategory;
 
+
+    /**
+     * 전체 STT 결과
+     */
     @JsonProperty("text_script")
     @JsonAlias("textScript")
     private String textScript;
 
+
+
+    /**
+     * 필러 분석
+     */
     @JsonProperty("filler_word_analysis")
     private FillerWordAnalysis fillerWordAnalysis;
 
+
+
+    /**
+     * 반복 표현 분석
+     */
     @JsonProperty("repeated_expressions")
     private List<RepeatedExpression> repeatedExpressions;
 
+
+
+    /**
+     * 말하기 속도 분석
+     */
     @JsonProperty("speech_pace_analysis")
     private SpeechPaceAnalysis speechPaceAnalysis;
 
-    @JsonProperty("volume_analysis")
-    private VolumeAnalysis volumeAnalysis;
 
+
+    /**
+     * 침묵 분석
+     */
     @JsonProperty("silence_analysis")
     private SilenceAnalysis silenceAnalysis;
 
+
+
+    /**
+     * 질문별 AI 평가
+     */
     @JsonProperty("ai_evaluation")
-    private Map<String, Object> aiEvaluation;
+    private AiEvaluation aiEvaluation;
 
-    @JsonProperty("model_answer")
-    private String modelAnswer;
 
-    // 필러워드 디테일
+
+    // ============================
+    // 내부 DTO
+    // ============================
+
+
+    /**
+     * 필러 단어 분석
+     */
     @Getter
     @Builder
     @Jacksonized
     @ToString
     public static class FillerWordAnalysis {
+
         private Map<String, Integer> details;
+
 
         @JsonProperty("total_count")
         private Integer totalCount;
     }
 
-    // 반복 표현 단건
+
+
+    /**
+     * 반복 표현 분석
+     */
     @Getter
     @Builder
     @Jacksonized
     @ToString
     public static class RepeatedExpression {
+
         private String expression;
+
         private Integer count;
     }
 
-    // 말하기 속도
+
+
+    /**
+     * 말하기 속도 분석
+     */
     @Getter
     @Builder
     @Jacksonized
     @ToString
     public static class SpeechPaceAnalysis {
+
+
         private String evaluation;
+
+
         private String feedback;
+
 
         @JsonProperty("characters_per_second")
         private Double charactersPerSecond;
     }
 
-    // 음량 평균/표준편차
-    @Getter
-    @Builder
-    @Jacksonized
-    @ToString
-    public static class VolumeAnalysis {
-        @JsonProperty("volume_db_mean")
-        private Double volumeDbMean;
 
-        @JsonProperty("volume_db_std")
-        private Double volumeDbStd;
-    }
 
-    // 침묵 구간 및 침묵 비율
+    /**
+     * 침묵 분석
+     */
     @Getter
     @Builder
     @Jacksonized
     @ToString
     public static class SilenceAnalysis {
+
+
         @JsonProperty("total_silence_seconds")
         private Double totalSilenceSeconds;
+
 
         @JsonProperty("pause_rate_percent")
         private Double pauseRatePercent;
 
+
         @JsonProperty("critical_silence_count")
         private Integer criticalSilenceCount;
+    }
+
+
+
+    /**
+     * AI 평가
+     * AiEvaluationEntity 저장용
+     */
+    @Getter
+    @Builder
+    @Jacksonized
+    @ToString
+    public static class AiEvaluation {
+
+
+        /**
+         * STAR 점수
+         */
+        @JsonProperty("star_score")
+        private Map<String, Integer> starScore;
+
+
+
+        /**
+         * Gemini 피드백
+         */
+        private String feedback;
+
+
+
+        /**
+         * 핵심 키워드
+         */
+        private List<String> keywords;
+
+
+
+        /**
+         * AI 모범 답안
+         */
+        @JsonProperty("model_answer")
+        private String modelAnswer;
     }
 }
