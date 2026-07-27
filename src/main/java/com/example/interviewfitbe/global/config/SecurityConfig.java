@@ -30,7 +30,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/users/kakao-login",
                                 "/webhook/**",
-                                "/api/group/**"
+                                "/api/group/**",
+                                "/ws-interview/**"
                         ).permitAll()
                         // 나머지 /api/** 는 JWT 인증 필요
                         .anyRequest().authenticated()
