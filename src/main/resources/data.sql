@@ -2,61 +2,62 @@
 -- 0. 다대일 질문 초기화
 -- =====================================================================
 
-TRUNCATE TABLE group_questions RESTART IDENTITY;
+TRUNCATE TABLE group_questions RESTART IDENTITY CASCADE;
+TRUNCATE TABLE job_roles RESTART IDENTITY CASCADE;
 
 -- =====================================================================
--- 1. 직무(job_role) 초기 데이터 삽입
+-- 1. 직무(job_roles) 초기 데이터 삽입
 -- =====================================================================
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (1, 'IT/개발', '프론트엔드')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (2, 'IT/개발', '백엔드')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (3, 'IT/개발', 'AI')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (4, 'IT/개발', '데이터분석')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (5, '비즈니스', '마케팅')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (6, '비즈니스', '인사')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (7, '비즈니스', '재무·회계')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (8, '디자인', 'UX/UI 디자이너')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (9, '디자인', '영상 제작')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO job_role (id, category, name)
+INSERT INTO job_roles (id, category, name)
     OVERRIDING SYSTEM VALUE
 VALUES (10, '디자인', '그래픽 디자이너')
-    ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- =====================================================================
 -- 2. 다대일 면접 질문 초기 데이터 삽입

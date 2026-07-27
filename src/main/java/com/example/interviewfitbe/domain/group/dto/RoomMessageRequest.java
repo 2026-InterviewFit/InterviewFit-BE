@@ -8,6 +8,9 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class RoomMessageRequest {
-    private String sender; // 보낸 사람 이름 또는 ID
-    private String message; // 내용
+
+    private Long userId; // 로그인한 사용자 PK
+
+    private String message; // 입장 메시지
+
 }
