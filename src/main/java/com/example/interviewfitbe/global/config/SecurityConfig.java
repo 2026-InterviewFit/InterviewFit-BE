@@ -29,7 +29,8 @@ public class SecurityConfig {
                         // 로그인 API, 카카오 웹훅 수신 엔드포인트만 인증 없이 허용
                         .requestMatchers(
                                 "/api/users/kakao-login",
-                                "/webhook/**"
+                                "/webhook/**",
+                                "/api/group/**"
                         ).permitAll()
                         // 나머지 /api/** 는 JWT 인증 필요
                         .anyRequest().authenticated()
