@@ -26,13 +26,9 @@ public class PtQuestionService {
     private static final int DEFAULT_QUESTION_COUNT = 5;
 
     private final PtInterviewRepository ptInterviewRepository;
-
     private final PtDocumentRepository ptDocumentRepository;
-
     private final PtSlideRepository ptSlideRepository;
-
     private final PtQuestionRepository ptQuestionRepository;
-
     private final PtQuestionAnalysisService ptQuestionAnalysisService;
 
     /*
@@ -51,7 +47,8 @@ public class PtQuestionService {
                         .findById(ptInterviewId)
                         .orElseThrow(
                                 () -> new IllegalArgumentException(
-                                        "존재하지 않는 PT 면접입니다."
+                                        "존재하지 않는 PT 면접입니다. ptInterviewId="
+                                                + ptInterviewId
                                 )
                         );
 
@@ -60,25 +57,23 @@ public class PtQuestionService {
          */
         PtDocumentEntity document =
                 ptDocumentRepository
-                        .findByPtInterviewId(
-                                ptInterviewId
-                        )
+                        .findByPtInterviewId(ptInterviewId)
                         .orElseThrow(
                                 () -> new IllegalStateException(
-                                        "업로드된 PT 발표자료가 없습니다."
+                                        "업로드된 PT 발표자료가 없습니다. ptInterviewId="
+                                                + ptInterviewId
                                 )
                         );
 
         /*
          * 문서 분석 완료 여부 확인
          */
-        if (
-                document.getAnalysisStatus()
-                        != PtDocumentStatus.COMPLETED
-        ) {
+        if (document.getAnalysisStatus()
+                != PtDocumentStatus.COMPLETED) {
 
             throw new IllegalStateException(
-                    "PT 발표자료 분석이 완료되지 않았습니다."
+                    "PT 발표자료 분석이 완료되지 않았습니다. 현재 상태="
+                            + document.getAnalysisStatus()
             );
         }
 
@@ -92,7 +87,6 @@ public class PtQuestionService {
                         );
 
         if (slides.isEmpty()) {
-
             throw new IllegalStateException(
                     "분석된 PT 슬라이드가 없습니다."
             );
@@ -104,6 +98,12 @@ public class PtQuestionService {
         String slidesText =
                 buildSlidesText(slides);
 
+        if (slidesText.isBlank()) {
+            throw new IllegalStateException(
+                    "PT 슬라이드에서 질문 생성에 사용할 내용을 찾을 수 없습니다."
+            );
+        }
+
         String documentSummary =
                 document.getSummary();
 
@@ -111,12 +111,11 @@ public class PtQuestionService {
          * 전체 요약이 비어 있으면
          * 슬라이드 텍스트를 대신 사용
          */
-        if (
-                documentSummary == null
-                        || documentSummary.isBlank()
-        ) {
+        if (documentSummary == null
+                || documentSummary.isBlank()) {
 
-            documentSummary = slidesText;
+            documentSummary =
+                    slidesText;
         }
 
         /*
@@ -130,21 +129,12 @@ public class PtQuestionService {
                                 DEFAULT_QUESTION_COUNT
                         );
 
-        if (
-                response == null
-                        || response.questions() == null
-                        || response.questions().isEmpty()
-        ) {
-
-            throw new IllegalStateException(
-                    "PT 예상 질문 생성 결과가 없습니다."
-            );
-        }
+        validateQuestionResponse(response);
 
         /*
          * 기존 질문 삭제
          *
-         * 재생성할 경우 중복 방지
+         * 질문을 재생성할 경우 중복 저장 방지
          */
         ptQuestionRepository
                 .deleteAllByPtInterviewId(
@@ -157,56 +147,56 @@ public class PtQuestionService {
         List<PtQuestionResponse> results =
                 new ArrayList<>();
 
-        int fallbackNumber = 1;
+        int questionNumber = 1;
 
-        for (
-                PtQuestionResult questionResult
-                : response.questions()
-        ) {
+        for (PtQuestionResult questionResult
+                : response.questions()) {
 
-            if (
-                    questionResult.question() == null
-                            || questionResult
-                            .question()
-                            .isBlank()
-            ) {
+            if (questionResult == null) {
                 continue;
             }
 
-            Integer questionNumber =
-                    questionResult.questionNumber();
+            String question =
+                    normalizeText(
+                            questionResult.question()
+                    );
 
-            if (questionNumber == null) {
-                questionNumber =
-                        fallbackNumber;
+            if (question == null) {
+                continue;
             }
+
+            String reason =
+                    normalizeText(
+                            questionResult.reason()
+                    );
 
             PtQuestionEntity entity =
                     PtQuestionEntity.create(
                             ptInterview,
                             questionNumber,
-                            questionResult.question(),
-                            questionResult.reason()
+                            question,
+                            reason
                     );
 
             PtQuestionEntity saved =
-                    ptQuestionRepository
-                            .save(entity);
+                    ptQuestionRepository.save(entity);
 
             results.add(
-                    new PtQuestionResponse(
-                            saved.getId(),
-                            saved.getQuestionNumber(),
-                            saved.getQuestion(),
-                            saved.getReason()
-                    )
+                    toResponse(saved)
             );
 
-            fallbackNumber++;
+            questionNumber++;
+
+            /*
+             * 요청한 기본 질문 개수를 초과하면 중단
+             */
+            if (questionNumber
+                    > DEFAULT_QUESTION_COUNT) {
+                break;
+            }
         }
 
         if (results.isEmpty()) {
-
             throw new IllegalStateException(
                     "저장할 수 있는 PT 예상 질문이 없습니다."
             );
@@ -223,13 +213,12 @@ public class PtQuestionService {
             Long ptInterviewId
     ) {
 
-        if (
-                !ptInterviewRepository
-                        .existsById(ptInterviewId)
-        ) {
+        if (!ptInterviewRepository
+                .existsById(ptInterviewId)) {
 
             throw new IllegalArgumentException(
-                    "존재하지 않는 PT 면접입니다."
+                    "존재하지 않는 PT 면접입니다. ptInterviewId="
+                            + ptInterviewId
             );
         }
 
@@ -238,16 +227,45 @@ public class PtQuestionService {
                         ptInterviewId
                 )
                 .stream()
-                .map(
-                        question ->
-                                new PtQuestionResponse(
-                                        question.getId(),
-                                        question.getQuestionNumber(),
-                                        question.getQuestion(),
-                                        question.getReason()
-                                )
-                )
+                .map(this::toResponse)
                 .toList();
+    }
+
+    /*
+     * FastAPI 질문 생성 응답 검증
+     */
+    private void validateQuestionResponse(
+            PtQuestionGenerateResponse response
+    ) {
+
+        if (response == null) {
+            throw new IllegalStateException(
+                    "FastAPI 질문 생성 응답이 없습니다."
+            );
+        }
+
+        if (response.questions() == null
+                || response.questions().isEmpty()) {
+
+            throw new IllegalStateException(
+                    "PT 예상 질문 생성 결과가 없습니다."
+            );
+        }
+    }
+
+    /*
+     * PtQuestionEntity를 응답 DTO로 변환
+     */
+    private PtQuestionResponse toResponse(
+            PtQuestionEntity question
+    ) {
+
+        return new PtQuestionResponse(
+                question.getId(),
+                question.getQuestionNumber(),
+                question.getQuestion(),
+                question.getReason()
+        );
     }
 
     /*
@@ -262,59 +280,65 @@ public class PtQuestionService {
 
         for (PtSlideEntity slide : slides) {
 
-            builder.append(
-                    "[슬라이드 "
-            );
+            builder.append("[슬라이드 ")
+                    .append(slide.getSlideNumber())
+                    .append("]\n");
 
-            builder.append(
-                    slide.getSlideNumber()
-            );
+            String title =
+                    normalizeText(
+                            slide.getTitle()
+                    );
 
-            builder.append("]\n");
-
-            if (
-                    slide.getTitle() != null
-                            && !slide.getTitle().isBlank()
-            ) {
-
+            if (title != null) {
                 builder.append("제목: ")
-                        .append(
-                                slide.getTitle()
-                        )
+                        .append(title)
                         .append("\n");
             }
 
-            if (
-                    slide.getExtractedText() != null
-                            && !slide
-                            .getExtractedText()
-                            .isBlank()
-            ) {
+            String extractedText =
+                    normalizeText(
+                            slide.getExtractedText()
+                    );
 
+            if (extractedText != null) {
                 builder.append("원본 내용:\n")
-                        .append(
-                                slide.getExtractedText()
-                        )
+                        .append(extractedText)
                         .append("\n");
             }
 
-            if (
-                    slide.getSummary() != null
-                            && !slide
-                            .getSummary()
-                            .isBlank()
-            ) {
+            String summary =
+                    normalizeText(
+                            slide.getSummary()
+                    );
 
+            if (summary != null) {
                 builder.append("요약:\n")
-                        .append(
-                                slide.getSummary()
-                        )
+                        .append(summary)
                         .append("\n");
             }
 
             builder.append("\n");
         }
 
-        return builder.toString();
+        return builder.toString()
+                .trim();
+    }
+
+    /*
+     * 문자열 공백 정리
+     *
+     * null 또는 빈 문자열이면 null 반환
+     */
+    private String normalizeText(
+            String value
+    ) {
+
+        if (value == null
+                || value.isBlank()) {
+
+            return null;
+        }
+
+        return value.trim();
     }
 }

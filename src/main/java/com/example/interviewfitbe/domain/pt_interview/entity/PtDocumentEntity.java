@@ -18,9 +18,6 @@ public class PtDocumentEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /*
-     * 하나의 PT 면접당 하나의 발표자료
-     */
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "pt_interview_id",
@@ -29,51 +26,27 @@ public class PtDocumentEntity {
     )
     private PtInterviewEntity ptInterview;
 
-    /*
-     * 사용자가 업로드한 원본 파일명
-     */
     private String originalFileName;
 
-    /*
-     * MinIO에 저장된 실제 파일 경로
-     *
-     * 예:
-     * pt-documents/15/uuid_presentation.pptx
-     */
     @Column(nullable = false)
     private String objectKey;
 
-    /*
-     * MIME Type
-     *
-     * 예:
-     * application/vnd.openxmlformats-officedocument.presentationml.presentation
-     */
     private String contentType;
 
-    /*
-     * 파일 크기(byte)
-     */
     private Long fileSize;
 
-    /*
-     * PPT 분석 진행 상태
-     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PtDocumentStatus analysisStatus;
 
     /*
-     * PPT 전체 요약
-     *
-     * FastAPI + AI 분석 완료 후 저장
+     * 전체 슬라이드 수
      */
+    private Integer totalSlides;
+
     @Column(columnDefinition = "TEXT")
     private String summary;
 
-    /*
-     * 분석 실패 시 오류 내용
-     */
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
@@ -89,7 +62,6 @@ public class PtDocumentEntity {
             String contentType,
             Long fileSize
     ) {
-
         PtDocumentEntity entity = new PtDocumentEntity();
 
         entity.ptInterview = ptInterview;
@@ -98,6 +70,7 @@ public class PtDocumentEntity {
         entity.contentType = contentType;
         entity.fileSize = fileSize;
         entity.analysisStatus = PtDocumentStatus.UPLOADED;
+        entity.totalSlides = 0;
         entity.createdAt = LocalDateTime.now();
 
         return entity;
@@ -105,12 +78,17 @@ public class PtDocumentEntity {
 
     public void startAnalysis() {
         this.analysisStatus = PtDocumentStatus.ANALYZING;
+        this.errorMessage = null;
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void completeAnalysis(String summary) {
+    public void completeAnalysis(
+            String summary,
+            Integer totalSlides
+    ) {
         this.analysisStatus = PtDocumentStatus.COMPLETED;
         this.summary = summary;
+        this.totalSlides = totalSlides;
         this.errorMessage = null;
         this.updatedAt = LocalDateTime.now();
     }
