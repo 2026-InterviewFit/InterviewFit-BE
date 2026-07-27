@@ -42,8 +42,6 @@ public class PtSlideEntity {
 
     /*
      * 슬라이드 번호
-     *
-     * 1, 2, 3...
      */
     @Column(nullable = false)
     private Integer slideNumber;
@@ -66,17 +64,12 @@ public class PtSlideEntity {
     private String summary;
 
     /*
-     * 슬라이드를 이미지로 변환했을 경우
-     * MinIO 이미지 objectKey
+     * 슬라이드 이미지 MinIO ObjectKey
      */
     private String imageObjectKey;
 
     /*
-     * 추가 분석 결과
-     *
-     * 핵심 키워드,
-     * 차트/표 분석,
-     * 중요도 등의 JSON 저장
+     * 추가 분석 결과(JSON)
      */
     @Column(columnDefinition = "TEXT")
     private String analysisJson;
@@ -84,6 +77,30 @@ public class PtSlideEntity {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * 일반적인 PT 문서 분석 시 사용하는 생성 메서드
+     */
+    public static PtSlideEntity create(
+            PtDocumentEntity document,
+            Integer slideNumber,
+            String title,
+            String extractedText,
+            String summary
+    ) {
+        return create(
+                document,
+                slideNumber,
+                title,
+                extractedText,
+                summary,
+                null,
+                null
+        );
+    }
+
+    /**
+     * 이미지 분석 등 추가 정보가 있을 때 사용하는 생성 메서드
+     */
     public static PtSlideEntity create(
             PtDocumentEntity document,
             Integer slideNumber,

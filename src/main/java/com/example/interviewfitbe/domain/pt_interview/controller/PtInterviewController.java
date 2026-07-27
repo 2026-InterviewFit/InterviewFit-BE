@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.pt_interview.controller;
 
+import com.example.interviewfitbe.domain.pt_interview.dto.PtDocumentDetailResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtDocumentUploadResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtInterviewCreateRequest;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtInterviewResponse;
@@ -62,6 +63,29 @@ public class PtInterviewController {
                 ptDocumentService.uploadDocument(
                         ptInterviewId,
                         file
+                );
+
+        return ResponseEntity.ok(
+                response
+        );
+    }
+
+    /*
+     * PT 발표자료 분석 결과 조회
+     *
+     * 문서 전체 요약과
+     * 슬라이드별 분석 결과를 반환한다.
+     */
+    @GetMapping(
+            "/{ptInterviewId}/document"
+    )
+    public ResponseEntity<PtDocumentDetailResponse> getDocumentDetail(
+            @PathVariable Long ptInterviewId
+    ) {
+
+        PtDocumentDetailResponse response =
+                ptDocumentService.getDocumentDetail(
+                        ptInterviewId
                 );
 
         return ResponseEntity.ok(

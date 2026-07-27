@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.pt_interview.service;
 
 import com.example.interviewfitbe.domain.pt_interview.dto.PtDocumentAnalyzeResponse;
+import com.example.interviewfitbe.domain.pt_interview.dto.PtDocumentDetailResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtDocumentUploadResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtSlideAnalyzeResult;
 import com.example.interviewfitbe.domain.pt_interview.entity.PtDocumentEntity;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -31,16 +33,9 @@ public class PtDocumentService {
     private static final String DOCUMENT_DIRECTORY = "pt-documents/";
 
     private final MinioClient minioClient;
-
     private final PtInterviewRepository ptInterviewRepository;
-
     private final PtDocumentRepository ptDocumentRepository;
-
     private final PtSlideRepository ptSlideRepository;
-
-    /*
-     * FastAPI PT 문서 분석 호출 서비스
-     */
     private final PtDocumentAnalysisService ptDocumentAnalysisService;
 
     @Value("${minio.bucket}")
@@ -49,15 +44,14 @@ public class PtDocumentService {
     /*
      * PT 발표자료 업로드
      *
-     * 흐름:
-     *
      * 1. 파일 검증
      * 2. PT 면접 조회
-     * 3. MinIO 업로드
-     * 4. PtDocument DB 저장
-     * 5. FastAPI 분석 요청
-     * 6. 슬라이드별 분석 결과 저장
-     * 7. 분석 상태 COMPLETED / FAILED 변경
+     * 3. 중복 업로드 확인
+     * 4. MinIO 업로드
+     * 5. PtDocument 저장
+     * 6. FastAPI 문서 분석
+     * 7. PtSlide 저장
+     * 8. 분석 상태 변경
      */
     @Transactional
     public PtDocumentUploadResponse uploadDocument(
@@ -65,31 +59,21 @@ public class PtDocumentService {
             MultipartFile file
     ) throws IOException {
 
-        /*
-         * 1. 파일 검증
-         */
         validateFile(file);
 
-        /*
-         * 2. PT 면접 조회
-         */
         PtInterviewEntity ptInterview =
-                ptInterviewRepository
-                        .findById(ptInterviewId)
+                ptInterviewRepository.findById(ptInterviewId)
                         .orElseThrow(
                                 () -> new IllegalArgumentException(
-                                        "존재하지 않는 PT 면접입니다."
+                                        "존재하지 않는 PT 면접입니다. ptInterviewId="
+                                                + ptInterviewId
                                 )
                         );
 
-        /*
-         * 하나의 PT 면접에는 하나의 발표자료만 허용
-         */
-        if (
-                ptDocumentRepository
-                        .findByPtInterviewId(ptInterviewId)
-                        .isPresent()
-        ) {
+        if (ptDocumentRepository
+                .findByPtInterviewId(ptInterviewId)
+                .isPresent()) {
+
             throw new IllegalStateException(
                     "이미 업로드된 PT 발표자료가 존재합니다."
             );
@@ -98,162 +82,176 @@ public class PtDocumentService {
         String originalFileName =
                 getOriginalFileName(file);
 
-        /*
-         * 3. MinIO 업로드
-         */
+        String contentType =
+                normalizeContentType(
+                        file.getContentType()
+                );
+
         String objectKey =
                 uploadToMinio(
                         ptInterviewId,
                         file,
-                        originalFileName
+                        originalFileName,
+                        contentType
                 );
 
-        /*
-         * 4. PtDocument 생성
-         */
         PtDocumentEntity document =
                 PtDocumentEntity.create(
                         ptInterview,
                         originalFileName,
                         objectKey,
-                        file.getContentType(),
+                        contentType,
                         file.getSize()
                 );
 
-        PtDocumentEntity saved =
+        PtDocumentEntity savedDocument =
                 ptDocumentRepository.save(document);
 
-        /*
-         * 5. FastAPI 분석 시작
-         */
-        analyzeAndSaveSlides(saved);
+        analyzeAndSaveSlides(savedDocument);
 
-        /*
-         * 최종 상태를 포함해서 반환
-         */
         return new PtDocumentUploadResponse(
-                saved.getId(),
+                savedDocument.getId(),
                 ptInterview.getId(),
-                saved.getOriginalFileName(),
-                saved.getObjectKey(),
-                saved.getAnalysisStatus().name()
+                savedDocument.getOriginalFileName(),
+                savedDocument.getObjectKey(),
+                savedDocument.getAnalysisStatus().name()
         );
     }
 
     /*
-     * FastAPI 문서 분석
+     * PT 발표자료 분석 결과 조회
      *
-     * MinIO objectKey를 FastAPI에 전달하고
-     * 분석된 슬라이드를 PtSlide 테이블에 저장한다.
+     * 문서 정보와 슬라이드별 분석 결과를 함께 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public PtDocumentDetailResponse getDocumentDetail(
+            Long ptInterviewId
+    ) {
+
+        /*
+         * PT 면접 존재 여부 확인
+         */
+        if (!ptInterviewRepository.existsById(ptInterviewId)) {
+            throw new IllegalArgumentException(
+                    "존재하지 않는 PT 면접입니다. ptInterviewId="
+                            + ptInterviewId
+            );
+        }
+
+        /*
+         * PT 면접에 연결된 발표자료 조회
+         */
+        PtDocumentEntity document =
+                ptDocumentRepository
+                        .findByPtInterviewId(ptInterviewId)
+                        .orElseThrow(
+                                () -> new IllegalArgumentException(
+                                        "업로드된 PT 발표자료가 없습니다. ptInterviewId="
+                                                + ptInterviewId
+                                )
+                        );
+
+        /*
+         * 슬라이드 번호 순서대로 조회
+         */
+        List<PtSlideEntity> slides =
+                ptSlideRepository
+                        .findAllByDocumentIdOrderBySlideNumberAsc(
+                                document.getId()
+                        );
+
+        return PtDocumentDetailResponse.from(
+                document,
+                slides
+        );
+    }
+
+    /*
+     * FastAPI 문서 분석 및 슬라이드 저장
      */
     private void analyzeAndSaveSlides(
             PtDocumentEntity document
     ) {
 
-        /*
-         * UPLOADED → ANALYZING
-         */
         document.startAnalysis();
 
         try {
-
-            /*
-             * FastAPI
-             *
-             * POST /apis/pt-document/analyze
-             */
             PtDocumentAnalyzeResponse response =
-                    ptDocumentAnalysisService
-                            .analyzeDocument(
-                                    document.getObjectKey()
-                            );
+                    ptDocumentAnalysisService.analyzeDocument(
+                            document.getObjectKey()
+                    );
 
-            /*
-             * 기존 슬라이드 데이터가 있다면 삭제
-             *
-             * 현재는 최초 업로드만 허용하지만
-             * 추후 재분석 기능을 고려한 처리
-             */
+            validateAnalysisResponse(response);
+
             ptSlideRepository.deleteAllByDocumentId(
                     document.getId()
             );
 
-            /*
-             * FastAPI에서 받은 슬라이드별 분석 결과 저장
-             */
-            if (
-                    response != null
-                            && response.slides() != null
-            ) {
+            for (PtSlideAnalyzeResult slide : response.slides()) {
 
-                for (
-                        PtSlideAnalyzeResult slide
-                        : response.slides()
-                ) {
+                PtSlideEntity slideEntity =
+                        PtSlideEntity.create(
+                                document,
+                                slide.slideNumber(),
+                                slide.title(),
+                                slide.extractedText(),
+                                slide.summary()
+                        );
 
-                    PtSlideEntity slideEntity =
-                            PtSlideEntity.create(
-                                    document,
-                                    slide.slideNumber(),
-                                    slide.title(),
-                                    slide.extractedText(),
-                                    slide.summary(),
-
-                                    /*
-                                     * 이미지 변환 기능은 아직 미구현
-                                     */
-                                    null,
-
-                                    /*
-                                     * 추가 AI 분석 JSON도 아직 미구현
-                                     */
-                                    null
-                            );
-
-                    ptSlideRepository.save(
-                            slideEntity
-                    );
-                }
+                ptSlideRepository.save(slideEntity);
             }
 
-            /*
-             * 현재 FastAPI에서는 문서 전체 summary를
-             * 반환하지 않으므로 null 처리
-             *
-             * 추후 Gemini 전체 요약 연결 예정
-             */
             document.completeAnalysis(
-                    response.summary()
+                    response.summary(),
+                    response.totalSlides()
             );
 
             log.info(
                     "PT 발표자료 분석 완료: documentId={}, objectKey={}, totalSlides={}",
                     document.getId(),
                     document.getObjectKey(),
-                    response != null
-                            ? response.totalSlides()
-                            : 0
+                    response.totalSlides()
             );
 
         } catch (Exception e) {
 
-            /*
-             * 분석 실패 상태 저장
-             *
-             * 여기서는 예외를 다시 던지지 않는다.
-             * 그래야 PtDocument의 FAILED 상태가
-             * 트랜잭션 롤백으로 사라지지 않는다.
-             */
-            document.failAnalysis(
-                    e.getMessage()
-            );
+            String errorMessage =
+                    getErrorMessage(e);
+
+            document.failAnalysis(errorMessage);
 
             log.error(
                     "PT 발표자료 분석 실패: documentId={}, objectKey={}, error={}",
                     document.getId(),
                     document.getObjectKey(),
-                    e.getMessage(),
+                    errorMessage,
                     e
+            );
+        }
+    }
+
+    /*
+     * FastAPI 응답 검증
+     */
+    private void validateAnalysisResponse(
+            PtDocumentAnalyzeResponse response
+    ) {
+
+        if (response == null) {
+            throw new IllegalStateException(
+                    "FastAPI 문서 분석 응답이 없습니다."
+            );
+        }
+
+        if (response.slides() == null) {
+            throw new IllegalStateException(
+                    "FastAPI 슬라이드 분석 결과가 없습니다."
+            );
+        }
+
+        if (response.totalSlides() == null) {
+            throw new IllegalStateException(
+                    "FastAPI 전체 슬라이드 수가 없습니다."
             );
         }
     }
@@ -264,7 +262,8 @@ public class PtDocumentService {
     private String uploadToMinio(
             Long ptInterviewId,
             MultipartFile file,
-            String originalFileName
+            String originalFileName,
+            String contentType
     ) throws IOException {
 
         String objectKey =
@@ -274,13 +273,7 @@ public class PtDocumentService {
                 );
 
         try {
-
             createBucketIfNotExists();
-
-            String contentType =
-                    normalizeContentType(
-                            file.getContentType()
-                    );
 
             minioClient.putObject(
                     PutObjectArgs.builder()
@@ -306,14 +299,15 @@ public class PtDocumentService {
         } catch (Exception e) {
 
             log.error(
-                    "PT 발표자료 MinIO 업로드 실패: {}",
+                    "PT 발표자료 MinIO 업로드 실패: ptInterviewId={}, error={}",
+                    ptInterviewId,
                     e.getMessage(),
                     e
             );
 
             throw new IOException(
                     "PT 발표자료 MinIO 업로드 실패: "
-                            + e.getMessage(),
+                            + getErrorMessage(e),
                     e
             );
         }
@@ -322,22 +316,15 @@ public class PtDocumentService {
     /*
      * 업로드 파일 검증
      *
-     * 현재 FastAPI 분석 서비스가 지원하는 형식:
-     *
+     * 지원 형식:
      * - PPTX
      * - PDF
-     *
-     * 구형 PPT(.ppt)는 지원하지 않음
      */
     private void validateFile(
             MultipartFile file
     ) throws IOException {
 
-        if (
-                file == null
-                        || file.isEmpty()
-        ) {
-
+        if (file == null || file.isEmpty()) {
             throw new IOException(
                     "업로드된 파일이 비어 있습니다."
             );
@@ -346,11 +333,7 @@ public class PtDocumentService {
         String fileName =
                 file.getOriginalFilename();
 
-        if (
-                fileName == null
-                        || fileName.isBlank()
-        ) {
-
+        if (fileName == null || fileName.isBlank()) {
             throw new IOException(
                     "파일명이 존재하지 않습니다."
             );
@@ -359,13 +342,11 @@ public class PtDocumentService {
         String lowerFileName =
                 fileName.toLowerCase();
 
-        if (
-                !lowerFileName.endsWith(".pptx")
-                        && !lowerFileName.endsWith(".pdf")
-        ) {
+        if (!lowerFileName.endsWith(".pptx")
+                && !lowerFileName.endsWith(".pdf")) {
 
             throw new IOException(
-                    "PPTX, PDF 파일만 업로드할 수 있습니다."
+                    "PPTX 또는 PDF 파일만 업로드할 수 있습니다."
             );
         }
     }
@@ -375,19 +356,29 @@ public class PtDocumentService {
      */
     private String getOriginalFileName(
             MultipartFile file
-    ) {
+    ) throws IOException {
 
-        return file.getOriginalFilename();
+        String originalFileName =
+                file.getOriginalFilename();
+
+        if (originalFileName == null
+                || originalFileName.isBlank()) {
+
+            throw new IOException(
+                    "파일명이 존재하지 않습니다."
+            );
+        }
+
+        return originalFileName
+                .replace("\\", "_")
+                .replace("/", "_");
     }
 
     /*
-     * MinIO objectKey 생성
+     * MinIO ObjectKey 생성
      *
      * 예:
-     *
-     * pt-documents/
-     *   15/
-     *     uuid_presentation.pptx
+     * pt-documents/15/uuid_presentation.pptx
      */
     private String createObjectKey(
             Long ptInterviewId,
@@ -409,16 +400,13 @@ public class PtDocumentService {
             String contentType
     ) {
 
-        if (
-                contentType == null
-                        || contentType.isBlank()
-        ) {
+        if (contentType == null
+                || contentType.isBlank()) {
 
             return "application/octet-stream";
         }
 
         if (contentType.contains(";")) {
-
             return contentType
                     .split(";")[0]
                     .trim();
@@ -428,26 +416,21 @@ public class PtDocumentService {
     }
 
     /*
-     * MinIO bucket 존재 여부 확인
-     *
-     * 없으면 자동 생성
+     * MinIO Bucket 확인 및 생성
      */
     private void createBucketIfNotExists()
             throws Exception {
 
         boolean exists =
                 minioClient.bucketExists(
-                        BucketExistsArgs
-                                .builder()
+                        BucketExistsArgs.builder()
                                 .bucket(bucketName)
                                 .build()
                 );
 
         if (!exists) {
-
             minioClient.makeBucket(
-                    MakeBucketArgs
-                            .builder()
+                    MakeBucketArgs.builder()
                             .bucket(bucketName)
                             .build()
             );
@@ -457,5 +440,19 @@ public class PtDocumentService {
                     bucketName
             );
         }
+    }
+
+    private String getErrorMessage(
+            Exception e
+    ) {
+
+        String message =
+                e.getMessage();
+
+        if (message == null || message.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+
+        return message;
     }
 }
