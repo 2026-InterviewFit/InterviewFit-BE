@@ -1,6 +1,6 @@
 package com.example.interviewfitbe.domain.coverletter.dto.client;
 
-import com.example.interviewfitbe.domain.coverletter.dto.analysis.StarDto;
+import com.example.interviewfitbe.domain.coverletter.dto.analysis.StarItem;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,21 +13,15 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class CoverLetterQuestionAnalysis {
+public class CoverLetterQuestionAnalysisResponseItem {
     @JsonProperty("question_number")
     private Integer questionNumber;
-
-    @JsonProperty("question")
-    private String question;
-
-    @JsonProperty("answer")
-    private String answer;
 
     @JsonProperty("summary")
     private String summary;
 
     @JsonProperty("star")
-    private StarDto star;
+    private StarItem star;
 
     @JsonProperty("strengths")
     private List<String> strengths;
@@ -44,3 +38,4 @@ public class CoverLetterQuestionAnalysis {
     @JsonProperty("importance_score")
     private Float importanceScore;
 }
+

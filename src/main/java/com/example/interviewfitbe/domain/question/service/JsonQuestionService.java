@@ -2,6 +2,7 @@ package com.example.interviewfitbe.domain.question.service;
 
 import com.example.interviewfitbe.domain.job.exception.JobRoleErrorCode;
 import com.example.interviewfitbe.domain.question.dto.client.QuestionClientResponse;
+import com.example.interviewfitbe.domain.question.dto.client.QuestionItem;
 import com.example.interviewfitbe.domain.question.exception.JsonQuestionErrorCode;
 import com.example.interviewfitbe.global.exception.BaseException;
 import jakarta.annotation.PostConstruct;
@@ -51,6 +52,10 @@ public class JsonQuestionService {
                 .questions(
                         shuffled.stream()
                                 .limit(Math.min(count, shuffled.size()))
+                                .map(question -> QuestionItem.builder()
+                                        .question(question)
+                                        .questionNumber(null)
+                                        .build())
                                 .toList()
                 )
                 .build();

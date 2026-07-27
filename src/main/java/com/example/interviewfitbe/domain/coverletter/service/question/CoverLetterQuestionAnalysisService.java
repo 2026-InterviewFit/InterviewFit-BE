@@ -1,6 +1,6 @@
 package com.example.interviewfitbe.domain.coverletter.service.question;
 
-import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterQuestionAnalysis;
+import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterQuestionAnalysisItem;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionEntity;
 import com.example.interviewfitbe.domain.coverletter.mapper.CoverLetterQuestionAnalysisMapper;
@@ -20,7 +20,7 @@ public class CoverLetterQuestionAnalysisService {
         return coverLetterQuestionAnalysisRepository.findAllByCoverLetterQuestionIn(coverLetterQuestions);
     }
 
-    public void saveQuestionAnalysis(CoverLetterQuestionAnalysis questionsAnalysis, CoverLetterQuestionEntity coverLetterQuestion) {
+    public void saveQuestionAnalysis(CoverLetterQuestionAnalysisItem questionsAnalysis, CoverLetterQuestionEntity coverLetterQuestion) {
         coverLetterQuestionAnalysisRepository.save(
                 coverLetterQuestionAnalysisMapper.toEntity(questionsAnalysis, coverLetterQuestion)
         );

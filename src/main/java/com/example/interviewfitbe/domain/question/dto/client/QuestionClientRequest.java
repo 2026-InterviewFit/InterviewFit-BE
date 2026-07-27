@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.question.dto.client;
 
+import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterQuestionAnalysisResponseItem;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +21,7 @@ public class QuestionClientRequest {
     private String jobName;
 
     @JsonProperty("analyses")
-    private List<CoverLetterQuestionAnalysis2> analyses;
+    private List<CoverLetterQuestionAnalysisResponseItem> analyses;
 
     @JsonProperty("previous_questions")
     private List<String> previousQuestions;

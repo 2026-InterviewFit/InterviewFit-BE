@@ -1,6 +1,6 @@
 package com.example.interviewfitbe.domain.question.entity;
 
-import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
+import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.question.enums.QuestionType;
@@ -32,10 +32,11 @@ public class QuestionEntity {
     @JoinColumn(name = "job_role_id", nullable = false)
     private JobRoleEntity jobRole;
 
+    // 자기소개서 문항별 저장 테이블
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cover_letter_id")
-    private CoverLetterEntity coverLetter;
+    @JoinColumn(name = "cover_letter_question_id")
+    private CoverLetterQuestionEntity coverLetterQuestion;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;

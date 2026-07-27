@@ -1,10 +1,10 @@
 package com.example.interviewfitbe.domain.coverletter.mapper;
 
-import com.example.interviewfitbe.domain.coverletter.dto.analysis.StarDto;
-import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterQuestionAnalysis;
+import com.example.interviewfitbe.domain.coverletter.dto.analysis.StarItem;
+import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterQuestionAnalysisItem;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionEntity;
-import com.example.interviewfitbe.domain.question.dto.client.CoverLetterQuestionAnalysis2;
+import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterQuestionAnalysisResponseItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
@@ -17,24 +17,24 @@ import java.util.List;
 public class CoverLetterQuestionAnalysisMapper {
     private final ObjectMapper objectMapper;
 
-    public CoverLetterQuestionAnalysisEntity toEntity(CoverLetterQuestionAnalysis coverLetterQuestionAnalysis, CoverLetterQuestionEntity coverLetterQuestion) {
+    public CoverLetterQuestionAnalysisEntity toEntity(CoverLetterQuestionAnalysisItem coverLetterQuestionAnalysisItem, CoverLetterQuestionEntity coverLetterQuestion) {
         return CoverLetterQuestionAnalysisEntity.builder()
                 .coverLetterQuestion(coverLetterQuestion)
-                .summary(coverLetterQuestionAnalysis.getSummary())
-                .starJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysis.getStar()))
-                .strengthsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysis.getStrengths()))
-                .improvementsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysis.getImprovements()))
-                .skillsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysis.getSkills()))
-                .keywordsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysis.getKeywords()))
-                .importanceScore(coverLetterQuestionAnalysis.getImportanceScore())
+                .summary(coverLetterQuestionAnalysisItem.getSummary())
+                .starJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getStar()))
+                .strengthsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getStrengths()))
+                .improvementsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getImprovements()))
+                .skillsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getSkills()))
+                .keywordsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getKeywords()))
+                .importanceScore(coverLetterQuestionAnalysisItem.getImportanceScore())
                 .build();
     }
 
-    public CoverLetterQuestionAnalysis2 toClient(CoverLetterQuestionAnalysisEntity entity) {
-        return CoverLetterQuestionAnalysis2.builder()
+    public CoverLetterQuestionAnalysisResponseItem toClient(CoverLetterQuestionAnalysisEntity entity) {
+        return CoverLetterQuestionAnalysisResponseItem.builder()
                 .questionNumber(entity.getCoverLetterQuestion().getQuestionOrder())
                 .summary(entity.getSummary())
-                .star(objectMapper.readValue(entity.getStarJson(), new TypeReference<StarDto>() {}))
+                .star(objectMapper.readValue(entity.getStarJson(), new TypeReference<StarItem>() {}))
                 .strengths(objectMapper.readValue(entity.getStrengthsJson(), new TypeReference<List<String>>() {}))
                 .improvements(objectMapper.readValue(entity.getImprovementsJson(), new TypeReference<List<String>>() {}))
                 .skills(objectMapper.readValue(entity.getSkillsJson(), new TypeReference<List<String>>() {}))
