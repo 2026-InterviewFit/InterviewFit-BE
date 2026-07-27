@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class StarDto {
+public class StarItem {
     private String situation;
     private String task;
     private String action;

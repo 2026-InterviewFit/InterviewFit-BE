@@ -2,7 +2,7 @@ package com.example.interviewfitbe.domain.question.service;
 
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
 import com.example.interviewfitbe.domain.coverletter.mapper.CoverLetterQuestionAnalysisMapper;
-import com.example.interviewfitbe.domain.question.dto.client.CoverLetterQuestionAnalysis2;
+import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterQuestionAnalysisResponseItem;
 import com.example.interviewfitbe.domain.question.dto.client.QuestionClientRequest;
 import com.example.interviewfitbe.domain.question.dto.client.QuestionClientResponse;
 import com.example.interviewfitbe.domain.question.exception.QuestionErrorCode;
@@ -16,6 +16,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletionException;
 
 @RequiredArgsConstructor
 @Service
@@ -24,10 +25,10 @@ public class QuestionClientService {
     private final CoverLetterQuestionAnalysisMapper coverLetterQuestionAnalysisMapper;
 
     public QuestionClientResponse createQuestions(int count, String jobName, List<CoverLetterQuestionAnalysisEntity> coverLetterQuestionAnalysis, List<String> previousQuestions) {
-        List<CoverLetterQuestionAnalysis2> analyses = coverLetterQuestionAnalysis.stream()
+        List<CoverLetterQuestionAnalysisResponseItem> analyses = coverLetterQuestionAnalysis.stream()
                 .map(coverLetterQuestionAnalysisMapper::toClient)
                 .sorted(Comparator.comparing(
-                        CoverLetterQuestionAnalysis2::getImportanceScore,
+                        CoverLetterQuestionAnalysisResponseItem::getImportanceScore,
                                 Comparator.nullsLast(Float::compareTo)
                         ).reversed()
                 )
@@ -46,22 +47,31 @@ public class QuestionClientService {
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(QuestionClientResponse.class)
-                    .block();
-        } catch (WebClientResponseException e) {
-            String body = e.getResponseBodyAsString();
+                    .toFuture()
+                    .join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
 
-            if (body.contains("QUESTION_GENERATION_FAILED")) {
-                throw new BaseException(QuestionErrorCode.QUESTION_GENERATION_FAILED);
+            if (cause instanceof WebClientResponseException ex) {
+                String body = ex.getResponseBodyAsString();
+
+                if (body.contains("QUESTION_GENERATION_FAILED")) {
+                    throw new BaseException(QuestionErrorCode.QUESTION_GENERATION_FAILED);
+                }
+
+                if (body.contains("INVALID_QUESTION_RESPONSE")) {
+                    throw new BaseException(QuestionErrorCode.INVALID_QUESTION_RESPONSE);
+                }
+
+                if (body.contains("INVALID_QUESTION_COUNT")) {
+                    throw new BaseException(QuestionErrorCode.INVALID_QUESTION_COUNT);
+                }
+
+                if (body.contains("INVALID_QUESTION_VALIDATION")) {
+                    throw new BaseException(QuestionErrorCode.INVALID_QUESTION_VALIDATION);
+                }
             }
-            if (body.contains("INVALID_QUESTION_RESPONSE")) {
-                throw new BaseException(QuestionErrorCode.INVALID_QUESTION_RESPONSE);
-            }
-            if (body.contains("INVALID_QUESTION_COUNT")) {
-                throw new BaseException(QuestionErrorCode.INVALID_QUESTION_COUNT);
-            }
-            if (body.contains("INVALID_QUESTION_VALIDATION")) {
-                throw new BaseException(QuestionErrorCode.INVALID_QUESTION_VALIDATION);
-            }
+
             throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
         }
     }

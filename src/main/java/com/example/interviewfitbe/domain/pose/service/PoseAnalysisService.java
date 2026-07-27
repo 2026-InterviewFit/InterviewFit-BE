@@ -28,14 +28,14 @@ public class PoseAnalysisService {
                     .retrieve()
                     .bodyToFlux(PoseAnalysisResponse.class)
                     .collectList()
-                    .toFuture() // 비동기
-                    .join(); // blocking
+                    .block();
         } catch (WebClientResponseException e) {
             String body = e.getResponseBodyAsString();
 
             if (body.contains("FRAME_NOT_FOUND")) {
                 throw new BaseException(FastApiErrorCode.FRAME_NOT_FOUND);
             }
+
             throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
         }
     }

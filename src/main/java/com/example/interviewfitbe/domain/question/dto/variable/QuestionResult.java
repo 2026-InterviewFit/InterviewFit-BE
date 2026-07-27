@@ -1,5 +1,6 @@
-package com.example.interviewfitbe.domain.question.dto;
+package com.example.interviewfitbe.domain.question.dto.variable;
 
+import com.example.interviewfitbe.domain.question.dto.client.QuestionItem;
 import com.example.interviewfitbe.domain.question.enums.QuestionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,6 +14,6 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class QuestionResult {
-    private List<String> questions;
+    private List<QuestionItem> questions;
     private QuestionType type;
 }

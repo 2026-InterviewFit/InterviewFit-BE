@@ -8,7 +8,7 @@ import lombok.*;
 @Builder
 @AllArgsConstructor
 @Entity
-@Table(name = "job_role")
+@Table(name = "job_roles")
 public class JobRoleEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

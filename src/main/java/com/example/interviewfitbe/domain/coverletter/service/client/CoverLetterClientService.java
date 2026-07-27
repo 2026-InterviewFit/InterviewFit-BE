@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.concurrent.CompletionException;
+
 @RequiredArgsConstructor
 @Service
 public class CoverLetterClientService {
@@ -25,8 +27,15 @@ public class CoverLetterClientService {
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(CoverLetterClientResponse.class)
-                    .block();
-        } catch (WebClientResponseException e) {
+                    .toFuture()
+                    .join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+
+            if (cause instanceof WebClientResponseException) {
+                throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
+            }
+
             throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
         }
     }
