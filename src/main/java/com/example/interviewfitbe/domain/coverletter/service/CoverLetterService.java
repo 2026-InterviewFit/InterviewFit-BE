@@ -5,39 +5,43 @@ import com.example.interviewfitbe.domain.coverletter.dto.analysis.CoverLetterAna
 import com.example.interviewfitbe.domain.coverletter.dto.analysis.CoverLetterAnalysisResponse;
 import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterClientResponse;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
-import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionEntity;
+import com.example.interviewfitbe.domain.coverletter.async.event.CoverLetterCreatedEvent;
 import com.example.interviewfitbe.domain.coverletter.exception.CoverLetterEmbeddingErrorCode;
 import com.example.interviewfitbe.domain.coverletter.exception.CoverLetterErrorCode;
 import com.example.interviewfitbe.domain.coverletter.mapper.CoverLetterMapper;
+import com.example.interviewfitbe.domain.coverletter.mapper.CoverLetterProcessingMapper;
+import com.example.interviewfitbe.domain.coverletter.repository.CoverLetterProcessingRepository;
 import com.example.interviewfitbe.domain.coverletter.repository.CoverLetterRepository;
 import com.example.interviewfitbe.domain.coverletter.service.client.CoverLetterClientService;
-import com.example.interviewfitbe.domain.coverletter.service.embedding.CoverLetterQuestionEmbeddingService;
-import com.example.interviewfitbe.domain.coverletter.service.question.CoverLetterQuestionService;
 import com.example.interviewfitbe.domain.job.entity.RecommendedJobEntity;
 import com.example.interviewfitbe.domain.job.service.RecommendJobService;
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import com.example.interviewfitbe.domain.user.service.UserService;
 import com.example.interviewfitbe.global.exception.BaseException;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.SQLException;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class CoverLetterService {
-    private final CoverLetterQuestionService coverLetterQuestionService;
+    private final ApplicationEventPublisher eventPublisher;
+
     private final CoverLetterClientService coverLetterClientService;
-    private final CoverLetterQuestionEmbeddingService coverLetterQuestionEmbeddingService;
+//    private final CoverLetterQuestionService coverLetterQuestionService;
+//    private final CoverLetterQuestionEmbeddingService coverLetterQuestionEmbeddingService;
     private final RecommendJobService recommendJobService;
     private final UserService userService;
     private final CoverLetterRepository coverLetterRepository;
+    private final CoverLetterProcessingRepository coverLetterProcessingRepository;
     private final CoverLetterMapper coverLetterMapper;
+    private final CoverLetterProcessingMapper processingMapper;
 
     public CoverLetterEntity getCoverLetter(Long id) {
         return coverLetterRepository.findById(id).orElseThrow(() ->
@@ -65,11 +69,20 @@ public class CoverLetterService {
             recommendedJob = recommendJobService.saveRecommendedJob(analysisResult, coverLetter);
             log.info("recommendedJob: {}ms", System.currentTimeMillis() - start);
 
-            List<CoverLetterQuestionEntity> coverLetterQuestions = coverLetterQuestionService.saveCoverLetterQuestions(analysisResult.getQuestionsAnalysis(), coverLetter);
-            log.info("saveQuestions: {}ms", System.currentTimeMillis() - start);
+            coverLetterProcessingRepository.save(processingMapper.toEntity(coverLetter));
 
-            coverLetterQuestionEmbeddingService.createEmbedding(coverLetterQuestions);
-            log.info("embedding: {}ms", System.currentTimeMillis() - start);
+            eventPublisher.publishEvent(
+                    CoverLetterCreatedEvent.builder()
+                            .coverLetterId(coverLetter.getId())
+                            .analyses(analysisResult.getQuestionsAnalysis())
+                            .build()
+            );
+
+//            List<CoverLetterQuestionEntity> coverLetterQuestions = coverLetterQuestionService.saveCoverLetterQuestions(analysisResult.getQuestionsAnalysis(), coverLetter);
+//            log.info("saveQuestions: {}ms", System.currentTimeMillis() - start);
+//
+//            coverLetterQuestionEmbeddingService.createEmbedding(coverLetterQuestions);
+//            log.info("embedding: {}ms", System.currentTimeMillis() - start);
         } else {
             recommendedJob = recommendJobService.getRecommendedJobByCoverLetter(coverLetter);
         }

@@ -1,15 +1,18 @@
 package com.example.interviewfitbe.domain.question.mapper;
 
-import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
+import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
+import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.question.dto.QuestionDto;
 import com.example.interviewfitbe.domain.question.dto.QuestionResponse;
-import com.example.interviewfitbe.domain.question.dto.QuestionResult;
+import com.example.interviewfitbe.domain.question.dto.variable.QuestionResult;
 import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class QuestionMapper {
@@ -30,13 +33,22 @@ public class QuestionMapper {
                 .build();
     }
 
-    public List<QuestionEntity> toEntities(QuestionResult questionResult, JobRoleEntity jobRole, CoverLetterEntity coverLetter) {
+    public List<QuestionEntity> toEntities(QuestionResult questionResult, JobRoleEntity jobRole, List<CoverLetterQuestionAnalysisEntity> analyses) {
+        Map<Integer, CoverLetterQuestionEntity> coverLetterQuestionMap =
+                analyses.stream()
+                        .collect(Collectors.toMap(
+                                analysis -> analysis.getCoverLetterQuestion().getQuestionOrder(),
+                                CoverLetterQuestionAnalysisEntity::getCoverLetterQuestion
+                        ));
+
         return questionResult.getQuestions().stream()
-                .map(question -> QuestionEntity.builder()
-                        .question(question)
+                .map(item -> QuestionEntity.builder()
+                        .question(item.getQuestion())
                         .type(questionResult.getType())
                         .jobRole(jobRole)
-                        .coverLetter(coverLetter)
+                        .coverLetterQuestion(
+                                coverLetterQuestionMap.get(item.getQuestionNumber())
+                        )
                         .build())
                 .toList();
     }

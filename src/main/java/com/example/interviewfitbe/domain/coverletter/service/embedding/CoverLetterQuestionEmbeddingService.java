@@ -54,11 +54,11 @@ public class CoverLetterQuestionEmbeddingService {
             similarEmbeddings.addAll(similar);
         }
 
-        List<CoverLetterEntity> similarCoverLetters = similarEmbeddings.stream()
+        List<CoverLetterQuestionEntity> similarCoverLetterQuestions = similarEmbeddings.stream()
                 .map(CoverLetterQuestionEmbeddingEntity::getCoverLetterQuestion)
-                .map(CoverLetterQuestionEntity::getCoverLetter)
+                .distinct()
                 .toList();
 
-        return questionRepository.findByCoverLetterInAndType(similarCoverLetters, QuestionType.AI_GENERATED);
+        return questionRepository.findByCoverLetterQuestionInAndType(similarCoverLetterQuestions, QuestionType.AI_GENERATED);
     }
 }

@@ -12,5 +12,5 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class QuestionClientResponse {
-    private List<String> questions;
+    private List<QuestionItem> questions;
 }
