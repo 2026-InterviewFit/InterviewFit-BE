@@ -16,11 +16,14 @@ public class FollowUpAnalysisService {
 
     private final WebClient fastApiWebClient;
 
-    /**
-     * FastAPI/Gemini 꼬리질문 생성 호출 전담 메서드.
+    /*
+     * Spring → FastAPI 꼬리질문 생성 호출
      *
-     * followup은 영상이 아니라
-     * 원본 질문 + 사용자 답변 텍스트 기반으로 생성된다.
+     * Spring 외부 API:
+     * POST /api/followup/create
+     *
+     * FastAPI 내부 API:
+     * POST /apis/followup/create
      */
     public String createFollowUpQuestion(
             String job,
@@ -36,7 +39,7 @@ public class FollowUpAnalysisService {
 
         try {
             Map<String, Object> response = this.fastApiWebClient.post()
-                    .uri("/api/followup/create")
+                    .uri("/apis/followup/create")
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(Map.class)
@@ -58,6 +61,8 @@ public class FollowUpAnalysisService {
             return followUpQuestion.toString();
 
         } catch (WebClientResponseException e) {
+            throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
+        } catch (Exception e) {
             throw new BaseException(FastApiErrorCode.FASTAPI_SERVER_ERROR);
         }
     }
