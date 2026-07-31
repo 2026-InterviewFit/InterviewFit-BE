@@ -4,6 +4,7 @@ import com.example.interviewfitbe.domain.eye_blinking.service.EyeBlinkingService
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
+import com.example.interviewfitbe.domain.pose.service.PoseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -17,15 +18,16 @@ public class InterviewAnswerAnalysisJobService {
 
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final EyeBlinkingService eyeBlinkingService;
+    private final PoseService poseService;
     private final TransactionTemplate transactionTemplate;
 
     /*
      * 구현완료:
      * - eye blinking
+     * - pose
      *
      * 구현 필요:
      * - eye gaze
-     * - pose
      * - speech
      *
      */
@@ -49,6 +51,8 @@ public class InterviewAnswerAnalysisJobService {
              * FastAPI: POST /apis/eye-blinking/analyze
              */
             eyeBlinkingService.analyzeAndSave(videoObjectKey, interview);
+
+            poseService.processPostureAnalysis(videoObjectKey, interview);
 
             markDone(answerId);
 
