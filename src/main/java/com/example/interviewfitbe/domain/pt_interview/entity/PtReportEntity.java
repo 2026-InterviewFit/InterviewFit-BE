@@ -40,8 +40,6 @@ public class PtReportEntity {
 
     /*
      * 전달력 점수
-     *
-     * 음성 + 비언어 분석 등을 종합
      */
     private Double deliveryScore;
 
@@ -88,6 +86,9 @@ public class PtReportEntity {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
     public static PtReportEntity create(
             PtInterviewEntity ptInterview,
             Double contentScore,
@@ -102,21 +103,131 @@ public class PtReportEntity {
             String resultJson
     ) {
 
-        PtReportEntity entity = new PtReportEntity();
+        PtReportEntity entity =
+                new PtReportEntity();
 
-        entity.ptInterview = ptInterview;
-        entity.contentScore = contentScore;
-        entity.structureScore = structureScore;
-        entity.deliveryScore = deliveryScore;
-        entity.qaScore = qaScore;
-        entity.overallScore = overallScore;
-        entity.presentationSummary = presentationSummary;
-        entity.strengths = strengths;
-        entity.weaknesses = weaknesses;
-        entity.improvement = improvement;
-        entity.resultJson = resultJson;
-        entity.createdAt = LocalDateTime.now();
+        entity.ptInterview =
+                ptInterview;
+
+        entity.applyReportResult(
+                contentScore,
+                structureScore,
+                deliveryScore,
+                qaScore,
+                overallScore,
+                presentationSummary,
+                strengths,
+                weaknesses,
+                improvement,
+                resultJson
+        );
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+        entity.createdAt = now;
+        entity.updatedAt = now;
 
         return entity;
+    }
+
+    /*
+     * 기존 PT 리포트 재생성 시 내용 갱신
+     */
+    public void update(
+            Double contentScore,
+            Double structureScore,
+            Double deliveryScore,
+            Double qaScore,
+            Double overallScore,
+            String presentationSummary,
+            String strengths,
+            String weaknesses,
+            String improvement,
+            String resultJson
+    ) {
+
+        applyReportResult(
+                contentScore,
+                structureScore,
+                deliveryScore,
+                qaScore,
+                overallScore,
+                presentationSummary,
+                strengths,
+                weaknesses,
+                improvement,
+                resultJson
+        );
+
+        this.updatedAt =
+                LocalDateTime.now();
+    }
+
+    private void applyReportResult(
+            Double contentScore,
+            Double structureScore,
+            Double deliveryScore,
+            Double qaScore,
+            Double overallScore,
+            String presentationSummary,
+            String strengths,
+            String weaknesses,
+            String improvement,
+            String resultJson
+    ) {
+
+        this.contentScore =
+                contentScore;
+
+        this.structureScore =
+                structureScore;
+
+        this.deliveryScore =
+                deliveryScore;
+
+        this.qaScore =
+                qaScore;
+
+        this.overallScore =
+                overallScore;
+
+        this.presentationSummary =
+                normalizeText(
+                        presentationSummary
+                );
+
+        this.strengths =
+                normalizeText(
+                        strengths
+                );
+
+        this.weaknesses =
+                normalizeText(
+                        weaknesses
+                );
+
+        this.improvement =
+                normalizeText(
+                        improvement
+                );
+
+        this.resultJson =
+                normalizeText(
+                        resultJson
+                );
+    }
+
+    private static String normalizeText(
+            String value
+    ) {
+
+        if (value == null
+                || value.isBlank()) {
+
+            return null;
+        }
+
+        return value.trim();
     }
 }
