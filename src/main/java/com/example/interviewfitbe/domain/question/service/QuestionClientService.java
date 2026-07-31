@@ -24,7 +24,13 @@ public class QuestionClientService {
     private final WebClient fastApiWebClient;
     private final CoverLetterQuestionAnalysisMapper coverLetterQuestionAnalysisMapper;
 
-    public QuestionClientResponse createQuestions(int count, String jobName, List<CoverLetterQuestionAnalysisEntity> coverLetterQuestionAnalysis, List<String> previousQuestions) {
+    public QuestionClientResponse createQuestions(
+            int count,
+            String jobName,
+            List<CoverLetterQuestionAnalysisEntity> coverLetterQuestionAnalysis,
+            List<String> previousQuestions,
+            List<String> reusableQuestions
+    ) {
         List<CoverLetterQuestionAnalysisResponseItem> analyses = coverLetterQuestionAnalysis.stream()
                 .map(coverLetterQuestionAnalysisMapper::toClient)
                 .sorted(Comparator.comparing(
@@ -39,6 +45,7 @@ public class QuestionClientService {
                 .jobName(jobName)
                 .analyses(analyses)
                 .previousQuestions(previousQuestions)
+                .reusableQuestions(reusableQuestions)
                 .build();
 
         try {

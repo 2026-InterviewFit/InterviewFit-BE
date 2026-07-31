@@ -16,7 +16,7 @@ public class CoverLetterQuestionAnalysisService {
     private final CoverLetterQuestionAnalysisRepository coverLetterQuestionAnalysisRepository;
     private final CoverLetterQuestionAnalysisMapper coverLetterQuestionAnalysisMapper;
 
-    public List<CoverLetterQuestionAnalysisEntity> getCoverLetterQuestionAnalysis(List<CoverLetterQuestionEntity> coverLetterQuestions) {
+    public List<CoverLetterQuestionAnalysisEntity> getCoverLetterQuestionAnalyses(List<CoverLetterQuestionEntity> coverLetterQuestions) {
         return coverLetterQuestionAnalysisRepository.findAllByCoverLetterQuestionIn(coverLetterQuestions);
     }
 

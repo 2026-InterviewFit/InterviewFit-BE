@@ -3,6 +3,7 @@ package com.example.interviewfitbe.domain.question.dto.variable;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
+import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,6 +18,16 @@ import java.util.List;
 public class QuestionCreateData {
     private JobRoleEntity jobRole;
     private CoverLetterEntity coverLetter;
-    private List<CoverLetterQuestionAnalysisEntity> coverLetterQuestionAnalyses;
-    private List<String> previousQuestions;
+
+    @Builder.Default
+    private List<QuestionEntity> reusableQuestions = List.of();
+
+    @Builder.Default
+    private List<CoverLetterQuestionAnalysisEntity> coverLetterQuestionAnalyses = List.of();
+
+    @Builder.Default
+    private List<CoverLetterQuestionAnalysisEntity> selectedCoverLetterQuestionAnalyses = List.of();
+
+    @Builder.Default
+    private List<String> previousQuestions = List.of();
 }
