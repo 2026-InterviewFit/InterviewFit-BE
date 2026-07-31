@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.interview.entity;
 
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.pt_interview.entity.PtQuestionEntity;
 import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -35,12 +36,26 @@ public class InterviewAnswerEntity {
     private InterviewEntity interview;
 
     /*
-     * Question 삭제 시 해당 질문의 답변도 같이 삭제.
+     * 일반 면접 질문.
+     *
+     * PT 면접 답변에서는 사용하지 않으므로
+     * nullable을 허용한다.
      */
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "question_id", nullable = false)
+    @JoinColumn(name = "question_id")
     private QuestionEntity question;
+
+    /*
+     * PT 면접 질문.
+     *
+     * 일반 면접 답변에서는 null이며,
+     * PT 면접 답변을 저장할 때만 연결한다.
+     */
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pt_question_id")
+    private PtQuestionEntity ptQuestion;
 
     @Column(nullable = false)
     private Integer answerOrder;
@@ -78,71 +93,141 @@ public class InterviewAnswerEntity {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-    public void updateTimestamp(Double startTime, Double endTime) {
+    public void updateTimestamp(
+            Double startTime,
+            Double endTime
+    ) {
         this.startTime = startTime;
         this.endTime = endTime;
     }
 
-    public void updateAnswerText(String answerText) {
+    public void updateAnswerText(
+            String answerText
+    ) {
         this.answerText = answerText;
     }
 
     public void markUploaded() {
-        this.analysisStatus = AnalysisStatus.UPLOADED;
-        this.errorMessage = null;
+        this.analysisStatus =
+                AnalysisStatus.UPLOADED;
+
+        this.errorMessage =
+                null;
     }
 
     public void markRunning() {
-        this.analysisStatus = AnalysisStatus.RUNNING;
-        this.errorMessage = null;
+        this.analysisStatus =
+                AnalysisStatus.RUNNING;
+
+        this.errorMessage =
+                null;
     }
 
     public void markDone() {
-        this.analysisStatus = AnalysisStatus.DONE;
-        this.errorMessage = null;
+        this.analysisStatus =
+                AnalysisStatus.DONE;
+
+        this.errorMessage =
+                null;
     }
 
-    public void markFailed(String errorMessage) {
-        this.analysisStatus = AnalysisStatus.FAILED;
-        this.errorMessage = errorMessage;
+    public void markFailed(
+            String errorMessage
+    ) {
+        this.analysisStatus =
+                AnalysisStatus.FAILED;
+
+        this.errorMessage =
+                errorMessage;
     }
 
+    /*
+     * 일반 면접 또는 PT 면접에서
+     * 연결된 Interview ID 반환.
+     */
     public Long getInterviewIdSafely() {
-        if (this.interview != null) {
-            return this.interview.getId();
-        }
 
-        if (this.question != null && this.question.getInterview() != null) {
-            return this.question.getInterview().getId();
-        }
+        InterviewEntity interviewEntity =
+                getInterviewSafely();
 
-        return null;
+        return interviewEntity == null
+                ? null
+                : interviewEntity.getId();
     }
 
+    /*
+     * 일반 면접 또는 PT 면접에서
+     * 연결된 Interview 반환.
+     */
     public InterviewEntity getInterviewSafely() {
+
         if (this.interview != null) {
             return this.interview;
         }
 
         if (this.question != null) {
-            return this.question.getInterview();
+            return this.question
+                    .getInterview();
+        }
+
+        if (
+                this.ptQuestion != null
+                        && this.ptQuestion
+                        .getPtInterview() != null
+        ) {
+
+            return this.ptQuestion
+                    .getPtInterview()
+                    .getInterview();
         }
 
         return null;
     }
 
     /*
-     * 기존 코드 호환용.
+     * 기존 일반 질문 ID 조회용.
      */
     public Long getQuestionId() {
-        return this.question == null ? null : this.question.getId();
+
+        return this.question == null
+                ? null
+                : this.question.getId();
     }
 
     /*
-     * 기존 코드 호환용.
+     * PT 질문 ID 조회용.
+     */
+    public Long getPtQuestionId() {
+
+        return this.ptQuestion == null
+                ? null
+                : this.ptQuestion.getId();
+    }
+
+    /*
+     * 일반 면접과 PT 면접 모두에서
+     * 질문 내용을 반환한다.
      */
     public String getQuestionText() {
-        return this.question == null ? null : this.question.getQuestion();
+
+        if (this.question != null) {
+            return this.question
+                    .getQuestion();
+        }
+
+        if (this.ptQuestion != null) {
+            return this.ptQuestion
+                    .getQuestion();
+        }
+
+        return null;
+    }
+
+    /*
+     * 현재 답변이 PT 면접 답변인지 확인.
+     */
+    public boolean isPtAnswer() {
+        return this.ptQuestion != null;
     }
 
     /*
