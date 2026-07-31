@@ -8,19 +8,19 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record PtReportGenerateResponse(
 
         @JsonProperty("content_score")
-        Double contentScore,
+        Integer contentScore,
 
         @JsonProperty("structure_score")
-        Double structureScore,
+        Integer structureScore,
 
         @JsonProperty("delivery_score")
-        Double deliveryScore,
+        Integer deliveryScore,
 
         @JsonProperty("qa_score")
-        Double qaScore,
+        Integer qaScore,
 
         @JsonProperty("overall_score")
-        Double overallScore,
+        Integer overallScore,
 
         @JsonProperty("presentation_summary")
         String presentationSummary,
