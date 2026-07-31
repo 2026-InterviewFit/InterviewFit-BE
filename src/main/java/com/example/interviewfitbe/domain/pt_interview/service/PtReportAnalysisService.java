@@ -20,24 +20,19 @@ public class PtReportAnalysisService {
     public PtReportGenerateResponse generateReport(
             PtReportGenerateRequest request
     ) {
-
         validateRequest(request);
 
         try {
-
             PtReportGenerateResponse response =
                     fastApiWebClient
                             .post()
                             .uri("/apis/pt-report/generate")
                             .bodyValue(request)
                             .retrieve()
-                            .bodyToMono(
-                                    PtReportGenerateResponse.class
-                            )
+                            .bodyToMono(PtReportGenerateResponse.class)
                             .block();
 
             if (response == null) {
-
                 throw new BaseException(
                         FastApiErrorCode.FASTAPI_SERVER_ERROR
                 );
@@ -45,8 +40,10 @@ public class PtReportAnalysisService {
 
             return response;
 
-        } catch (WebClientResponseException e) {
+        } catch (BaseException e) {
+            throw e;
 
+        } catch (WebClientResponseException e) {
             log.error(
                     "PT 리포트 생성 실패. status={}, body={}",
                     e.getStatusCode(),
@@ -59,7 +56,6 @@ public class PtReportAnalysisService {
             );
 
         } catch (Exception e) {
-
             log.error(
                     "PT 리포트 생성 실패",
                     e
@@ -74,9 +70,7 @@ public class PtReportAnalysisService {
     private void validateRequest(
             PtReportGenerateRequest request
     ) {
-
         if (request == null) {
-
             throw new IllegalArgumentException(
                     "PT 리포트 요청 정보가 존재하지 않습니다."
             );

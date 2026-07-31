@@ -32,9 +32,7 @@ public class PtReportService {
     private final PtReportAnalysisService ptReportAnalysisService;
 
     @Transactional
-    public PtReportResponse generateReport(
-            Long ptInterviewId
-    ) {
+    public PtReportResponse generateReport(Long ptInterviewId) {
 
         PtInterviewEntity ptInterview =
                 ptInterviewRepository
@@ -66,9 +64,14 @@ public class PtReportService {
                                 ptInterviewId
                         );
 
+        String presentationSummary =
+                document.getSummary() == null
+                        ? ""
+                        : document.getSummary();
+
         PtReportGenerateRequest request =
                 new PtReportGenerateRequest(
-                        document.getSummary(),
+                        presentationSummary,
                         extractQuestions(questions),
                         extractAnswers(answers),
                         new ArrayList<>(),
@@ -78,12 +81,27 @@ public class PtReportService {
                 );
 
         PtReportGenerateResponse response =
-                ptReportAnalysisService
-                        .generateReport(request);
+                ptReportAnalysisService.generateReport(request);
 
         PtReportEntity report =
                 ptReportRepository
                         .findByPtInterviewId(ptInterviewId)
+                        .map(existingReport -> {
+                            existingReport.update(
+                                    response.contentScore(),
+                                    response.structureScore(),
+                                    response.deliveryScore(),
+                                    response.qaScore(),
+                                    response.overallScore(),
+                                    response.presentationSummary(),
+                                    response.strengths(),
+                                    response.weaknesses(),
+                                    response.improvement(),
+                                    null
+                            );
+
+                            return existingReport;
+                        })
                         .orElseGet(() ->
                                 PtReportEntity.create(
                                         ptInterview,
@@ -100,19 +118,6 @@ public class PtReportService {
                                 )
                         );
 
-        report.update(
-                response.contentScore(),
-                response.structureScore(),
-                response.deliveryScore(),
-                response.qaScore(),
-                response.overallScore(),
-                response.presentationSummary(),
-                response.strengths(),
-                response.weaknesses(),
-                response.improvement(),
-                null
-        );
-
         PtReportEntity saved =
                 ptReportRepository.save(report);
 
@@ -120,9 +125,7 @@ public class PtReportService {
     }
 
     @Transactional(readOnly = true)
-    public PtReportResponse getReport(
-            Long ptInterviewId
-    ) {
+    public PtReportResponse getReport(Long ptInterviewId) {
 
         PtReportEntity report =
                 ptReportRepository
@@ -139,32 +142,30 @@ public class PtReportService {
     private List<String> extractQuestions(
             List<PtQuestionEntity> questions
     ) {
-
         return questions.stream()
-                .map(PtQuestionEntity::getQuestion)
+                .map(question ->
+                        question.getQuestion() == null
+                                ? ""
+                                : question.getQuestion()
+                )
                 .toList();
     }
 
     private List<String> extractAnswers(
             List<InterviewAnswerEntity> answers
     ) {
-
         return answers.stream()
-                .map(answer -> {
-
-                    if (answer.getAnswerText() == null) {
-                        return "";
-                    }
-
-                    return answer.getAnswerText();
-                })
+                .map(answer ->
+                        answer.getAnswerText() == null
+                                ? ""
+                                : answer.getAnswerText()
+                )
                 .toList();
     }
 
     private PtReportResponse toResponse(
             PtReportEntity report
     ) {
-
         return new PtReportResponse(
                 report.getId(),
                 report.getPtInterview().getId(),
