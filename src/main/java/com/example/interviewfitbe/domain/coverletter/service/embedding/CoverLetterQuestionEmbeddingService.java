@@ -40,7 +40,7 @@ public class CoverLetterQuestionEmbeddingService {
         }
     }
 
-    public List<QuestionEntity> findPreviousQuestions(UserEntity user, List<CoverLetterQuestionEntity> coverLetterQuestions) {
+    public List<QuestionEntity> findPreviousQuestions(UserEntity user, List<CoverLetterQuestionEntity> coverLetterQuestions, List<QuestionEntity> reusableQuestions) {
         if (coverLetterQuestions == null) {
             return List.of();
         }
@@ -59,6 +59,16 @@ public class CoverLetterQuestionEmbeddingService {
                 .distinct()
                 .toList();
 
-        return questionRepository.findByCoverLetterQuestionInAndType(similarCoverLetterQuestions, QuestionType.AI_GENERATED);
+        if (reusableQuestions.isEmpty()) {
+            return questionRepository.findTop6ByCoverLetterQuestionInAndTypeOrderByCreatedAtDesc(similarCoverLetterQuestions, QuestionType.AI_GENERATED);
+        }
+
+        return questionRepository.findTop6ByCoverLetterQuestionInAndTypeAndIdNotInOrderByCreatedAtDesc(
+                similarCoverLetterQuestions,
+                QuestionType.AI_GENERATED,
+                reusableQuestions.stream()
+                        .map(QuestionEntity::getId)
+                        .toList()
+        );
     }
 }

@@ -49,10 +49,10 @@ public class CoverLetterService {
     }
 
     @Transactional
-    public CoverLetterAnalysisResponse analyzeCoverLetter(CoverLetterAnalysisRequest request) {
+    public CoverLetterAnalysisResponse analyzeCoverLetter(Long userId, CoverLetterAnalysisRequest request) {
         long start = System.currentTimeMillis();
 
-        UserEntity user = userService.getUserById(request.getUserId());
+        UserEntity user = userService.getUserById(userId);
         log.info("getUser: {}ms", System.currentTimeMillis() - start);
 
         CoverLetterCheckResult coverLetterCheckResult = getOrCreateCoverLetter(user, request.getCoverLetter());

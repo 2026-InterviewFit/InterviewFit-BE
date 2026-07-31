@@ -8,7 +8,8 @@ import lombok.Getter;
 @Getter
 public enum CoverLetterProcessingErrorCode  implements ErrorCode {
     COVER_LETTER_PROCESSING_NOT_FOUND(404, "COVER_LETTER_PROCESSING_NOT_FOUND", "자기소개서 저장 로그가 존재하지 않습니다."),
-    COVER_LETTER_PROCESSING_NOT_COMPLETED(409, "CLP002", "자기소개서 처리가 아직 완료되지 않았습니다.");
+    COVER_LETTER_PROCESSING_NOT_COMPLETED(409, "COVER_LETTER_PROCESSING_NOT_COMPLETED", "자기소개서 처리가 아직 완료되지 않았습니다."),
+    COVER_LETTER_PROCESSING_FAILED(422, "COVER_LETTER_PROCESSING_FAILED", "자기소개서 저장 및 분석에 실패했습니다.");
 
     private final int status;
     private final String code;

@@ -25,4 +25,7 @@ public class QuestionClientRequest {
 
     @JsonProperty("previous_questions")
     private List<String> previousQuestions;
+
+    @JsonProperty("reusable_questions")
+    private List<String> reusableQuestions;
 }

@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.question.service;
 
+import com.example.interviewfitbe.domain.coverletter.calculator.CoverLetterQuestionSelector;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterProcessingEntity;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
@@ -14,6 +15,7 @@ import com.example.interviewfitbe.domain.coverletter.service.embedding.CoverLett
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.job.service.JobRoleService;
 import com.example.interviewfitbe.domain.question.dto.*;
+import com.example.interviewfitbe.domain.question.dto.variable.CoverLetterQuestionData;
 import com.example.interviewfitbe.domain.question.dto.variable.QuestionCreateData;
 import com.example.interviewfitbe.domain.question.dto.variable.QuestionResult;
 import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 @Service
@@ -43,6 +46,8 @@ public class QuestionService {
     private final JobRoleService jobRoleService;
     private final QuestionRepository questionRepository;
     private final QuestionMapper questionMapper;
+
+    private final CoverLetterQuestionSelector coverLetterQuestionSelector;
 
     private final UserService userService;
 
@@ -61,72 +66,207 @@ public class QuestionService {
 
     @Transactional
     public List<QuestionResponse> createQuestions(Long userId, QuestionRequest request) {
-        QuestionCreateData data = loadQuestionData(userId, request);
+        QuestionCreateData data = new QuestionCreateData();
         List<QuestionEntity> entities;
 
         try {
-            QuestionResult questionResult = getQuestions(request, data.getJobRole(), data.getPreviousQuestions(), data.getCoverLetterQuestionAnalyses());
-            entities = questionMapper.toEntities(questionResult, data.getJobRole(), data.getCoverLetterQuestionAnalyses());
-        } catch (Exception e) {
-            QuestionResult defaultResult = getDefaultQuestions(request.getJobName(), request.getCount());
-            entities = questionMapper.toEntities(defaultResult, data.getJobRole(), List.of());
+            data = loadQuestionData(userId, request);
+
+            if (hasEnoughReusableQuestions(data, request)) {
+                return getReusableQuestions(data, request);
+            }
+
+            entities = generateQuestions(request, data);
+        } catch (BaseException e) {
+            if (e.getErrorCode() == CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_COMPLETED) {
+                throw e;
+            }
+
+            int reusableCount = data.getReusableQuestions() == null
+                    ? 0
+                    : data.getReusableQuestions().size();
+            int generateCount = Math.max(request.getCount() - reusableCount, 0);
+
+            QuestionResult result = getDefaultQuestions(request.getJobName(), generateCount);
+            entities = questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
         }
 
-        return questionRepository.saveAll(entities)
-                .stream()
-                .map(questionMapper::toResponse)
-                .toList();
+        List<QuestionEntity> saved = saveQuestions(entities);
+
+        return mergeQuestions(
+                data.getReusableQuestions().isEmpty()
+                        ? List.of()
+                        : data.getReusableQuestions(),
+                saved
+        );
+    }
+
+    private boolean hasEnoughReusableQuestions(QuestionCreateData data, QuestionRequest request) {
+        return data.getReusableQuestions() != null
+                && data.getReusableQuestions().size() >= request.getCount();
     }
 
     private QuestionCreateData loadQuestionData(Long userId, QuestionRequest request) {
         UserEntity user = userService.getUserById(userId);
         JobRoleEntity jobRole = jobRoleService.getJobRoleEntity(request.getJobRoleId());
 
-        CoverLetterEntity coverLetter = null;
-        List<CoverLetterQuestionAnalysisEntity> analyses = List.of();
-        List<String> previousQuestions = List.of();
-
-        if (request.getCoverLetterId() != null) {
-            coverLetter = coverLetterService.getCoverLetter(request.getCoverLetterId());
-            CoverLetterProcessingEntity processing = coverLetterProcessingService.getProcessingByCoverLetter(coverLetter);
-
-            if (processing.getStatus() != ProcessingStatus.COMPLETED) {
-                throw new BaseException(CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_COMPLETED);
-            }
-
-            List<CoverLetterQuestionEntity> coverLetterQuestions = coverLetterQuestionService.getCoverLetterQuestions(coverLetter);
-            analyses = coverLetterQuestionAnalysisService.getCoverLetterQuestionAnalysis(coverLetterQuestions);
-            previousQuestions = coverLetterQuestionEmbeddingService.findPreviousQuestions(user, coverLetterQuestions)
-                    .stream()
-                    .map(QuestionEntity::getQuestion)
-                    .toList();
+        if (request.getCoverLetterId() == null) {
+            return createWithoutCoverLetterData(jobRole);
         }
+
+        return createWithCoverLetterData(user, jobRole, request);
+    }
+
+    private void validateProcessing(CoverLetterEntity coverLetter) {
+        CoverLetterProcessingEntity processing = coverLetterProcessingService.getProcessingByCoverLetter(coverLetter);
+
+        if (processing.getStatus() == ProcessingStatus.FAILED) {
+            throw new BaseException(
+                    CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_FAILED
+            );
+        } else if (processing.getStatus() != ProcessingStatus.COMPLETED) {
+            throw new BaseException(
+                    CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_COMPLETED
+            );
+        }
+    }
+
+    private QuestionCreateData createWithoutCoverLetterData(JobRoleEntity jobRole) {
+        return QuestionCreateData.builder()
+                .jobRole(jobRole)
+                .reusableQuestions(List.of())
+                .coverLetterQuestionAnalyses(List.of())
+                .previousQuestions(List.of())
+                .build();
+    }
+
+    private QuestionCreateData createWithCoverLetterData(UserEntity user, JobRoleEntity jobRole, QuestionRequest request) {
+        CoverLetterEntity coverLetter = coverLetterService.getCoverLetter(request.getCoverLetterId());
+
+        validateProcessing(coverLetter);
+
+        CoverLetterQuestionData coverLetterData = loadCoverLetterQuestionData(coverLetter, request.getCount());
+
+        List<QuestionEntity> previousQuestions = coverLetterData.getReusableQuestions().size() < request.getCount()
+                ? loadPreviousQuestions(user, coverLetterData)
+                : List.of();
+
+        List<CoverLetterQuestionAnalysisEntity> selected = coverLetterData.getCoverLetterQuestionAnalyses().size() > (request.getCount() - coverLetterData.getReusableQuestions().size())
+                ? coverLetterQuestionSelector.selectForQuestionGeneration(coverLetterData.getCoverLetterQuestionAnalyses(), previousQuestions, request.getCount() - coverLetterData.getReusableQuestions().size())
+                : List.of();
 
         return QuestionCreateData.builder()
                 .jobRole(jobRole)
                 .coverLetter(coverLetter)
-                .coverLetterQuestionAnalyses(analyses)
-                .previousQuestions(previousQuestions)
+                .reusableQuestions(coverLetterData.getReusableQuestions())
+                .previousQuestions(
+                        previousQuestions
+                                .stream()
+                                .map(QuestionEntity::getQuestion)
+                                .toList()
+                )
+                .coverLetterQuestionAnalyses(coverLetterData.getCoverLetterQuestionAnalyses())
+                .selectedCoverLetterQuestionAnalyses(selected)
                 .build();
     }
 
-    private QuestionResult getQuestions(QuestionRequest request, JobRoleEntity jobRole, List<String> previousQuestions, List<CoverLetterQuestionAnalysisEntity> analyses) {
+    private CoverLetterQuestionData loadCoverLetterQuestionData(CoverLetterEntity coverLetter, Integer count) {
+        List<CoverLetterQuestionEntity> coverLetterQuestions = coverLetterQuestionService.getCoverLetterQuestions(coverLetter);
+
+        List<QuestionEntity> reusableQuestions = questionRepository.findReusableQuestions(
+                coverLetterQuestions.stream()
+                                .map(CoverLetterQuestionEntity::getId)
+                                .toList(),
+                QuestionType.AI_GENERATED.name(),
+                count
+        );
+
+        List<CoverLetterQuestionAnalysisEntity> analyses = coverLetterQuestionAnalysisService.getCoverLetterQuestionAnalyses(coverLetterQuestions);
+
+        return CoverLetterQuestionData.builder()
+                .reusableQuestions(reusableQuestions)
+                .coverLetterQuestionAnalyses(analyses)
+                .coverLetterQuestions(coverLetterQuestions)
+                .build();
+    }
+
+    private List<QuestionEntity> loadPreviousQuestions(UserEntity user, CoverLetterQuestionData data) {
+        return coverLetterQuestionEmbeddingService.findPreviousQuestions(
+                        user,
+                        data.getCoverLetterQuestions(),
+                        data.getReusableQuestions()
+                );
+    }
+
+    private List<QuestionEntity> generateQuestions(QuestionRequest request, QuestionCreateData data) {
+        QuestionResult result = getQuestions(
+                request,
+                data.getJobRole(),
+                data.getPreviousQuestions() ,
+                data.getSelectedCoverLetterQuestionAnalyses().isEmpty()
+                        ? data.getCoverLetterQuestionAnalyses()
+                        : data.getSelectedCoverLetterQuestionAnalyses(),
+                data.getReusableQuestions()
+        );
+
+        return questionMapper.toEntities(result, data.getJobRole(), data.getCoverLetterQuestionAnalyses());
+    }
+
+    private List<QuestionEntity> saveQuestions(List<QuestionEntity> questions) {
+        return questionRepository.saveAll(questions);
+    }
+
+    private List<QuestionResponse> getReusableQuestions(QuestionCreateData data, QuestionRequest request) {
+        return data.getReusableQuestions()
+                .stream()
+                .limit(request.getCount())
+                .map(questionMapper::toResponse)
+                .toList();
+    }
+
+    private List<QuestionResponse> mergeQuestions(List<QuestionEntity> reusable, List<QuestionEntity> saved) {
+        return Stream.concat(
+                        reusable == null ? Stream.empty() : reusable.stream(),
+                        saved.stream()
+                )
+                .map(questionMapper::toResponse)
+                .toList();
+    }
+
+    private QuestionResult getQuestions(
+            QuestionRequest request,
+            JobRoleEntity jobRole,
+            List<String> previousQuestions,
+            List<CoverLetterQuestionAnalysisEntity> analyses,
+            List<QuestionEntity> reusableQuestions
+    ) {
+        int reusableQuestionsSize = reusableQuestions != null ? reusableQuestions.size() : 0;
+        int remainCount = request.getCount() - reusableQuestionsSize;
+
         if (request.getCoverLetterId() == null) {
-            return getDefaultQuestions(request.getJobName(), request.getCount());
+            return getDefaultQuestions(request.getJobName(), remainCount);
         }
-        try {
-            String jobName = "기타".equals(jobRole.getName())
-                    ? request.getJobName()
-                    : jobRole.getName();
-            return QuestionResult.builder()
-                    .questions(
-                            questionClientService.createQuestions(request.getCount(), jobName, analyses, previousQuestions).getQuestions()
-                    )
-                    .type(QuestionType.AI_GENERATED)
-                    .build();
-        } catch (Exception e) {
-            return getDefaultQuestions(request.getJobName(), request.getCount());
-        }
+
+        String jobName = "기타".equals(jobRole.getName())
+                ? request.getJobName()
+                : jobRole.getName();
+
+        return QuestionResult.builder()
+                .questions(
+                        questionClientService.createQuestions(
+                                remainCount,
+                                jobName,
+                                analyses,
+                                previousQuestions,
+                                reusableQuestions != null
+                                        ? reusableQuestions.stream()
+                                        .map(QuestionEntity::getQuestion)
+                                        .toList()
+                                        : null
+                        ).getQuestions()
+                )
+                .type(QuestionType.AI_GENERATED)
+                .build();
     }
 
     private QuestionResult getDefaultQuestions(String jobName, int count) {

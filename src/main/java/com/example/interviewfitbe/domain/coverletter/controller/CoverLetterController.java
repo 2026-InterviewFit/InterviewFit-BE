@@ -31,13 +31,16 @@ public class CoverLetterController {
     public ResponseEntity<CoverLetterAnalysisResponse> analyzeCoverLetter(
             @RequestPart("request") CoverLetterAnalysisRequest request,
             @RequestPart(value = "coverLetterFile", required = false) MultipartFile coverLetterFile
+//            Authentication authentication
     ) {
         if (coverLetterFile != null && !coverLetterFile.isEmpty()) {
             String coverLetter = pdfService.extractText(coverLetterFile);
             request.updateCoverLetter(coverLetter);
         }
 
-        CoverLetterAnalysisResponse response = coverLetterService.analyzeCoverLetter(request);
+//        Long userId = (Long) authentication.getPrincipal();
+
+        CoverLetterAnalysisResponse response = coverLetterService.analyzeCoverLetter(request.getUserId(), request);
         return ResponseEntity.ok(response);
     }
 }
