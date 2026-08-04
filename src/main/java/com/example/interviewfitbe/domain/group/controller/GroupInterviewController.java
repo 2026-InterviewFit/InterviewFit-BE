@@ -1,11 +1,11 @@
 package com.example.interviewfitbe.domain.group.controller;
 
+import com.example.interviewfitbe.domain.group.dto.JoinRoomRequest;
+import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,49 +18,123 @@ public class GroupInterviewController {
 
     private final GroupInterviewService groupInterviewService;
 
+
     /**
-     * POST /api/group-interviews
-     * 다대일 면접 방 생성 API
+     * 다대일 면접 방 생성
      */
     @PostMapping
-    public ResponseEntity<GroupInterviewEntity> createRoom(@RequestBody CreateRoomRequest request) {
-        GroupInterviewEntity room = groupInterviewService.createRoom(request.getHostUserId(), request.getJobRoleId());
+    public ResponseEntity<GroupInterviewEntity> createRoom(
+            @RequestBody RoomCreateRequest request) {
+
+        // 최대 참여 인원 검증 (2~4명)
+        if (request.getMaxParticipants() == null
+                || request.getMaxParticipants() < 2
+                || request.getMaxParticipants() > 4) {
+
+            throw new IllegalArgumentException(
+                    "다대일 면접 인원 제한은 최소 2명부터 최대 4명까지 설정 가능합니다."
+            );
+        }
+
+
+        // 로그인 구현 전에는 요청받은 hostUserId 사용
+        GroupInterviewEntity room =
+                groupInterviewService.createRoom(
+                        request.getTitle(),
+                        request.getHostUserId(),
+                        request.getJobRoleId(),
+                        request.getMaxParticipants(),
+                        request.getScheduledStartTime()
+                );
+
+
         return ResponseEntity.ok(room);
     }
 
+
     /**
-     * POST /api/group-interviews/{roomId}/join
-     * 면접 방 입장(참여) API
+     * 면접 방 입장
      */
     @PostMapping("/{roomId}/join")
     public ResponseEntity<GroupParticipantEntity> joinRoom(
             @PathVariable Long roomId,
             @RequestBody JoinRoomRequest request) {
-        GroupParticipantEntity participant = groupInterviewService.joinRoom(roomId, request.getUserId());
-        return ResponseEntity.ok(participant);
+
+
+        return ResponseEntity.ok(
+                groupInterviewService.joinRoom(
+                        roomId,
+                        request.getUserId()
+                )
+        );
     }
+
 
     /**
-     * GET /api/group-interviews/{roomId}/participants
-     * 방 참여자 목록 조회 API
+     * 방 참여자 목록 조회
      */
     @GetMapping("/{roomId}/participants")
-    public ResponseEntity<List<GroupParticipantEntity>> getParticipants(@PathVariable Long roomId) {
-        List<GroupParticipantEntity> participants = groupInterviewService.getParticipants(roomId);
-        return ResponseEntity.ok(participants);
+    public ResponseEntity<List<GroupParticipantEntity>> getParticipants(
+            @PathVariable Long roomId) {
+
+
+        return ResponseEntity.ok(
+                groupInterviewService.getParticipants(roomId)
+        );
     }
 
-    // --- API 요청용 내부 DTO 클래스들 ---
-    @Getter
-    @Setter
-    public static class CreateRoomRequest {
-        private Long hostUserId;
-        private Long jobRoleId;
+
+    /**
+     * 면접 방 목록 조회
+     */
+    @GetMapping
+    public ResponseEntity<List<GroupInterviewEntity>> getRooms() {
+
+
+        return ResponseEntity.ok(
+                groupInterviewService.getAllRooms()
+        );
     }
 
-    @Getter
-    @Setter
-    public static class JoinRoomRequest {
-        private Long userId;
+
+    /**
+     * 면접 방 상세 조회
+     */
+    @GetMapping("/{roomId}")
+    public ResponseEntity<GroupInterviewEntity> getRoom(
+            @PathVariable Long roomId) {
+
+
+        return ResponseEntity.ok(
+                groupInterviewService.getRoomById(roomId)
+        );
+    }
+
+
+    /**
+     * 면접 시작
+     */
+    @PostMapping("/{roomId}/start")
+    public ResponseEntity<Void> startInterview(
+            @PathVariable Long roomId) {
+
+
+        groupInterviewService.startInterview(roomId);
+
+        return ResponseEntity.ok().build();
+    }
+
+
+    /**
+     * 면접 종료
+     */
+    @PostMapping("/{roomId}/finish")
+    public ResponseEntity<Void> finishInterview(
+            @PathVariable Long roomId) {
+
+
+        groupInterviewService.finishInterview(roomId);
+
+        return ResponseEntity.ok().build();
     }
 }

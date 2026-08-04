@@ -51,6 +51,8 @@ dependencies {
 
     // 웹소켓
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // 라이브킷
+    implementation 'io.livekit:livekit-server:0.10.0'
 }
 
 tasks.named('test') {

@@ -44,6 +44,7 @@ public class SecurityConfig {
                                 "/api/job-role/**",
                                 "/webhook/**",
                                 "/api/group/**",
+                                "/api/group-interviews/**",
                                 "/ws-interview/**"
                         ).permitAll()
 
