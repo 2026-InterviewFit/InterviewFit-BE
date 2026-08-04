@@ -25,6 +25,7 @@ public class SpeechReportEntity {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id", nullable = false, unique = true)
     private InterviewEntity interview;
+    private Double score;
 
     /**
      * 전체 STT 결과
