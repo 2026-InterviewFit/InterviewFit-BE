@@ -11,15 +11,15 @@ public record PtReportResponse(
 
         Long ptInterviewId,
 
-        Double contentScore,
+        Integer contentScore,
 
-        Double structureScore,
+        Integer structureScore,
 
-        Double deliveryScore,
+        Integer deliveryScore,
 
-        Double qaScore,
+        Integer qaScore,
 
-        Double overallScore,
+        Integer overallScore,
 
         String presentationSummary,
 
