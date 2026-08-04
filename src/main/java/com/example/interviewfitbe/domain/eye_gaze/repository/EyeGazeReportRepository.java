@@ -11,9 +11,9 @@ import java.util.Optional;
 public interface EyeGazeReportRepository
         extends JpaRepository<EyeGazeReport, Long> {
 
-    List<EyeGazeReport> findAllByInterviewId(Long interviewId);
+    List<EyeGazeReport> findAllByInterview_Id(Long interviewId);
 
-    Optional<EyeGazeReport> findTopByInterviewIdOrderByCreatedAtDesc(
+    Optional<EyeGazeReport> findTopByInterview_IdOrderByCreatedAtDesc(
             Long interviewId
     );
 }

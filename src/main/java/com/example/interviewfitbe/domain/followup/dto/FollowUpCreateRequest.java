@@ -13,6 +13,9 @@ public class FollowUpCreateRequest {
 
     private Long interviewId;
 
+    // JWT에서 추출한 로그인 사용자 ID
+    private Long userId;
+
     /*
      * source_question_id.
      * FE에서 questionId로 보내도 받게 alias 처리.
@@ -53,4 +56,6 @@ public class FollowUpCreateRequest {
     @JsonProperty("result_json")
     @JsonAlias("resultJson")
     private String resultJson;
+
+
 }

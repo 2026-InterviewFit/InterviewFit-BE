@@ -6,6 +6,7 @@ import com.example.interviewfitbe.domain.interview.dto.InterviewStartRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartResponse;
 import com.example.interviewfitbe.domain.interview.service.InterviewAnswerService;
 import com.example.interviewfitbe.domain.interview.service.InterviewService;
+import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +26,11 @@ public class InterviewController {
     public ResponseEntity<InterviewStartResponse> startInterview(
             @RequestBody InterviewStartRequest request
     ) {
-        InterviewStartResponse response = interviewService.startInterview(request);
+        Long userId = AuthUtils.getCurrentUserId();
+        InterviewStartResponse response = interviewService.startInterview(userId, request);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * 질문별 답변 영상 업로드 API.
-     */
     @PostMapping("/{interviewId}/answers")
     public ResponseEntity<InterviewAnswerUploadResponse> uploadInterviewAnswer(
             @PathVariable Long interviewId,
@@ -41,14 +40,10 @@ public class InterviewController {
             @RequestParam(value = "startTime", required = false) Double startTime,
             @RequestParam(value = "endTime", required = false) Double endTime
     ) throws IOException {
+        Long userId = AuthUtils.getCurrentUserId();
         InterviewAnswerUploadResponse response =
                 interviewAnswerService.uploadAnswerVideo(
-                        interviewId,
-                        file,
-                        questionId,
-                        answerOrder,
-                        startTime,
-                        endTime
+                        userId, interviewId, file, questionId, answerOrder, startTime, endTime
                 );
         return ResponseEntity.ok(response);
     }
@@ -57,7 +52,8 @@ public class InterviewController {
     public ResponseEntity<InterviewReportResponse> getInterviewReport(
             @PathVariable Long interviewId
     ) {
-        InterviewReportResponse response = interviewService.getInterviewReport(interviewId);
+        Long userId = AuthUtils.getCurrentUserId();
+        InterviewReportResponse response = interviewService.getInterviewReport(userId, interviewId);
         return ResponseEntity.ok(response);
     }
 }

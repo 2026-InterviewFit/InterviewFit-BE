@@ -9,6 +9,9 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/users")
@@ -23,45 +26,20 @@ public class UserController {
     public ResponseEntity<KakaoLoginResponse> kakaoLogin(
             @RequestBody KakaoLoginRequest request
     ) {
+        if (request.getCode() == null || request.getCode().isBlank()) {
+            throw new IllegalArgumentException("카카오 인가 코드가 없습니다.");
+        }
 
         System.out.println("======================================");
-        System.out.println("🔥🔥🔥 KAKAO LOGIN API START 🔥🔥🔥");
+        System.out.println("KAKAO LOGIN API START");
         System.out.println("======================================");
 
         try {
-
-            System.out.println("1️⃣ 프론트에서 받은 인가 코드");
-            System.out.println(request.getCode());
-
-            //----------------------------------
-            // AccessToken 발급
-            //----------------------------------
-            System.out.println("2️⃣ 카카오 AccessToken 요청");
-
             String kakaoAccessToken =
                     kakaoApiClient.getAccessToken(request.getCode());
 
-            System.out.println("AccessToken 발급 성공");
-            System.out.println(kakaoAccessToken);
-
-            //----------------------------------
-            // 사용자 조회
-            //----------------------------------
-            System.out.println("3️⃣ 카카오 사용자 조회");
-
             KakaoUserInfoResponse kakaoUserInfo =
                     kakaoApiClient.getUserInfo(kakaoAccessToken);
-
-            System.out.println("카카오 사용자 조회 성공");
-
-            System.out.println("id = " + kakaoUserInfo.getId());
-            System.out.println("email = " + kakaoUserInfo.getEmail());
-            System.out.println("nickname = " + kakaoUserInfo.getNickname());
-
-            //----------------------------------
-            // DB 회원조회
-            //----------------------------------
-            System.out.println("4️⃣ DB 회원 조회/회원가입");
 
             UserEntity user =
                     userService.processKakaoLogin(
@@ -70,38 +48,20 @@ public class UserController {
                             kakaoUserInfo.getNickname()
                     );
 
-            System.out.println("DB 처리 완료");
+            String jwt = jwtTokenProvider.createToken(user.getId());
 
-            System.out.println("userId = " + user.getId());
-            System.out.println("email = " + user.getEmail());
-
-            //----------------------------------
-            // JWT 생성
-            //----------------------------------
-            System.out.println("5️⃣ JWT 생성");
-
-            String jwt =
-                    jwtTokenProvider.createToken(user.getId());
-
-            System.out.println("JWT 생성 성공");
-            System.out.println(jwt);
-
-            System.out.println("======================================");
-            System.out.println("🎉 카카오 로그인 성공");
-            System.out.println("======================================");
+            System.out.println("카카오 로그인 성공. userId=" + user.getId());
 
             return ResponseEntity.ok(
-                    new KakaoLoginResponse(jwt, user)
+                    KakaoLoginResponse.from(jwt, user)
             );
 
+        } catch (WebClientResponseException e) {
+            System.out.println("카카오 로그인 실패. status=" + e.getStatusCode());
+            throw e;
+
         } catch (Exception e) {
-
-            System.out.println("======================================");
-            System.out.println("❌ 카카오 로그인 실패");
-            System.out.println("======================================");
-
-            e.printStackTrace();
-
+            System.out.println("카카오 로그인 실패. message=" + e.getMessage());
             throw e;
         }
     }
@@ -115,6 +75,33 @@ public class UserController {
     @RequiredArgsConstructor
     public static class KakaoLoginResponse {
         private final String token;
-        private final UserEntity user;
+        private final UserResponse user;
+
+        public static KakaoLoginResponse from(String token, UserEntity user) {
+            return new KakaoLoginResponse(
+                    token,
+                    UserResponse.from(user)
+            );
+        }
+    }
+
+    @Getter
+    @RequiredArgsConstructor
+    public static class UserResponse {
+        private final Long id;
+        private final Long kakaoId;
+        private final String email;
+        private final String name;
+        private final LocalDateTime createdAt;
+
+        public static UserResponse from(UserEntity user) {
+            return new UserResponse(
+                    user.getId(),
+                    user.getKakaoId(),
+                    user.getEmail(),
+                    user.getName(),
+                    user.getCreatedAt()
+            );
+        }
     }
 }
