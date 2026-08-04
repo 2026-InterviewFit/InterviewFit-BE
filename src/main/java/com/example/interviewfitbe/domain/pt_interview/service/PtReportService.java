@@ -1,7 +1,11 @@
 package com.example.interviewfitbe.domain.pt_interview.service;
 
+import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
+import com.example.interviewfitbe.domain.eye_gaze.repository.EyeGazeReportRepository;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
+import com.example.interviewfitbe.domain.speech_coaching.repository.SpeechReportRepository;
+import com.example.interviewfitbe.domain.pose.repository.PoseReportRepository;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtReportGenerateRequest;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtReportGenerateResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtReportResponse;
@@ -17,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+
 import java.util.List;
 
 @Service
@@ -30,6 +34,10 @@ public class PtReportService {
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final PtReportRepository ptReportRepository;
     private final PtReportAnalysisService ptReportAnalysisService;
+    private final SpeechReportRepository speechReportRepository;
+    private final EyeGazeReportRepository eyeGazeReportRepository;
+    private final EyeBlinkingReportRepository eyeBlinkingReportRepository;
+    private final PoseReportRepository poseReportRepository;
 
     @Transactional
     public PtReportResponse generateReport(Long ptInterviewId) {
@@ -69,15 +77,43 @@ public class PtReportService {
                         ? ""
                         : document.getSummary();
 
+        Long interviewId =
+                ptInterview.getInterview().getId();
+
+        List<Double> eyeScores =
+                extractEyeScores(interviewId);
+
+        List<Double> blinkScores =
+                extractBlinkScores(answers);
+
+        List<Double> poseScores =
+                extractPoseScores(interviewId);
+
+        /*
+         * SpeechReportEntity에 종합 점수 필드가 아직 없으므로
+         * 현재는 빈 배열로 FastAPI에 전달한다.
+         */
+        List<Double> speechScores =
+                speechReportRepository
+                        .findByInterview_Id(interviewId)
+                        .map(report ->
+                                List.of(
+                                        report.getScore() == null
+                                                ? 0.0
+                                                : report.getScore()
+                                )
+                        )
+                        .orElseGet(List::of);
+
         PtReportGenerateRequest request =
                 new PtReportGenerateRequest(
                         presentationSummary,
                         extractQuestions(questions),
                         extractAnswers(answers),
-                        new ArrayList<>(),
-                        new ArrayList<>(),
-                        new ArrayList<>(),
-                        new ArrayList<>()
+                        eyeScores,
+                        blinkScores,
+                        poseScores,
+                        speechScores
                 );
 
         PtReportGenerateResponse response =
@@ -161,6 +197,66 @@ public class PtReportService {
                                 : answer.getAnswerText()
                 )
                 .toList();
+    }
+
+    /*
+     * 면접 기준 가장 최근 시선 분석 점수 조회
+     */
+    private List<Double> extractEyeScores(
+            Long interviewId
+    ) {
+        return eyeGazeReportRepository
+                .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
+                .map(report -> {
+                    Double score =
+                            report.getScore() == null
+                                    ? 0.0
+                                    : report.getScore();
+
+                    return List.of(score);
+                })
+                .orElseGet(List::of);
+    }
+
+    /*
+     * 각 PT 답변별 가장 최근 눈 깜빡임 점수 조회
+     */
+    private List<Double> extractBlinkScores(
+            List<InterviewAnswerEntity> answers
+    ) {
+        return answers.stream()
+                .map(answer ->
+                        eyeBlinkingReportRepository
+                                .findTopByInterviewAnswer_IdOrderByCreatedAtDesc(
+                                        answer.getId()
+                                )
+                                .map(report ->
+                                        report.getScore() == null
+                                                ? 0.0
+                                                : report.getScore()
+                                )
+                                .orElse(0.0)
+                )
+                .toList();
+    }
+
+    /*
+     * 면접 기준 가장 최근 자세 분석 점수 조회
+     */
+    private List<Double> extractPoseScores(
+            Long interviewId
+    ) {
+        return poseReportRepository
+                .findTopByInterview_IdOrderByIdDesc(interviewId)
+                .map(report -> {
+                    Double score =
+                            report.getScore() == null
+                                    ? 0.0
+                                    : report.getScore().doubleValue();
+
+                    return List.of(score);
+                })
+                .orElseGet(List::of);
     }
 
     private PtReportResponse toResponse(

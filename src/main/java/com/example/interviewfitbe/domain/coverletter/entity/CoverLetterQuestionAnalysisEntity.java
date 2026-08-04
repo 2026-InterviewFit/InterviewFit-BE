@@ -37,8 +37,5 @@ public class CoverLetterQuestionAnalysisEntity {
     @Column(columnDefinition = "TEXT")
     private String skillsJson;
 
-    @Column(columnDefinition = "TEXT")
-    private String keywordsJson;
-
     private Float importanceScore;
 }

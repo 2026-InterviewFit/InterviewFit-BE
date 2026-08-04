@@ -25,7 +25,6 @@ public class CoverLetterQuestionAnalysisMapper {
                 .strengthsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getStrengths()))
                 .improvementsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getImprovements()))
                 .skillsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getSkills()))
-                .keywordsJson(objectMapper.writeValueAsString(coverLetterQuestionAnalysisItem.getKeywords()))
                 .importanceScore(coverLetterQuestionAnalysisItem.getImportanceScore())
                 .build();
     }
@@ -38,7 +37,6 @@ public class CoverLetterQuestionAnalysisMapper {
                 .strengths(objectMapper.readValue(entity.getStrengthsJson(), new TypeReference<List<String>>() {}))
                 .improvements(objectMapper.readValue(entity.getImprovementsJson(), new TypeReference<List<String>>() {}))
                 .skills(objectMapper.readValue(entity.getSkillsJson(), new TypeReference<List<String>>() {}))
-                .keywords(objectMapper.readValue(entity.getKeywordsJson(), new TypeReference<List<String>>() {}))
                 .importanceScore(entity.getImportanceScore())
                 .build();
     }
