@@ -24,7 +24,8 @@ VALUES
     (7, '비즈니스', '재무·회계'),
     (8, '디자인', 'UX/UI 디자이너'),
     (9, '디자인', '영상 제작'),
-    (10, '디자인', '그래픽 디자이너')
+    (10, '디자인', '그래픽 디자이너'),
+    (11, '기타', '기타')
     ON CONFLICT (id) DO UPDATE
                             SET
                                 category = EXCLUDED.category,
