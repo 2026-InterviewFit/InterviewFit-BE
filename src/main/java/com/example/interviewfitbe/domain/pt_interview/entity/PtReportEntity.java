@@ -17,9 +17,6 @@ public class PtReportEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /*
-     * PT 면접 1개당 종합 리포트 1개
-     */
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "pt_interview_id",
@@ -28,58 +25,28 @@ public class PtReportEntity {
     )
     private PtInterviewEntity ptInterview;
 
-    /*
-     * 발표 내용 점수
-     */
-    private Double contentScore;
+    private Integer contentScore;
 
-    /*
-     * 발표 구성 및 논리 점수
-     */
-    private Double structureScore;
+    private Integer structureScore;
 
-    /*
-     * 전달력 점수
-     */
-    private Double deliveryScore;
+    private Integer deliveryScore;
 
-    /*
-     * 질의응답 대응 점수
-     */
-    private Double qaScore;
+    private Integer qaScore;
 
-    /*
-     * PT 최종 점수
-     */
-    private Double overallScore;
+    private Integer overallScore;
 
-    /*
-     * 발표 내용 전체 요약
-     */
     @Column(columnDefinition = "TEXT")
     private String presentationSummary;
 
-    /*
-     * 잘한 점
-     */
     @Column(columnDefinition = "TEXT")
     private String strengths;
 
-    /*
-     * 부족한 점
-     */
     @Column(columnDefinition = "TEXT")
     private String weaknesses;
 
-    /*
-     * 개선 방향
-     */
     @Column(columnDefinition = "TEXT")
     private String improvement;
 
-    /*
-     * AI 원본 분석 JSON
-     */
     @Column(columnDefinition = "TEXT")
     private String resultJson;
 
@@ -91,11 +58,11 @@ public class PtReportEntity {
 
     public static PtReportEntity create(
             PtInterviewEntity ptInterview,
-            Double contentScore,
-            Double structureScore,
-            Double deliveryScore,
-            Double qaScore,
-            Double overallScore,
+            Integer contentScore,
+            Integer structureScore,
+            Integer deliveryScore,
+            Integer qaScore,
+            Integer overallScore,
             String presentationSummary,
             String strengths,
             String weaknesses,
@@ -103,11 +70,9 @@ public class PtReportEntity {
             String resultJson
     ) {
 
-        PtReportEntity entity =
-                new PtReportEntity();
+        PtReportEntity entity = new PtReportEntity();
 
-        entity.ptInterview =
-                ptInterview;
+        entity.ptInterview = ptInterview;
 
         entity.applyReportResult(
                 contentScore,
@@ -122,8 +87,7 @@ public class PtReportEntity {
                 resultJson
         );
 
-        LocalDateTime now =
-                LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
 
         entity.createdAt = now;
         entity.updatedAt = now;
@@ -131,15 +95,12 @@ public class PtReportEntity {
         return entity;
     }
 
-    /*
-     * 기존 PT 리포트 재생성 시 내용 갱신
-     */
     public void update(
-            Double contentScore,
-            Double structureScore,
-            Double deliveryScore,
-            Double qaScore,
-            Double overallScore,
+            Integer contentScore,
+            Integer structureScore,
+            Integer deliveryScore,
+            Integer qaScore,
+            Integer overallScore,
             String presentationSummary,
             String strengths,
             String weaknesses,
@@ -160,16 +121,15 @@ public class PtReportEntity {
                 resultJson
         );
 
-        this.updatedAt =
-                LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     private void applyReportResult(
-            Double contentScore,
-            Double structureScore,
-            Double deliveryScore,
-            Double qaScore,
-            Double overallScore,
+            Integer contentScore,
+            Integer structureScore,
+            Integer deliveryScore,
+            Integer qaScore,
+            Integer overallScore,
             String presentationSummary,
             String strengths,
             String weaknesses,
@@ -177,54 +137,22 @@ public class PtReportEntity {
             String resultJson
     ) {
 
-        this.contentScore =
-                contentScore;
+        this.contentScore = contentScore;
+        this.structureScore = structureScore;
+        this.deliveryScore = deliveryScore;
+        this.qaScore = qaScore;
+        this.overallScore = overallScore;
 
-        this.structureScore =
-                structureScore;
-
-        this.deliveryScore =
-                deliveryScore;
-
-        this.qaScore =
-                qaScore;
-
-        this.overallScore =
-                overallScore;
-
-        this.presentationSummary =
-                normalizeText(
-                        presentationSummary
-                );
-
-        this.strengths =
-                normalizeText(
-                        strengths
-                );
-
-        this.weaknesses =
-                normalizeText(
-                        weaknesses
-                );
-
-        this.improvement =
-                normalizeText(
-                        improvement
-                );
-
-        this.resultJson =
-                normalizeText(
-                        resultJson
-                );
+        this.presentationSummary = normalizeText(presentationSummary);
+        this.strengths = normalizeText(strengths);
+        this.weaknesses = normalizeText(weaknesses);
+        this.improvement = normalizeText(improvement);
+        this.resultJson = normalizeText(resultJson);
     }
 
-    private static String normalizeText(
-            String value
-    ) {
+    private static String normalizeText(String value) {
 
-        if (value == null
-                || value.isBlank()) {
-
+        if (value == null || value.isBlank()) {
             return null;
         }
 
