@@ -6,6 +6,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface GroupParticipantRepository extends JpaRepository<GroupParticipantEntity, Long> {
+
     // 특정 방에 참여한 모든 인원 조회
     List<GroupParticipantEntity> findAllByRoomId(Long roomId);
+
+    // 특정 방의 현재 참여 인원 수 조회
+    long countByRoomId(Long roomId);
+
+    // 해당 사용자가 이미 방에 참여했는지 확인
+    boolean existsByRoomIdAndUserId(Long roomId, Long userId);
 }

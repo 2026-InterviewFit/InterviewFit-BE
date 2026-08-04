@@ -31,6 +31,7 @@ public class SecurityConfig {
                                 "/api/users/kakao-login",
                                 "/webhook/**",
                                 "/api/group/**",
+                                "/api/group-interviews/**",
                                 "/ws-interview/**"
                         ).permitAll()
                         // 나머지 /api/** 는 JWT 인증 필요
