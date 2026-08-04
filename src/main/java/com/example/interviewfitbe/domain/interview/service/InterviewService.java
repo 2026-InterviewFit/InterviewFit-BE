@@ -23,11 +23,11 @@ import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import com.example.interviewfitbe.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 @RequiredArgsConstructor
 @Service
@@ -43,13 +43,23 @@ public class InterviewService {
     private final PoseReportRepository poseReportRepository;
     private final SpeechReportRepository speechReportRepository;
 
+    /**
+     * 면접 시작.
+     * userId는 카카오 로그인된 사용자 ID (JWT에서 추출된 값).
+     */
     @Transactional
-    public InterviewStartResponse startInterview(InterviewStartRequest request) {
+    public InterviewStartResponse startInterview(Long userId, InterviewStartRequest request) {
+        if (userId == null) {
+            throw new IllegalStateException("인증된 사용자 정보가 필요합니다.");
+        }
         if (request.getJobRoleId() == null) {
             throw new IllegalArgumentException("jobRoleId는 필수입니다.");
         }
 
-        UserEntity user = findOrCreateUser(request.getUserId());
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "인증된 사용자를 찾을 수 없습니다. userId=" + userId
+                ));
 
         JobRoleEntity jobRole = jobRoleRepository
                 .findById(request.getJobRoleId())
@@ -67,17 +77,26 @@ public class InterviewService {
                 .userId(user.getId())
                 .jobRoleId(jobRole.getId())
                 .jobName(jobRole.getName())
-                .status(savedInterview.getStatus().name())
+                .status("STARTED")
                 .build();
     }
 
+    /**
+     * 대시보드 면접 분석 결과 조회.
+     * 요청한 사용자가 이 면접의 소유자인지 검증한다.
+     */
     @Transactional(readOnly = true)
-    public InterviewReportResponse getInterviewReport(Long interviewId) {
+    public InterviewReportResponse getInterviewReport(Long userId, Long interviewId) {
         InterviewEntity interview = interviewRepository
                 .findById(interviewId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "해당 면접을 찾을 수 없습니다. interviewId=" + interviewId
                 ));
+
+        // 🔐 소유권 검증
+        if (!interview.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("본인의 면접만 조회할 수 있습니다.");
+        }
 
         List<InterviewAnswerEntity> answers =
                 interviewAnswerRepository.findByInterview_IdOrderByAnswerOrderAsc(interviewId);
@@ -101,10 +120,9 @@ public class InterviewService {
 
         String overallStatus = determineOverallStatus(answers);
 
-        boolean completed =
-                !answers.isEmpty()
-                        && answers.stream()
-                        .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
+        boolean completed = !answers.isEmpty()
+                && answers.stream()
+                .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
 
         JobRoleEntity jobRole = interview.getJobRole();
 
@@ -123,29 +141,36 @@ public class InterviewService {
                 .build();
     }
 
-    private InterviewReportResponse.AnswerReport toAnswerReport(
-            InterviewAnswerEntity answer
-    ) {
-        Long interviewId = answer.getInterviewIdSafely();
+    /**
+     * 본인의 면접 세션 목록 조회.
+     */
+    @Transactional(readOnly = true)
+    public List<InterviewEntity> getMyInterviews(Long userId) {
+        return interviewRepository.findByUserId(userId);
+    }
 
+    // ============================
+    // 아래 toXxxReport, determineOverallStatus 등은 기존 그대로 유지
+    // (생략)
+    // ============================
+
+    private InterviewReportResponse.AnswerReport toAnswerReport(InterviewAnswerEntity answer) {
         return InterviewReportResponse.AnswerReport.builder()
                 .answerId(answer.getId())
-                .questionId(answer.getQuestionId())
-                .questionText(answer.getQuestionText())
+                .questionId(answer.getQuestion() == null ? null : answer.getQuestion().getId())
+                .questionText(answer.getQuestion() == null ? null : answer.getQuestion().getQuestion())
                 .answerText(answer.getAnswerText())
                 .answerOrder(answer.getAnswerOrder())
                 .startTime(answer.getStartTime())
                 .endTime(answer.getEndTime())
                 .analysisStatus(answer.getAnalysisStatus())
                 .errorMessage(answer.getErrorMessage())
-                .gaze(toGazeReport(interviewId))
-                .speech(toSpeechReport(interviewId))
+                .gaze(toGazeReport(answer))
+                .speech(toSpeechReport(answer))
                 .build();
     }
 
-    private InterviewReportResponse.EyeReport toEyeReport(
-            EyeBlinkingReportEntity report
-    ) {
+    private InterviewReportResponse.EyeReport toEyeReport(EyeBlinkingReportEntity report) {
         return InterviewReportResponse.EyeReport.builder()
                 .reportId(report.getId())
                 .durationSeconds(report.getDurationSeconds())
@@ -160,21 +185,17 @@ public class InterviewService {
     }
 
     private InterviewReportResponse.GazeReport toGazeReport(
-            Long interviewId
+            InterviewAnswerEntity answer
     ) {
-        if (interviewId == null) {
-            return null;
-        }
-
         return eyeGazeReportRepository
-                .findTopByInterviewIdOrderByCreatedAtDesc(interviewId)
+                .findTopByInterview_IdOrderByCreatedAtDesc(
+                        answer.getInterview().getId()
+                )
                 .map(this::toGazeReport)
                 .orElse(null);
     }
 
-    private InterviewReportResponse.GazeReport toGazeReport(
-            EyeGazeReport report
-    ) {
+    private InterviewReportResponse.GazeReport toGazeReport(EyeGazeReport report) {
         return InterviewReportResponse.GazeReport.builder()
                 .reportId(report.getId())
                 .centerRatio(report.getCenterRatio())
@@ -186,9 +207,7 @@ public class InterviewService {
                 .build();
     }
 
-    private InterviewReportResponse.PoseReport toPoseReport(
-            PoseReportEntity report
-    ) {
+    private InterviewReportResponse.PoseReport toPoseReport(PoseReportEntity report) {
         return InterviewReportResponse.PoseReport.builder()
                 .reportId(report.getId())
                 .totalDuration(report.getTotalDuration())
@@ -205,14 +224,10 @@ public class InterviewService {
     }
 
     private InterviewReportResponse.SpeechReport toSpeechReport(
-            Long interviewId
+            InterviewAnswerEntity answer
     ) {
-        if (interviewId == null) {
-            return null;
-        }
-
         return speechReportRepository
-                .findByInterview_Id(interviewId)
+                .findByInterview_Id(answer.getInterview().getId())
                 .map(this::toSpeechReport)
                 .orElse(null);
     }
@@ -235,53 +250,17 @@ public class InterviewService {
                 .build();
     }
 
-    private String determineOverallStatus(
-            List<InterviewAnswerEntity> answers
-    ) {
-        if (answers.isEmpty()) {
-            return "EMPTY";
-        }
-
+    private String determineOverallStatus(List<InterviewAnswerEntity> answers) {
+        if (answers.isEmpty()) return "EMPTY";
         boolean hasFailed = answers.stream()
-                .anyMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.FAILED);
-
-        if (hasFailed) {
-            return "FAILED";
-        }
-
+                .anyMatch(a -> a.getAnalysisStatus() == AnalysisStatus.FAILED);
+        if (hasFailed) return "FAILED";
         boolean allDone = answers.stream()
-                .allMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.DONE);
-
-        if (allDone) {
-            return "DONE";
-        }
-
+                .allMatch(a -> a.getAnalysisStatus() == AnalysisStatus.DONE);
+        if (allDone) return "DONE";
         boolean hasRunning = answers.stream()
-                .anyMatch(answer -> answer.getAnalysisStatus() == AnalysisStatus.RUNNING);
-
-        if (hasRunning) {
-            return "RUNNING";
-        }
-
+                .anyMatch(a -> a.getAnalysisStatus() == AnalysisStatus.RUNNING);
+        if (hasRunning) return "RUNNING";
         return "UPLOADED";
-    }
-
-    private UserEntity findOrCreateUser(Long userId) {
-        if (userId != null) {
-            return userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "해당 유저를 찾을 수 없습니다. userId=" + userId
-                    ));
-        }
-
-        Long tempKakaoId = Math.abs(UUID.randomUUID().getMostSignificantBits());
-
-        UserEntity tempUser = UserEntity.builder()
-                .kakaoId(tempKakaoId)
-                .email(null)
-                .name("임시 사용자")
-                .build();
-
-        return userRepository.save(tempUser);
     }
 }
