@@ -206,7 +206,7 @@ public class PtReportService {
             Long interviewId
     ) {
         return eyeGazeReportRepository
-                .findTopByInterviewIdOrderByCreatedAtDesc(interviewId)
+                .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
                 .map(report -> {
                     Double score =
                             report.getScore() == null
