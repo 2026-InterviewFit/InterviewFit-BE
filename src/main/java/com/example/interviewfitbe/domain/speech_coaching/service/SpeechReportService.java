@@ -97,8 +97,56 @@ public class SpeechReportService {
         return saveReport(reportRequest);
     }
 
+    private Double calculateSpeechScore(
+            SpeechReportRequest request
+    ) {
+        double score = 100.0;
 
+        int fillerCount =
+                getTotalFillerCount(request);
 
+        if (fillerCount > 20) {
+            score -= Math.min(
+                    20.0,
+                    fillerCount - 20.0
+            );
+        }
+
+        Double pauseRate =
+                getPauseRatePercent(request);
+
+        if (pauseRate != null && pauseRate > 15.0) {
+            score -= Math.min(
+                    20.0,
+                    pauseRate - 15.0
+            );
+        }
+
+        int criticalSilenceCount =
+                getCriticalSilenceCount(request);
+
+        if (criticalSilenceCount > 3) {
+            score -= Math.min(
+                    20.0,
+                    criticalSilenceCount * 2.0
+            );
+        }
+
+        Double charactersPerSecond =
+                getCharactersPerSecond(request);
+
+        if (charactersPerSecond != null
+                && (charactersPerSecond < 3.0
+                || charactersPerSecond > 8.0)) {
+
+            score -= 10.0;
+        }
+
+        return Math.max(
+                0.0,
+                Math.min(100.0, score)
+        );
+    }
 
     /**
      * SpeechReport 저장
@@ -106,6 +154,7 @@ public class SpeechReportService {
      * 전체 영상 기반 분석 결과 저장
      * + 질문별 AI 평가 저장
      */
+
     @Transactional
     public Long saveReport(
             SpeechReportRequest request
@@ -140,6 +189,10 @@ public class SpeechReportService {
 
                             .interview(interview)
 
+                            .score(
+                                    calculateSpeechScore(request)
+                            )
+
                             .textScript(
                                     request.getTextScript()
                             )
@@ -171,7 +224,6 @@ public class SpeechReportService {
                             .charactersPerSecond(
                                     getCharactersPerSecond(request)
                             )
-
 
                             .totalSilenceSeconds(
                                     getTotalSilenceSeconds(request)
