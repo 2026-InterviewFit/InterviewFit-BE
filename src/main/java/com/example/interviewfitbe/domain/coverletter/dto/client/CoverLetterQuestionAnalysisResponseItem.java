@@ -32,9 +32,6 @@ public class CoverLetterQuestionAnalysisResponseItem {
     @JsonProperty("skills")
     private List<String> skills;
 
-    @JsonProperty("keywords")
-    private List<String> keywords;
-
     @JsonProperty("importance_score")
     private Float importanceScore;
 }
