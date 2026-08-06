@@ -40,6 +40,7 @@ public class SecurityConfig {
 
                         // 로그인 없이 접근 가능한 API
                         .requestMatchers(
+                                "/error",
                                 "/api/users/kakao-login",
                                 "/api/job-role/**",
                                 "/webhook/**",
