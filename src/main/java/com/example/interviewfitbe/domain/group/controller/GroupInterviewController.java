@@ -171,6 +171,39 @@ public class GroupInterviewController {
 
 
     /**
+     * 답변 종료
+     */
+    @PostMapping("/{roomId}/answer/end")
+    public ResponseEntity<Void> endAnswer(
+            @PathVariable Long roomId,
+            @RequestParam int participantCount) {
+
+
+        groupInterviewFlowService.endAnswer(
+                roomId,
+                participantCount
+        );
+
+
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 다음 질문 이동
+     */
+    @PostMapping("/{roomId}/next-question")
+    public ResponseEntity<GroupInterviewSessionEntity> nextQuestion(
+            @PathVariable Long roomId) {
+
+        GroupInterviewSessionEntity session =
+                groupInterviewFlowService.nextQuestion(roomId);
+
+
+
+        return ResponseEntity.ok(session);
+    }
+
+    /**
      * 면접 종료
      */
     @PostMapping("/{roomId}/finish")

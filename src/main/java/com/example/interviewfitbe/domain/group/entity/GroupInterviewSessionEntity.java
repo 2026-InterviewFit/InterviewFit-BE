@@ -82,6 +82,27 @@ public class GroupInterviewSessionEntity {
 
     }
 
+    public void endAnswer(int participantCount) {
+
+        // 답변 종료 후 참가자 전환
+        this.status = InterviewStatus.TRANSITION;
+
+        nextParticipant(participantCount);
+
+        // 다음 참가자 답변 준비
+        this.status = InterviewStatus.QUESTION_VIEW;
+
+    }
+
+    public void nextQuestion() {
+
+        this.currentQuestionIndex++;
+
+        this.currentParticipantIndex = 0;
+
+        this.status = InterviewStatus.QUESTION_VIEW;
+
+    }
 
     public void finish(){
 

@@ -83,7 +83,40 @@ public class GroupInterviewFlowService {
 
     }
 
+    /**
+     * 답변 종료
+     */
+    @Transactional
+    public void endAnswer(
+            Long roomId,
+            int participantCount
+    ){
 
+        GroupInterviewSessionEntity session =
+                sessionRepository.findByInterviewId(roomId)
+                        .orElseThrow();
+
+
+        session.endAnswer(participantCount);
+
+    }
+
+    /**
+     * 다음 질문 이동
+     */
+    @Transactional
+    public GroupInterviewSessionEntity nextQuestion(Long roomId){
+
+        GroupInterviewSessionEntity session =
+                sessionRepository.findByInterviewId(roomId)
+                        .orElseThrow();
+
+
+        session.nextQuestion();
+
+        return session;
+
+    }
 
     /**
      * 면접 종료
