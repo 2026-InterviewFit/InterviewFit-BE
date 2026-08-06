@@ -155,7 +155,19 @@ public class GroupInterviewController {
     }
 
 
+    /**
+     * 답변 시작
+     */
+    @PostMapping("/{roomId}/answer/start")
+    public ResponseEntity<Void> startAnswer(
+            @PathVariable Long roomId) {
 
+
+        groupInterviewFlowService.startAnswer(roomId);
+
+
+        return ResponseEntity.ok().build();
+    }
 
 
     /**
