@@ -45,7 +45,8 @@ public class SecurityConfig {
                                 "/webhook/**",
                                 "/api/group/**",
                                 "/api/group-interviews/**",
-                                "/ws-interview/**"
+                                "/ws-interview/**",
+                                "/api/livekit/**"
                         ).permitAll()
 
                         // 나머지는 JWT 필요
