@@ -16,15 +16,6 @@ public class CoverLetterClientResponse {
     @JsonProperty("questions_analysis")
     private List<CoverLetterQuestionAnalysisItem> questionsAnalysis;
 
-    @JsonProperty("job_name")
-    private String jobName;
-
-    @JsonProperty("custom_job_name")
-    private String customJobName;
-
-    @JsonProperty("score")
-    private Float score;
-
-    @JsonProperty("job_reason")
-    private String jobReason;
+    @JsonProperty("job")
+    private JobRecommendation job;
 }

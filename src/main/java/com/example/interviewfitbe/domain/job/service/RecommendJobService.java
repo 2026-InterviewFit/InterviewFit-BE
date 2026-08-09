@@ -21,7 +21,7 @@ public class RecommendJobService {
     private final JobRoleMapper jobRoleMapper;
 
     public RecommendedJobEntity saveRecommendedJob(CoverLetterClientResponse analysisResult, CoverLetterEntity coverLetter) {
-        JobRoleEntity jobRole = jobRoleRepository.findByName(analysisResult.getJobName())
+        JobRoleEntity jobRole = jobRoleRepository.findByName(analysisResult.getJob().getJobName())
                 .or(() -> jobRoleRepository.findByName("기타"))
                 .orElseThrow(() -> new BaseException(JobRoleErrorCode.JOB_ROLE_NOT_FOUND));
 
