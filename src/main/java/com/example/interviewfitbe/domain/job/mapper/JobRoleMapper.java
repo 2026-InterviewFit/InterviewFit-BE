@@ -21,9 +21,9 @@ public class JobRoleMapper {
         return RecommendedJobEntity.builder()
                 .coverLetter(coverLetter)
                 .jobRole(jobRole)
-                .customJobName(analysisResult.getCustomJobName())
-                .score(analysisResult.getScore())
-                .reason(analysisResult.getJobReason())
+                .customJobName(analysisResult.getJob().getCustomJobName())
+                .score(analysisResult.getJob().getScore())
+                .reason(analysisResult.getJob().getJobReason())
                 .build();
     }
 }

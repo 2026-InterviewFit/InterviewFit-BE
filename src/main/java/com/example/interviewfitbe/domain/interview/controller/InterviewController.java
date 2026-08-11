@@ -26,10 +26,13 @@ public class InterviewController {
     public ResponseEntity<InterviewStartResponse> startInterview(
             @RequestBody InterviewStartRequest request
     ) {
-        Long userId = 5L;
+        Long userId = AuthUtils.getCurrentUserId();
 
         InterviewStartResponse response =
-                interviewService.startInterview(userId, request);
+                interviewService.startInterview(
+                        userId,
+                        request
+                );
 
         return ResponseEntity.ok(response);
     }
@@ -38,16 +41,48 @@ public class InterviewController {
     public ResponseEntity<InterviewAnswerUploadResponse> uploadInterviewAnswer(
             @PathVariable Long interviewId,
             @RequestPart("file") MultipartFile file,
-            @RequestParam("questionId") Long questionId,
-            @RequestParam("answerOrder") Integer answerOrder,
-            @RequestParam(value = "startTime", required = false) Double startTime,
-            @RequestParam(value = "endTime", required = false) Double endTime
+
+            /*
+             * 현재 프론트는 전체 면접을 하나의 영상으로 녹화하기 때문에
+             * 특정 질문 하나의 ID를 반드시 전달하기 어렵다.
+             *
+             * 따라서 questionId를 선택값으로 받는다.
+             */
+            @RequestParam(
+                    value = "questionId",
+                    required = false
+            )
+            Long questionId,
+
+            @RequestParam("answerOrder")
+            Integer answerOrder,
+
+            @RequestParam(
+                    value = "startTime",
+                    required = false
+            )
+            Double startTime,
+
+            @RequestParam(
+                    value = "endTime",
+                    required = false
+            )
+            Double endTime
     ) throws IOException {
+
         Long userId = AuthUtils.getCurrentUserId();
+
         InterviewAnswerUploadResponse response =
                 interviewAnswerService.uploadAnswerVideo(
-                        userId, interviewId, file, questionId, answerOrder, startTime, endTime
+                        userId,
+                        interviewId,
+                        file,
+                        questionId,
+                        answerOrder,
+                        startTime,
+                        endTime
                 );
+
         return ResponseEntity.ok(response);
     }
 
@@ -56,7 +91,13 @@ public class InterviewController {
             @PathVariable Long interviewId
     ) {
         Long userId = AuthUtils.getCurrentUserId();
-        InterviewReportResponse response = interviewService.getInterviewReport(userId, interviewId);
+
+        InterviewReportResponse response =
+                interviewService.getInterviewReport(
+                        userId,
+                        interviewId
+                );
+
         return ResponseEntity.ok(response);
     }
 }

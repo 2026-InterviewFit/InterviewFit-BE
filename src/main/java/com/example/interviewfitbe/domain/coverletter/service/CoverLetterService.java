@@ -1,7 +1,6 @@
 package com.example.interviewfitbe.domain.coverletter.service;
 
 import com.example.interviewfitbe.domain.coverletter.dto.CoverLetterCheckResult;
-import com.example.interviewfitbe.domain.coverletter.dto.analysis.CoverLetterAnalysisRequest;
 import com.example.interviewfitbe.domain.coverletter.dto.analysis.CoverLetterAnalysisResponse;
 import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterClientResponse;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
@@ -49,13 +48,13 @@ public class CoverLetterService {
     }
 
     @Transactional
-    public CoverLetterAnalysisResponse analyzeCoverLetter(Long userId, CoverLetterAnalysisRequest request) {
+    public CoverLetterAnalysisResponse analyzeCoverLetter(Long userId, String coverLetterString) {
         long start = System.currentTimeMillis();
 
         UserEntity user = userService.getUserById(userId);
         log.info("getUser: {}ms", System.currentTimeMillis() - start);
 
-        CoverLetterCheckResult coverLetterCheckResult = getOrCreateCoverLetter(user, request.getCoverLetter());
+        CoverLetterCheckResult coverLetterCheckResult = getOrCreateCoverLetter(user, coverLetterString);
         log.info("coverLetter: {}ms", System.currentTimeMillis() - start);
 
         CoverLetterEntity coverLetter = coverLetterCheckResult.getCoverLetter();
@@ -64,7 +63,7 @@ public class CoverLetterService {
         RecommendedJobEntity recommendedJob;
 
         if (coverLetterCheckResult.isNew()) {
-            analysisResult = coverLetterClientService.analyzeCoverLetter(request.getCoverLetter());
+            analysisResult = coverLetterClientService.analyzeCoverLetter(coverLetterString);
             log.info("gemini: {}ms", System.currentTimeMillis() - start);
             recommendedJob = recommendJobService.saveRecommendedJob(analysisResult, coverLetter);
             log.info("recommendedJob: {}ms", System.currentTimeMillis() - start);

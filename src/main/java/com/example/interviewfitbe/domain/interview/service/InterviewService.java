@@ -22,6 +22,7 @@ import com.example.interviewfitbe.domain.speech_coaching.repository.SpeechReport
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import com.example.interviewfitbe.global.exception.BaseException;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -87,12 +88,25 @@ public class InterviewService {
      */
     @Transactional(readOnly = true)
     public InterviewReportResponse getInterviewReport(Long userId, Long interviewId) {
-        InterviewEntity interview = interviewRepository
-                .findById(interviewId)
-                .orElseThrow(() -> new IllegalArgumentException(
+        InterviewEntity interview = interviewRepository.findById(interviewId)
+                .orElseThrow(() -> new EntityNotFoundException(
                         "해당 면접을 찾을 수 없습니다. interviewId=" + interviewId
                 ));
 
+        Long ownerUserId = interview.getUser().getId();
+
+        System.out.println("======================================");
+        System.out.println("[답변 업로드 권한 확인]");
+        System.out.println("interviewId = " + interviewId);
+        System.out.println("JWT userId = " + userId);
+        System.out.println("면접 ownerUserId = " + ownerUserId);
+        System.out.println("======================================");
+
+        if (!ownerUserId.equals(userId)) {
+            throw new AccessDeniedException(
+                    "본인의 면접에만 답변을 업로드할 수 있습니다."
+            );
+        }
         // 🔐 소유권 검증
         if (!interview.getUser().getId().equals(userId)) {
             throw new AccessDeniedException("본인의 면접만 조회할 수 있습니다.");
