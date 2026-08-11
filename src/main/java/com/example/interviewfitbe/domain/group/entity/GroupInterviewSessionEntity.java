@@ -104,6 +104,31 @@ public class GroupInterviewSessionEntity {
 
     }
 
+    /**
+     * 다음 라운드로 이동한다.
+     * 라운드가 바뀔 때마다 첫 답변자를 한 명씩 순환시킨다.
+     */
+    public void moveToNextRound(int participantCount) {
+
+        if (participantCount <= 0) {
+            throw new IllegalArgumentException("라운드 전환을 위해 최소 1명의 참가자가 필요합니다.");
+        }
+
+        if (this.currentRound == null || this.currentQuestionIndex == null) {
+            throw new IllegalStateException("아직 시작되지 않은 면접 세션입니다.");
+        }
+
+        if (this.currentRound >= 3) {
+            this.status = InterviewStatus.FINISHED;
+            return;
+        }
+
+        this.currentRound++;
+        this.currentQuestionIndex++;
+        this.currentParticipantIndex = (this.currentRound - 1) % participantCount;
+        this.status = InterviewStatus.QUESTION_VIEW;
+    }
+
     public void finish(){
 
         this.status = InterviewStatus.FINISHED;
