@@ -26,8 +26,11 @@ public class InterviewController {
     public ResponseEntity<InterviewStartResponse> startInterview(
             @RequestBody InterviewStartRequest request
     ) {
-        Long userId = AuthUtils.getCurrentUserId();
-        InterviewStartResponse response = interviewService.startInterview(userId, request);
+        Long userId = 5L;
+
+        InterviewStartResponse response =
+                interviewService.startInterview(userId, request);
+
         return ResponseEntity.ok(response);
     }
 
