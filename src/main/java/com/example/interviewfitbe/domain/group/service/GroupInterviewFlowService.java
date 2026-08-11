@@ -1,11 +1,13 @@
 package com.example.interviewfitbe.domain.group.service;
 
 
+import com.example.interviewfitbe.domain.group.dto.InterviewProgressResponse;
 import com.example.interviewfitbe.domain.group.entity.*;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewSessionRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupParticipantRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,8 @@ public class GroupInterviewFlowService {
     private final GroupInterviewSessionRepository sessionRepository;
 
     private final GroupParticipantRepository groupParticipantRepository;
+
+    private final SimpMessagingTemplate messagingTemplate;
 
 
 
@@ -44,7 +48,11 @@ public class GroupInterviewFlowService {
         session.start();
 
 
-        return sessionRepository.save(session);
+        GroupInterviewSessionEntity savedSession = sessionRepository.save(session);
+
+        broadcastProgress(roomId, savedSession);
+
+        return savedSession;
 
     }
 
@@ -63,6 +71,8 @@ public class GroupInterviewFlowService {
 
 
         session.startAnswer();
+
+        broadcastProgress(roomId, session);
 
     }
 
@@ -84,6 +94,8 @@ public class GroupInterviewFlowService {
 
         session.nextParticipant(participantCount);
 
+        broadcastProgress(roomId, session);
+
     }
 
     /**
@@ -102,6 +114,8 @@ public class GroupInterviewFlowService {
 
         session.endAnswer(participantCount);
 
+        broadcastProgress(roomId, session);
+
     }
 
     /**
@@ -116,6 +130,8 @@ public class GroupInterviewFlowService {
 
 
         session.nextQuestion();
+
+        broadcastProgress(roomId, session);
 
         return session;
 
@@ -139,6 +155,8 @@ public class GroupInterviewFlowService {
 
         session.moveToNextRound(participantCount);
 
+        broadcastProgress(roomId, session);
+
         return session;
     }
 
@@ -155,6 +173,18 @@ public class GroupInterviewFlowService {
 
         session.finish();
 
+        broadcastProgress(roomId, session);
+
+    }
+
+    private void broadcastProgress(
+            Long roomId,
+            GroupInterviewSessionEntity session
+    ) {
+        messagingTemplate.convertAndSend(
+                "/topic/room/" + roomId,
+                InterviewProgressResponse.from(roomId, session)
+        );
     }
 
 }
