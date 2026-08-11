@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.group.controller;
 
 import com.example.interviewfitbe.domain.group.dto.JoinRoomRequest;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewSessionResponse;
 import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
@@ -201,6 +202,21 @@ public class GroupInterviewController {
 
 
         return ResponseEntity.ok(session);
+    }
+
+    /**
+     * 다음 라운드 이동
+     */
+    @PostMapping("/{roomId}/next-round")
+    public ResponseEntity<GroupInterviewSessionResponse> nextRound(
+            @PathVariable Long roomId) {
+
+        GroupInterviewSessionEntity session =
+                groupInterviewFlowService.nextRound(roomId);
+
+        return ResponseEntity.ok(
+                GroupInterviewSessionResponse.from(session)
+        );
     }
 
     /**
