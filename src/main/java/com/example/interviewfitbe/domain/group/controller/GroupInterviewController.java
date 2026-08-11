@@ -8,6 +8,8 @@ import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntit
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
+import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
+import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,8 @@ public class GroupInterviewController {
      * 면접 진행 상태 관리 서비스
      */
     private final GroupInterviewFlowService groupInterviewFlowService;
+
+    private final LiveKitService liveKitService;
 
 
 
@@ -96,6 +100,19 @@ public class GroupInterviewController {
 
         return ResponseEntity.ok(
                 groupInterviewService.getParticipants(roomId)
+        );
+    }
+
+    /**
+     * 다대일 면접 참가자의 LiveKit 입장 토큰 발급
+     */
+    @PostMapping("/{roomId}/livekit-token")
+    public ResponseEntity<LiveKitTokenResponse> createLiveKitToken(
+            @PathVariable Long roomId,
+            @RequestParam Long userId) {
+
+        return ResponseEntity.ok(
+                liveKitService.createGroupInterviewToken(roomId, userId)
         );
     }
 
