@@ -6,10 +6,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -43,12 +45,32 @@ public class SecurityConfig {
                                 "/api/job-role/**",
                                 "/webhook/**",
                                 "/api/group/**",
-                                "/api/group-interviews/**",
-                                "/ws-interview/**",
-                                "/api/livekit/**"
+                                "/ws-interview/**"
                         ).permitAll()
 
+                        // 방 목록/상세/참가자 목록은 로그인 없이 조회 가능
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/group-interviews/**"
+                        ).permitAll()
+
+                        // 생성/참여/진행 제어는 로그인 필요
+                        .requestMatchers(
+                                "/api/group-interviews/**"
+                        ).authenticated()
+
+                        // LiveKit 관련 API도 로그인 필요
+                        .requestMatchers(
+                                "/api/livekit/**"
+                        ).authenticated()
+
+                        // 나머지 API는 JWT 필요
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(exception ->
+                        exception.authenticationEntryPoint(
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)
+                        )
                 )
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtTokenProvider),
@@ -64,7 +86,9 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://127.0.0.1:3000"
+                "http://127.0.0.1:3000",
+                "http://172.20.14.83:3000",
+                "http://localhost:63343"
         ));
 
         configuration.setAllowedMethods(List.of(

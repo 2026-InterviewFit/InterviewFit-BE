@@ -1,4 +1,4 @@
-package com.example.interviewfitbe.domain.group.config;
+package com.example.interviewfitbe.global.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
