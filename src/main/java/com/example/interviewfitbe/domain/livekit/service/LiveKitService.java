@@ -13,6 +13,7 @@ import io.livekit.server.RoomJoin;
 import io.livekit.server.RoomName;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,8 +80,8 @@ public class LiveKitService {
                 ));
 
         if (!groupParticipantRepository.existsByRoomIdAndUserId(roomId, userId)) {
-            throw new IllegalArgumentException(
-                    "해당 면접 방에 참여하지 않은 사용자입니다. userId=" + userId
+            throw new AccessDeniedException(
+                    "해당 면접 방에 참여하지 않은 사용자입니다."
             );
         }
 

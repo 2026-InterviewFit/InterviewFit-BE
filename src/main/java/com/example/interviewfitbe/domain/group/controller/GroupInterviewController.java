@@ -1,6 +1,5 @@
 package com.example.interviewfitbe.domain.group.controller;
 
-import com.example.interviewfitbe.domain.group.dto.JoinRoomRequest;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewSessionResponse;
 import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
@@ -10,6 +9,7 @@ import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
+import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -41,6 +41,8 @@ public class GroupInterviewController {
     public ResponseEntity<GroupInterviewEntity> createRoom(
             @RequestBody RoomCreateRequest request) {
 
+        Long userId = AuthUtils.getCurrentUserId();
+
 
         // 최대 참여 인원 검증
         if (request.getMaxParticipants() == null
@@ -57,7 +59,7 @@ public class GroupInterviewController {
         GroupInterviewEntity room =
                 groupInterviewService.createRoom(
                         request.getTitle(),
-                        request.getHostUserId(),
+                        userId,
                         request.getJobRoleId(),
                         request.getMaxParticipants(),
                         request.getScheduledStartTime()
@@ -75,14 +77,15 @@ public class GroupInterviewController {
      */
     @PostMapping("/{roomId}/join")
     public ResponseEntity<GroupParticipantEntity> joinRoom(
-            @PathVariable Long roomId,
-            @RequestBody JoinRoomRequest request) {
+            @PathVariable Long roomId) {
+
+        Long userId = AuthUtils.getCurrentUserId();
 
 
         return ResponseEntity.ok(
                 groupInterviewService.joinRoom(
                         roomId,
-                        request.getUserId()
+                        userId
                 )
         );
     }
@@ -108,8 +111,9 @@ public class GroupInterviewController {
      */
     @PostMapping("/{roomId}/livekit-token")
     public ResponseEntity<LiveKitTokenResponse> createLiveKitToken(
-            @PathVariable Long roomId,
-            @RequestParam Long userId) {
+            @PathVariable Long roomId) {
+
+        Long userId = AuthUtils.getCurrentUserId();
 
         return ResponseEntity.ok(
                 liveKitService.createGroupInterviewToken(roomId, userId)
