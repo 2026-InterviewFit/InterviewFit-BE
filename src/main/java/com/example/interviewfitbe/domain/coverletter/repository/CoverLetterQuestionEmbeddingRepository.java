@@ -25,7 +25,7 @@ public interface CoverLetterQuestionEmbeddingRepository extends JpaRepository<Co
         JOIN cover_letters cl
             ON clq.cover_letter_id = cl.id
         WHERE cl.user_id = :userId
-          AND cle.embedding <=> CAST(:vectorEmbedding AS vector) <= 0.25
+          AND cle.embedding <=> CAST(:vectorEmbedding AS vector) <= 0.1
         ORDER BY cle.embedding <=> CAST(:vectorEmbedding AS vector)
         LIMIT :limit
     """, nativeQuery = true)
