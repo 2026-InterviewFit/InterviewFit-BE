@@ -41,8 +41,7 @@ public class SecurityConfig {
                  * =========================================
                  *
                  * HttpOnly Cookie 인증을 사용하므로
-                 * allowCredentials(true)가 적용된
-                 * CORS 설정을 사용한다.
+                 * credentials 허용 CORS 설정을 사용한다.
                  */
                 .cors(cors ->
                         cors.configurationSource(
@@ -56,10 +55,10 @@ public class SecurityConfig {
                  * CSRF
                  * =========================================
                  *
-                 * 현재 로컬 개발 단계에서는 비활성화한다.
+                 * 현재 로컬 개발 단계에서는 비활성화.
                  *
-                 * 쿠키 인증을 사용하는 실제 배포 환경에서는
-                 * CSRF 방어 전략을 별도로 적용해야 한다.
+                 * 실제 배포 전에는 Cookie 인증에 맞는
+                 * CSRF 방어 전략을 추가해야 한다.
                  */
                 .csrf(csrf ->
                         csrf.disable()
@@ -71,8 +70,7 @@ public class SecurityConfig {
                  * Session
                  * =========================================
                  *
-                 * Spring Session은 사용하지 않고
-                 * JWT 기반 Stateless 인증을 사용한다.
+                 * JWT Stateless 인증
                  */
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -82,7 +80,7 @@ public class SecurityConfig {
 
 
                 /*
-                 * Spring 기본 인증 방식 비활성화
+                 * Spring 기본 로그인 방식 비활성화
                  */
                 .httpBasic(httpBasic ->
                         httpBasic.disable()
@@ -95,15 +93,15 @@ public class SecurityConfig {
 
                 /*
                  * =========================================
-                 * 401 / 403 응답
+                 * 401 / 403
                  * =========================================
                  */
                 .exceptionHandling(exception ->
                         exception
 
                                 /*
-                                 * 인증 정보가 없거나
-                                 * 유효한 Access Token이 없는 경우
+                                 * 로그인하지 않았거나
+                                 * 유효한 인증 정보가 없는 경우
                                  */
                                 .authenticationEntryPoint(
                                         (
@@ -112,9 +110,7 @@ public class SecurityConfig {
                                                 authException
                                         ) -> {
 
-                                            response.setStatus(
-                                                    401
-                                            );
+                                            response.setStatus(401);
 
                                             response.setCharacterEncoding(
                                                     StandardCharsets.UTF_8.name()
@@ -140,8 +136,8 @@ public class SecurityConfig {
 
 
                                 /*
-                                 * 인증은 되었지만
-                                 * 해당 요청 권한이 없는 경우
+                                 * 로그인은 되어 있지만
+                                 * 해당 요청에 대한 권한이 없는 경우
                                  */
                                 .accessDeniedHandler(
                                         (
@@ -150,9 +146,7 @@ public class SecurityConfig {
                                                 accessDeniedException
                                         ) -> {
 
-                                            response.setStatus(
-                                                    403
-                                            );
+                                            response.setStatus(403);
 
                                             response.setCharacterEncoding(
                                                     StandardCharsets.UTF_8.name()
@@ -187,7 +181,7 @@ public class SecurityConfig {
                         auth
 
                                 /*
-                                 * 브라우저 CORS Preflight
+                                 * CORS Preflight
                                  */
                                 .requestMatchers(
                                         HttpMethod.OPTIONS,
@@ -198,52 +192,54 @@ public class SecurityConfig {
 
                                 /*
                                  * =================================
-                                 * 인증 없이 접근 가능한 API
+                                 * 카카오 인증 관련 공개 API
+                                 * =================================
+                                 */
+
+                                /*
+                                 * 카카오 로그인
+                                 */
+                                .requestMatchers(
+                                        "/api/users/kakao-login"
+                                )
+                                .permitAll()
+
+
+                                /*
+                                 * Access Token 재발급
+                                 *
+                                 * Access Token이 만료되어도
+                                 * Refresh Cookie를 이용해야 하므로
+                                 * 인증 없이 접근 가능해야 한다.
+                                 */
+                                .requestMatchers(
+                                        "/api/users/refresh"
+                                )
+                                .permitAll()
+
+
+                                /*
+                                 * 로그아웃
+                                 *
+                                 * Access Token이 이미 만료됐어도
+                                 * Refresh Cookie를 삭제할 수 있어야 한다.
+                                 */
+                                .requestMatchers(
+                                        "/api/users/logout"
+                                )
+                                .permitAll()
+
+
+                                /*
+                                 * =================================
+                                 * 기타 공개 API
                                  * =================================
                                  */
                                 .requestMatchers(
-
                                         "/error",
-
-
-                                        /*
-                                         * 카카오 로그인
-                                         */
-                                        "/api/users/kakao-login",
-
-
-                                        /*
-                                         * Access Token 재발급
-                                         *
-                                         * Access Token이 이미 만료된 상태에서
-                                         * Refresh Cookie로 인증을 복구해야 하므로
-                                         * permitAll이어야 한다.
-                                         */
-                                        "/api/users/refresh",
-
-
-                                        /*
-                                         * Access Token이 만료됐더라도
-                                         * Refresh Cookie까지 삭제할 수 있어야 한다.
-                                         */
-                                        "/api/users/logout",
-
-
-                                        /*
-                                         * 직무 목록
-                                         */
                                         "/api/job-role/**",
-
-
-                                        /*
-                                         * 기존 공개 API
-                                         */
                                         "/webhook/**",
-
                                         "/api/group/**",
-
-                                        "/api/group-interviews/**",
-
                                         "/ws-interview/**"
                                 )
                                 .permitAll()
@@ -251,14 +247,55 @@ public class SecurityConfig {
 
                                 /*
                                  * =================================
-                                 * 나머지 API
+                                 * 그룹 면접
                                  * =================================
+                                 *
+                                 * 방 목록 / 상세 / 참가자 목록 등의
+                                 * GET 요청은 공개 조회 가능.
+                                 */
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/group-interviews/**"
+                                )
+                                .permitAll()
+
+
+                                /*
+                                 * 그룹 면접 생성 / 참여 /
+                                 * 진행 제어 등의 요청은 로그인 필요.
+                                 *
+                                 * 위 GET matcher가 먼저 처리되기 때문에
+                                 * 여기서는 GET 이외 요청에 적용된다.
+                                 */
+                                .requestMatchers(
+                                        "/api/group-interviews/**"
+                                )
+                                .authenticated()
+
+
+                                /*
+                                 * LiveKit 토큰 발급 등은
+                                 * 로그인 사용자만 가능.
+                                 */
+                                .requestMatchers(
+                                        "/api/livekit/**"
+                                )
+                                .authenticated()
+
+
+                                /*
+                                 * =================================
+                                 * 나머지 모든 API
+                                 * =================================
+                                 *
+                                 * 예:
                                  *
                                  * /api/users/me
                                  * /api/interview/**
                                  * /api/followup/**
                                  * /api/pt-interviews/**
-                                 * 등은 인증 필요.
+                                 *
+                                 * 모두 로그인 필요.
                                  */
                                 .anyRequest()
                                 .authenticated()
@@ -267,17 +304,11 @@ public class SecurityConfig {
 
                 /*
                  * =========================================
-                 * JWT 인증 필터
+                 * JWT Authentication Filter
                  * =========================================
                  *
-                 * JwtAuthenticationFilter에서
-                 *
                  * interviewfit_access_token
-                 *
-                 * HttpOnly Cookie를 읽어 인증한다.
-                 *
-                 * 전환 기간 동안 Bearer Token fallback을
-                 * 유지하고 있다면 그것도 이 필터에서 처리한다.
+                 * HttpOnly Cookie를 읽어서 인증한다.
                  */
                 .addFilterBefore(
                         new JwtAuthenticationFilter(
@@ -295,9 +326,6 @@ public class SecurityConfig {
      * =====================================================
      * CORS
      * =====================================================
-     *
-     * HttpOnly Cookie를 FE ↔ BE 간 요청에서
-     * 주고받을 수 있도록 credentials를 허용한다.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -307,10 +335,8 @@ public class SecurityConfig {
 
 
         /*
-         * allowCredentials(true) 사용 시
-         * allowedOrigins에 "*" 사용 불가.
-         *
-         * FE 주소를 정확하게 명시해야 한다.
+         * allowCredentials(true)를 사용하므로
+         * "*" Origin은 사용할 수 없다.
          */
         configuration.setAllowedOrigins(
                 List.of(
@@ -318,14 +344,16 @@ public class SecurityConfig {
                         "http://127.0.0.1:3000",
 
                         /*
-                         * 현재 개발 Network 주소
+                         * 현재 / 기존 로컬 네트워크 개발 주소
                          */
                         "http://172.20.2.15:3000",
+                        "http://172.20.14.83:3000",
 
                         /*
-                         * 기존 개발 Network 주소
+                         * develop에서 사용하던
+                         * 테스트용 HTML 서버
                          */
-                        "http://172.20.14.83:3000"
+                        "http://localhost:63343"
                 )
         );
 
@@ -343,15 +371,13 @@ public class SecurityConfig {
 
 
         configuration.setAllowedHeaders(
-                List.of(
-                        "*"
-                )
+                List.of("*")
         );
 
 
         /*
-         * 기존 Bearer Token 방식과의
-         * 임시 호환을 위해 유지.
+         * 이전 Bearer 인증 코드와의
+         * 호환성을 위해 유지.
          */
         configuration.setExposedHeaders(
                 List.of(
@@ -361,14 +387,10 @@ public class SecurityConfig {
 
 
         /*
-         * 매우 중요:
-         *
-         * 브라우저가 Access / Refresh Cookie를
-         * Spring 요청에 포함할 수 있도록 한다.
+         * HttpOnly Access / Refresh Cookie를
+         * 브라우저가 Spring으로 전송할 수 있게 한다.
          */
-        configuration.setAllowCredentials(
-                true
-        );
+        configuration.setAllowCredentials(true);
 
 
         UrlBasedCorsConfigurationSource source =
