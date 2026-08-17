@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface GroupQuestionRepository extends JpaRepository<GroupQuestionEntity, Long> {
@@ -15,4 +16,11 @@ public interface GroupQuestionRepository extends JpaRepository<GroupQuestionEnti
 
     // 3라운드용: 특정 직무에 매핑된 직무 토의 질문 조회
     List<GroupQuestionEntity> findByRoundNumberAndJobRole(Integer roundNumber, JobRoleEntity jobRole);
+
+    Optional<GroupQuestionEntity> findFirstByRoundNumberOrderByIdAsc(Integer roundNumber);
+
+    Optional<GroupQuestionEntity> findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(
+            Integer roundNumber,
+            Long jobRoleId
+    );
 }

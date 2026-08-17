@@ -46,4 +46,7 @@ dockerfile
 docker-compose.yml
 uploads/
 
+# Local frontend integration contract
+/docs/group-interview-frontend-contract.md
+
 src/main/resources/application-local.propertiessrc/main/resources/application.properties

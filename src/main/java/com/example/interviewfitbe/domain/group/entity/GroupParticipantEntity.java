@@ -32,4 +32,12 @@ public class GroupParticipantEntity {
         this.userId = userId;
         this.status = status;
     }
+
+    public void ready() {
+        this.status = "READY";
+    }
+
+    public void unready() {
+        this.status = "JOINED";
+    }
 }

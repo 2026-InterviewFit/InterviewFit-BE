@@ -4,6 +4,7 @@ import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface GroupParticipantRepository extends JpaRepository<GroupParticipantEntity, Long> {
 
@@ -15,4 +16,8 @@ public interface GroupParticipantRepository extends JpaRepository<GroupParticipa
 
     // 해당 사용자가 이미 방에 참여했는지 확인
     boolean existsByRoomIdAndUserId(Long roomId, Long userId);
+
+    Optional<GroupParticipantEntity> findByRoomIdAndUserId(Long roomId, Long userId);
+
+    List<GroupParticipantEntity> findAllByRoomIdOrderByIdAsc(Long roomId);
 }

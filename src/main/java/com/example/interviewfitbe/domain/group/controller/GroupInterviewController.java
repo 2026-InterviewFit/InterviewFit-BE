@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.group.controller;
 
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewSessionResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
 import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
@@ -76,18 +77,13 @@ public class GroupInterviewController {
      * 면접 방 입장
      */
     @PostMapping("/{roomId}/join")
-    public ResponseEntity<GroupParticipantEntity> joinRoom(
+    public ResponseEntity<GroupParticipantResponse> joinRoom(
             @PathVariable Long roomId) {
 
         Long userId = AuthUtils.getCurrentUserId();
 
 
-        return ResponseEntity.ok(
-                groupInterviewService.joinRoom(
-                        roomId,
-                        userId
-                )
-        );
+        return ResponseEntity.ok(groupInterviewService.joinRoom(roomId, userId));
     }
 
 
@@ -97,13 +93,45 @@ public class GroupInterviewController {
      * 방 참여자 목록 조회
      */
     @GetMapping("/{roomId}/participants")
-    public ResponseEntity<List<GroupParticipantEntity>> getParticipants(
+    public ResponseEntity<List<GroupParticipantResponse>> getParticipants(
             @PathVariable Long roomId) {
 
 
         return ResponseEntity.ok(
                 groupInterviewService.getParticipants(roomId)
         );
+    }
+
+    @PostMapping("/{roomId}/ready")
+    public ResponseEntity<GroupParticipantResponse> ready(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(
+                groupInterviewService.setReady(
+                        roomId,
+                        AuthUtils.getCurrentUserId(),
+                        true
+                )
+        );
+    }
+
+    @DeleteMapping("/{roomId}/ready")
+    public ResponseEntity<GroupParticipantResponse> unready(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(
+                groupInterviewService.setReady(
+                        roomId,
+                        AuthUtils.getCurrentUserId(),
+                        false
+                )
+        );
+    }
+
+    @DeleteMapping("/{roomId}/participants/me")
+    public ResponseEntity<Void> leaveRoom(@PathVariable Long roomId) {
+        groupInterviewService.leaveRoom(roomId, AuthUtils.getCurrentUserId());
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -165,15 +193,12 @@ public class GroupInterviewController {
      * 면접 세션 생성 + 진행 상태 초기화
      */
     @PostMapping("/{roomId}/start")
-    public ResponseEntity<GroupInterviewSessionEntity> startInterview(
+    public ResponseEntity<GroupInterviewSessionResponse> startInterview(
             @PathVariable Long roomId) {
 
-
-        GroupInterviewSessionEntity session =
-                groupInterviewFlowService.start(roomId);
-
-
-        return ResponseEntity.ok(session);
+        Long userId = AuthUtils.getCurrentUserId();
+        groupInterviewFlowService.start(roomId, userId);
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 
 
@@ -181,14 +206,10 @@ public class GroupInterviewController {
      * 답변 시작
      */
     @PostMapping("/{roomId}/answer/start")
-    public ResponseEntity<Void> startAnswer(
+    public ResponseEntity<GroupInterviewSessionResponse> startAnswer(
             @PathVariable Long roomId) {
-
-
-        groupInterviewFlowService.startAnswer(roomId);
-
-
-        return ResponseEntity.ok().build();
+        groupInterviewFlowService.startAnswer(roomId, AuthUtils.getCurrentUserId());
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 
 
@@ -196,33 +217,20 @@ public class GroupInterviewController {
      * 답변 종료
      */
     @PostMapping("/{roomId}/answer/end")
-    public ResponseEntity<Void> endAnswer(
-            @PathVariable Long roomId,
-            @RequestParam int participantCount) {
-
-
-        groupInterviewFlowService.endAnswer(
-                roomId,
-                participantCount
-        );
-
-
-        return ResponseEntity.ok().build();
+    public ResponseEntity<GroupInterviewSessionResponse> endAnswer(
+            @PathVariable Long roomId) {
+        groupInterviewFlowService.endAnswer(roomId, AuthUtils.getCurrentUserId());
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 
     /**
      * 다음 질문 이동
      */
     @PostMapping("/{roomId}/next-question")
-    public ResponseEntity<GroupInterviewSessionEntity> nextQuestion(
+    public ResponseEntity<GroupInterviewSessionResponse> nextQuestion(
             @PathVariable Long roomId) {
-
-        GroupInterviewSessionEntity session =
-                groupInterviewFlowService.nextQuestion(roomId);
-
-
-
-        return ResponseEntity.ok(session);
+        groupInterviewFlowService.nextQuestion(roomId, AuthUtils.getCurrentUserId());
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 
     /**
@@ -232,26 +240,25 @@ public class GroupInterviewController {
     public ResponseEntity<GroupInterviewSessionResponse> nextRound(
             @PathVariable Long roomId) {
 
-        GroupInterviewSessionEntity session =
-                groupInterviewFlowService.nextRound(roomId);
-
-        return ResponseEntity.ok(
-                GroupInterviewSessionResponse.from(session)
-        );
+        groupInterviewFlowService.nextRound(roomId, AuthUtils.getCurrentUserId());
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 
     /**
      * 면접 종료
      */
     @PostMapping("/{roomId}/finish")
-    public ResponseEntity<Void> finishInterview(
+    public ResponseEntity<GroupInterviewSessionResponse> finishInterview(
             @PathVariable Long roomId) {
+        groupInterviewFlowService.finish(roomId, AuthUtils.getCurrentUserId());
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
+    }
 
-
-        groupInterviewFlowService.finish(roomId);
-
-
-        return ResponseEntity.ok().build();
+    @GetMapping("/{roomId}/session")
+    public ResponseEntity<GroupInterviewSessionResponse> getSession(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 
 }

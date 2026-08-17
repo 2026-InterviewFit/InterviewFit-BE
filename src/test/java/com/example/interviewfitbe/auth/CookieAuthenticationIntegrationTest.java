@@ -3,6 +3,7 @@ package com.example.interviewfitbe.auth;
 import com.example.interviewfitbe.domain.group.controller.GroupInterviewController;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
+import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -117,7 +119,7 @@ class CookieAuthenticationIntegrationTest {
     @Test
     void joinRoomUsesAuthenticatedUserId() throws Exception {
         when(groupInterviewService.joinRoom(1L, USER_ID))
-                .thenReturn(GroupParticipantEntity.builder()
+                .thenReturn(GroupParticipantResponse.builder()
                         .roomId(1L).userId(USER_ID).status("JOINED").build());
 
         mockMvc.perform(post("/api/group-interviews/1/join").cookie(accessCookie))
@@ -141,6 +143,38 @@ class CookieAuthenticationIntegrationTest {
     void protectedGroupPostWithoutCookieReturns401() throws Exception {
         mockMvc.perform(post("/api/group-interviews/1/join"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void participantListWithoutCookieReturns401() throws Exception {
+        mockMvc.perform(get("/api/group-interviews/1/participants"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void readyAndLeaveUseAuthenticatedUserId() throws Exception {
+        when(groupInterviewService.setReady(1L, USER_ID, true))
+                .thenReturn(GroupParticipantResponse.builder()
+                        .roomId(1L).userId(USER_ID).status("READY").build());
+
+        mockMvc.perform(post("/api/group-interviews/1/ready").cookie(accessCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/group-interviews/1/participants/me").cookie(accessCookie))
+                .andExpect(status().isNoContent());
+
+        verify(groupInterviewService).setReady(1L, USER_ID, true);
+        verify(groupInterviewService).leaveRoom(1L, USER_ID);
+    }
+
+    @Test
+    void interviewControlUsesAuthenticatedHostIdAndNoParticipantCount() throws Exception {
+        mockMvc.perform(post("/api/group-interviews/1/start").cookie(accessCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/group-interviews/1/answer/end").cookie(accessCookie))
+                .andExpect(status().isOk());
+
+        verify(groupInterviewFlowService).start(1L, USER_ID);
+        verify(groupInterviewFlowService).endAnswer(1L, USER_ID);
     }
 
     @Test
