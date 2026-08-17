@@ -10,7 +10,13 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "group_participants")
+@Table(
+        name = "group_participants",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_group_participants_room_user",
+                columnNames = {"room_id", "user_id"}
+        )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class GroupParticipantEntity {

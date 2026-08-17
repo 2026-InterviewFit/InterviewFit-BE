@@ -9,6 +9,7 @@ import com.example.interviewfitbe.domain.group.repository.GroupParticipantReposi
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class GroupInterviewService {
     private final GroupParticipantRepository groupParticipantRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final GroupParticipantJoinWriter groupParticipantJoinWriter;
 
 
     /**
@@ -114,6 +116,13 @@ public class GroupInterviewService {
         }
 
 
+        // 재시도는 멱등적으로 기존 참가자를 반환한다.
+        var existingParticipant =
+                groupParticipantRepository.findFirstByRoomIdAndUserIdOrderByIdAsc(roomId, userId);
+        if (existingParticipant.isPresent()) {
+            return toResponse(room, existingParticipant.get());
+        }
+
         // 최대 인원 확인
         long participantCount =
                 groupParticipantRepository.countByRoomId(roomId);
@@ -126,25 +135,18 @@ public class GroupInterviewService {
         }
 
 
-        // 중복 참여 확인
-        if (groupParticipantRepository.existsByRoomIdAndUserId(roomId, userId)) {
-            throw new IllegalStateException(
-                    "이미 참여 중인 사용자입니다."
-            );
+        try {
+            GroupParticipantEntity savedParticipant =
+                    groupParticipantJoinWriter.insert(roomId, userId);
+            broadcastParticipant("PARTICIPANT_JOINED", room, savedParticipant);
+            return toResponse(room, savedParticipant);
+        } catch (DataIntegrityViolationException exception) {
+            // 동시 입장 race는 DB UNIQUE 제약이 최종 방어한다.
+            return groupParticipantRepository
+                    .findFirstByRoomIdAndUserIdOrderByIdAsc(roomId, userId)
+                    .map(participant -> toResponse(room, participant))
+                    .orElseThrow(() -> exception);
         }
-
-
-        GroupParticipantEntity participant =
-                GroupParticipantEntity.builder()
-                        .roomId(roomId)
-                        .userId(userId)
-                        .status("JOINED")
-                        .build();
-
-
-        GroupParticipantEntity savedParticipant = groupParticipantRepository.save(participant);
-        broadcastParticipant("PARTICIPANT_JOINED", room, savedParticipant);
-        return toResponse(room, savedParticipant);
     }
 
 
@@ -265,7 +267,7 @@ public class GroupInterviewService {
     }
 
     private GroupParticipantEntity getParticipant(Long roomId, Long userId) {
-        return groupParticipantRepository.findByRoomIdAndUserId(roomId, userId)
+        return groupParticipantRepository.findFirstByRoomIdAndUserIdOrderByIdAsc(roomId, userId)
                 .orElseThrow(() -> new AccessDeniedException("면접 방 참가자가 아닙니다."));
     }
 
