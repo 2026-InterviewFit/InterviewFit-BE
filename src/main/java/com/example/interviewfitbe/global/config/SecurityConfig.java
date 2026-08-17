@@ -248,6 +248,13 @@ public class SecurityConfig {
                                  */
                                 .requestMatchers(
                                         HttpMethod.GET,
+                                        "/api/group-interviews/*/participants",
+                                        "/api/group-interviews/*/session"
+                                )
+                                .authenticated()
+
+                                .requestMatchers(
+                                        HttpMethod.GET,
                                         "/api/group-interviews/**"
                                 )
                                 .permitAll()
