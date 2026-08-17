@@ -396,11 +396,8 @@ public class UserController {
      * 나중에 FE가 localStorage의 user 정보도 없애고
      * 서버에서 실제 로그인 사용자 정보를 가져오기 위해 사용.
      *
-     * 현재 단계에서는 JwtAuthenticationFilter가 아직
-     * Cookie를 읽지 않기 때문에
-     * 기존 Authorization Bearer Token으로 호출된다.
-     *
-     * 다음 단계에서 Cookie 인증으로 변경한다.
+     * JwtAuthenticationFilter가 HttpOnly Access Token Cookie를 읽고
+     * SecurityContext에 저장한 userId를 사용한다.
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me() {

@@ -8,12 +8,12 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 public class LiveKitConfig {
 
-    @Value("${livekit.api-key}")
+    @Value("${livekit.api-key:${LIVEKIT_API_KEY}}")
     private String apiKey;
 
-    @Value("${livekit.api-secret}")
+    @Value("${livekit.api-secret:${LIVEKIT_API_SECRET}}")
     private String apiSecret;
 
-    @Value("${livekit.url}")
+    @Value("${livekit.url:${LIVEKIT_URL}}")
     private String url;
 }

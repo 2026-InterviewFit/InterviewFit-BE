@@ -3,6 +3,7 @@ package com.example.interviewfitbe.global.config;
 import com.example.interviewfitbe.global.jwt.JwtAuthenticationFilter;
 import com.example.interviewfitbe.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,6 +18,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -26,6 +28,9 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+
+    @Value("${app.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000}")
+    private String allowedOrigins;
 
 
     @Bean
@@ -316,21 +321,10 @@ public class SecurityConfig {
          * allowedOrigins에 "*" 사용 불가
          */
         configuration.setAllowedOrigins(
-                List.of(
-                        "http://localhost:3000",
-                        "http://127.0.0.1:3000",
-
-                        /*
-                         * 현재 / 기존 개발 네트워크 주소
-                         */
-                        "http://172.20.2.15:3000",
-                        "http://172.20.14.83:3000",
-
-                        /*
-                         * 테스트 HTML
-                         */
-                        "http://localhost:63343"
-                )
+                Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .filter(origin -> !origin.isBlank())
+                        .toList()
         );
 
 

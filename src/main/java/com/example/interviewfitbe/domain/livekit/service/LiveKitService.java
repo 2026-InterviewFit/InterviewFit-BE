@@ -29,11 +29,11 @@ public class LiveKitService {
     private final LiveKitConfig liveKitConfig;
 
 
-    @Value("${livekit.api-key}")
+    @Value("${livekit.api-key:${LIVEKIT_API_KEY}}")
     private String apiKey;
 
 
-    @Value("${livekit.api-secret}")
+    @Value("${livekit.api-secret:${LIVEKIT_API_SECRET}}")
     private String apiSecret;
 
 

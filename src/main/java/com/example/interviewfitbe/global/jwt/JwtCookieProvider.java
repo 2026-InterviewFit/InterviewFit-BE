@@ -23,6 +23,8 @@ public class JwtCookieProvider {
 
     private final String sameSite;
 
+    private final String domain;
+
     private final long accessTokenValidityInMs;
 
     private final long refreshTokenValidityInMs;
@@ -35,6 +37,9 @@ public class JwtCookieProvider {
             @Value("${jwt.cookie.same-site:Lax}")
             String sameSite,
 
+            @Value("${jwt.cookie.domain:}")
+            String domain,
+
             @Value("${jwt.access-expiration-ms}")
             long accessTokenValidityInMs,
 
@@ -46,6 +51,9 @@ public class JwtCookieProvider {
 
         this.sameSite =
                 sameSite;
+
+        this.domain =
+                domain;
 
         this.accessTokenValidityInMs =
                 accessTokenValidityInMs;
@@ -61,7 +69,7 @@ public class JwtCookieProvider {
     public ResponseCookie createAccessTokenCookie(
             String accessToken
     ) {
-        return ResponseCookie
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
                 .from(
                         ACCESS_TOKEN_COOKIE_NAME,
                         accessToken
@@ -106,9 +114,10 @@ public class JwtCookieProvider {
                         Duration.ofMillis(
                                 accessTokenValidityInMs
                         )
-                )
+                );
 
-                .build();
+        applyDomain(builder);
+        return builder.build();
     }
 
 
@@ -118,7 +127,7 @@ public class JwtCookieProvider {
     public ResponseCookie createRefreshTokenCookie(
             String refreshToken
     ) {
-        return ResponseCookie
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
                 .from(
                         REFRESH_TOKEN_COOKIE_NAME,
                         refreshToken
@@ -144,9 +153,10 @@ public class JwtCookieProvider {
                         Duration.ofMillis(
                                 refreshTokenValidityInMs
                         )
-                )
+                );
 
-                .build();
+        applyDomain(builder);
+        return builder.build();
     }
 
 
@@ -154,7 +164,7 @@ public class JwtCookieProvider {
      * 로그아웃 시 Access Token Cookie 삭제
      */
     public ResponseCookie deleteAccessTokenCookie() {
-        return ResponseCookie
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
                 .from(
                         ACCESS_TOKEN_COOKIE_NAME,
                         ""
@@ -182,9 +192,10 @@ public class JwtCookieProvider {
                  */
                 .maxAge(
                         Duration.ZERO
-                )
+                );
 
-                .build();
+        applyDomain(builder);
+        return builder.build();
     }
 
 
@@ -192,7 +203,7 @@ public class JwtCookieProvider {
      * 로그아웃 시 Refresh Token Cookie 삭제
      */
     public ResponseCookie deleteRefreshTokenCookie() {
-        return ResponseCookie
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
                 .from(
                         REFRESH_TOKEN_COOKIE_NAME,
                         ""
@@ -216,8 +227,15 @@ public class JwtCookieProvider {
 
                 .maxAge(
                         Duration.ZERO
-                )
+                );
 
-                .build();
+        applyDomain(builder);
+        return builder.build();
+    }
+
+    private void applyDomain(ResponseCookie.ResponseCookieBuilder builder) {
+        if (domain != null && !domain.isBlank()) {
+            builder.domain(domain.trim());
+        }
     }
 }
