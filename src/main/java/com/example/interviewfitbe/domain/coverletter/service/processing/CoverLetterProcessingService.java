@@ -21,6 +21,18 @@ public class CoverLetterProcessingService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void processing(CoverLetterProcessingEntity processing) {
+        processing.processing();
+        coverLetterProcessingRepository.saveAndFlush(processing);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void complete(CoverLetterProcessingEntity processing) {
+        processing.completed();
+        coverLetterProcessingRepository.saveAndFlush(processing);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void fail(CoverLetterProcessingEntity processing) {
         processing.failed();
         coverLetterProcessingRepository.saveAndFlush(processing);
