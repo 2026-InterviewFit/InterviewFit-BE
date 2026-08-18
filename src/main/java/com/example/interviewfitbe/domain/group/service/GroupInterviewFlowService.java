@@ -9,15 +9,23 @@ import com.example.interviewfitbe.domain.group.repository.GroupInterviewReposito
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewSessionRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupParticipantRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupQuestionRepository;
+import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class GroupInterviewFlowService {
 
 
@@ -29,7 +37,14 @@ public class GroupInterviewFlowService {
 
     private final GroupQuestionRepository groupQuestionRepository;
 
+    private final GroupInterviewAnswerRepository answerRepository;
+
+    private final GroupInterviewAnswerCompletionService answerCompletionService;
+
     private final SimpMessagingTemplate messagingTemplate;
+
+    @Value("${app.group-interview.answer-limit-seconds:60}")
+    private long answerLimitSeconds;
 
 
 
@@ -77,16 +92,27 @@ public class GroupInterviewFlowService {
      */
     @Transactional
     public void startAnswer(Long roomId, Long actorUserId){
-
-        validateHost(roomId, actorUserId);
-
-
         GroupInterviewSessionEntity session =
                 sessionRepository.findByInterviewId(roomId)
                         .orElseThrow();
 
 
-        session.startAnswer();
+        validateCurrentParticipant(roomId, session, actorUserId);
+        Instant startedAt = Instant.now();
+        session.startAnswer(startedAt, startedAt.plus(answerLimitSeconds, ChronoUnit.SECONDS));
+        GroupQuestionEntity question = currentQuestion(session);
+        GroupInterviewAnswerEntity answer = answerRepository.saveAndFlush(
+                GroupInterviewAnswerEntity.builder()
+                        .groupInterview(session.getInterview())
+                        .participantUserId(actorUserId)
+                        .questionId(question == null ? null : question.getId())
+                        .round(session.getCurrentRound())
+                        .questionIndex(session.getCurrentQuestionIndex())
+                        .answerStartedAt(startedAt)
+                        .build()
+        );
+        session.assignCurrentAnswer(answer.getId());
+        sessionRepository.saveAndFlush(session);
 
         broadcastProgress("ANSWER_STARTED", roomId, actorUserId, session);
 
@@ -95,10 +121,10 @@ public class GroupInterviewFlowService {
 
 
     /**
-     * 다음 참가자
+     * 현재 답변자의 답변 완료. 이후 상태는 서버가 결정한다.
      */
     @Transactional
-    public void nextParticipant(
+    public void completeAnswer(
             Long roomId,
             Long actorUserId
     ){
@@ -108,78 +134,28 @@ public class GroupInterviewFlowService {
                         .orElseThrow();
 
 
-        validateHost(roomId, actorUserId);
-        session.nextParticipant(participantCount(roomId));
-
-        broadcastProgress("SPEAKER_CHANGED", roomId, actorUserId, session);
+        validateCurrentParticipant(roomId, session, actorUserId);
+        completeAnswer(roomId, actorUserId, session, false);
 
     }
 
-    /**
-     * 답변 종료
-     */
     @Transactional
-    public void endAnswer(
-            Long roomId,
-            Long actorUserId
-    ){
-
-        GroupInterviewSessionEntity session =
-                sessionRepository.findByInterviewId(roomId)
-                        .orElseThrow();
-
-
-        validateHost(roomId, actorUserId);
-        session.endAnswer(participantCount(roomId));
-
-        broadcastProgress("ANSWER_ENDED", roomId, actorUserId, session);
-
+    public void completeExpiredAnswer(Long sessionId) {
+        GroupInterviewSessionEntity session = sessionRepository.findById(sessionId).orElse(null);
+        if (session == null
+                || session.getStatus() != InterviewStatus.ANSWERING
+                || session.getAnswerDeadlineAt() == null
+                || session.getAnswerDeadlineAt().isAfter(Instant.now())) {
+            return;
+        }
+        Long roomId = session.getInterview().getId();
+        Long timedOutUserId = currentParticipantUserId(roomId, session.getCurrentParticipantIndex());
+        completeAnswer(roomId, timedOutUserId, session, true);
     }
 
-    /**
-     * 다음 질문 이동
-     */
-    @Transactional
-    public GroupInterviewSessionEntity nextQuestion(Long roomId, Long actorUserId){
-
-        validateHost(roomId, actorUserId);
-
-        GroupInterviewSessionEntity session =
-                sessionRepository.findByInterviewId(roomId)
-                        .orElseThrow();
-
-
-        session.nextQuestion();
-
-        broadcastProgress("QUESTION_CHANGED", roomId, actorUserId, session);
-
-        return session;
-
-    }
-
-    /**
-     * 다음 라운드 이동
-     */
-    @Transactional
-    public GroupInterviewSessionEntity nextRound(Long roomId, Long actorUserId) {
-
-        validateHost(roomId, actorUserId);
-
-        GroupInterviewSessionEntity session =
-                sessionRepository.findByInterviewId(roomId)
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                "면접 세션을 찾을 수 없습니다. roomId=" + roomId
-                        ));
-
-        int participantCount = Math.toIntExact(
-                groupParticipantRepository.countByRoomId(roomId)
-        );
-
-        session.moveToNextRound(participantCount);
-
-        broadcastProgress("ROUND_CHANGED", roomId, actorUserId, session);
-
-        return session;
+    @Transactional(readOnly = true)
+    public List<Long> findExpiredAnswerSessionIds(Instant now) {
+        return sessionRepository.findExpiredAnswerSessionIds(now);
     }
 
     /**
@@ -199,6 +175,7 @@ public class GroupInterviewFlowService {
 
         session.finish();
         interview.finishInterview();
+        sessionRepository.saveAndFlush(session);
 
         broadcastProgress("INTERVIEW_FINISHED", roomId, actorUserId, session);
 
@@ -281,18 +258,65 @@ public class GroupInterviewFlowService {
         return count;
     }
 
+    private void completeAnswer(
+            Long roomId,
+            Long actorUserId,
+            GroupInterviewSessionEntity session,
+            boolean timedOut
+    ) {
+        Long completedAnswerId = session.getCurrentAnswerId();
+        GroupInterviewSessionEntity.AnswerCompletionResult result =
+                session.completeCurrentAnswer(participantCount(roomId));
+        if (result == GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED) {
+            session.getInterview().finishInterview();
+        }
+        sessionRepository.saveAndFlush(session);
+
+        try {
+            answerCompletionService.complete(
+                    completedAnswerId,
+                    timedOut ? GroupAnswerCompletionType.TIMED_OUT : GroupAnswerCompletionType.COMPLETED,
+                    Instant.now()
+            );
+        } catch (RuntimeException exception) {
+            log.error(
+                    "그룹 면접 답변 완료 정보 저장 실패. 진행 상태는 유지합니다. answerId={}",
+                    completedAnswerId,
+                    exception
+            );
+        }
+
+        String type = switch (result) {
+            case NEXT_PARTICIPANT -> timedOut
+                    ? "ANSWER_TIMED_OUT_SPEAKER_CHANGED"
+                    : "ANSWER_COMPLETED_SPEAKER_CHANGED";
+            case NEXT_QUESTION -> timedOut
+                    ? "ANSWER_TIMED_OUT_QUESTION_CHANGED"
+                    : "ANSWER_COMPLETED_QUESTION_CHANGED";
+            case INTERVIEW_FINISHED -> timedOut
+                    ? "ANSWER_TIMED_OUT_INTERVIEW_FINISHED"
+                    : "ANSWER_COMPLETED_INTERVIEW_FINISHED";
+        };
+        broadcastProgress(type, roomId, actorUserId, session);
+    }
+
+    private void validateCurrentParticipant(
+            Long roomId,
+            GroupInterviewSessionEntity session,
+            Long actorUserId
+    ) {
+        Long currentUserId = currentParticipantUserId(roomId, session.getCurrentParticipantIndex());
+        if (currentUserId == null || !currentUserId.equals(actorUserId)) {
+            throw new AccessDeniedException("현재 답변자만 자신의 답변 상태를 변경할 수 있습니다.");
+        }
+    }
+
     private void validateAllReady(Long roomId) {
         var participants = groupParticipantRepository.findAllByRoomIdOrderByIdAsc(roomId);
         if (participants.size() < 2
                 || participants.stream().anyMatch(p -> !"READY".equals(p.getStatus()))) {
             throw new IllegalStateException("최소 2명의 참가자가 모두 준비 완료 상태여야 합니다.");
         }
-    }
-
-    private void validateHost(Long roomId, Long userId) {
-        GroupInterviewEntity interview = groupInterviewRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("면접 방을 찾을 수 없습니다."));
-        validateHost(interview, userId);
     }
 
     private void validateHost(GroupInterviewEntity interview, Long userId) {

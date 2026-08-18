@@ -2,17 +2,25 @@ package com.example.interviewfitbe.domain.group.controller;
 
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewSessionResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewHistoryResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewMyAnswerResponse;
 import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerAnalysisService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewDashboardService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +40,12 @@ public class GroupInterviewController {
     private final GroupInterviewFlowService groupInterviewFlowService;
 
     private final LiveKitService liveKitService;
+
+    private final GroupInterviewAnswerService groupInterviewAnswerService;
+
+    private final GroupInterviewAnswerAnalysisService groupInterviewAnswerAnalysisService;
+
+    private final GroupInterviewDashboardService groupInterviewDashboardService;
 
 
 
@@ -216,31 +230,10 @@ public class GroupInterviewController {
     /**
      * 답변 종료
      */
-    @PostMapping("/{roomId}/answer/end")
-    public ResponseEntity<GroupInterviewSessionResponse> endAnswer(
+    @PostMapping({"/{roomId}/answer-complete", "/{roomId}/answer/end"})
+    public ResponseEntity<GroupInterviewSessionResponse> completeAnswer(
             @PathVariable Long roomId) {
-        groupInterviewFlowService.endAnswer(roomId, AuthUtils.getCurrentUserId());
-        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
-    }
-
-    /**
-     * 다음 질문 이동
-     */
-    @PostMapping("/{roomId}/next-question")
-    public ResponseEntity<GroupInterviewSessionResponse> nextQuestion(
-            @PathVariable Long roomId) {
-        groupInterviewFlowService.nextQuestion(roomId, AuthUtils.getCurrentUserId());
-        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
-    }
-
-    /**
-     * 다음 라운드 이동
-     */
-    @PostMapping("/{roomId}/next-round")
-    public ResponseEntity<GroupInterviewSessionResponse> nextRound(
-            @PathVariable Long roomId) {
-
-        groupInterviewFlowService.nextRound(roomId, AuthUtils.getCurrentUserId());
+        groupInterviewFlowService.completeAnswer(roomId, AuthUtils.getCurrentUserId());
         return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 
@@ -259,6 +252,75 @@ public class GroupInterviewController {
             @PathVariable Long roomId
     ) {
         return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
+    }
+
+    @PostMapping(value = "/{roomId}/answers/{answerId}/video", consumes = "multipart/form-data")
+    public ResponseEntity<GroupInterviewAnswerResponse> uploadAnswerVideo(
+            @PathVariable Long roomId,
+            @PathVariable Long answerId,
+            @RequestPart("file") MultipartFile file
+    ) throws java.io.IOException {
+        return ResponseEntity.ok(groupInterviewAnswerService.uploadVideo(
+                roomId,
+                answerId,
+                AuthUtils.getCurrentUserId(),
+                file
+        ));
+    }
+
+    @GetMapping("/{roomId}/answers")
+    public ResponseEntity<List<GroupInterviewAnswerResponse>> getAnswers(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(groupInterviewAnswerService.getAnswers(
+                roomId,
+                AuthUtils.getCurrentUserId()
+        ));
+    }
+
+    @PostMapping("/{roomId}/answers/{answerId}/analysis")
+    public ResponseEntity<GroupInterviewAnswerAnalysisResponse> requestAnswerAnalysis(
+            @PathVariable Long roomId,
+            @PathVariable Long answerId
+    ) {
+        return ResponseEntity.accepted().body(
+                groupInterviewAnswerAnalysisService.requestAnalysis(
+                        roomId,
+                        answerId,
+                        AuthUtils.getCurrentUserId()
+                )
+        );
+    }
+
+    @GetMapping("/{roomId}/answers/{answerId}/analysis")
+    public ResponseEntity<GroupInterviewAnswerAnalysisResponse> getAnswerAnalysis(
+            @PathVariable Long roomId,
+            @PathVariable Long answerId
+    ) {
+        return ResponseEntity.ok(
+                groupInterviewAnswerAnalysisService.getAnalysis(
+                        roomId,
+                        answerId,
+                        AuthUtils.getCurrentUserId()
+                )
+        );
+    }
+
+    @GetMapping("/me/history")
+    public ResponseEntity<List<GroupInterviewHistoryResponse>> getMyHistory() {
+        return ResponseEntity.ok(groupInterviewDashboardService.getMyHistory(
+                AuthUtils.getCurrentUserId()
+        ));
+    }
+
+    @GetMapping("/{roomId}/answers/me")
+    public ResponseEntity<List<GroupInterviewMyAnswerResponse>> getMyAnswers(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(groupInterviewDashboardService.getMyAnswers(
+                roomId,
+                AuthUtils.getCurrentUserId()
+        ));
     }
 
 }
