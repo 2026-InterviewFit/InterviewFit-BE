@@ -44,6 +44,18 @@ class GroupInterviewSessionEntityTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    void answerCompletionStoresTypeAndTimestampOnce() {
+        Instant completedAt = Instant.parse("2026-08-18T00:01:00Z");
+        GroupInterviewAnswerEntity answer = GroupInterviewAnswerEntity.builder().build();
+
+        answer.complete(GroupAnswerCompletionType.TIMED_OUT, completedAt);
+        answer.complete(GroupAnswerCompletionType.COMPLETED, completedAt.plusSeconds(1));
+
+        assertThat(answer.getCompletionType()).isEqualTo(GroupAnswerCompletionType.TIMED_OUT);
+        assertThat(answer.getAnswerCompletedAt()).isEqualTo(completedAt);
+    }
+
     private GroupInterviewSessionEntity.AnswerCompletionResult complete(
             GroupInterviewSessionEntity session,
             Instant now,

@@ -52,6 +52,8 @@ public class GroupInterviewSessionEntity {
 
     private Instant answerDeadlineAt;
 
+    private Long currentAnswerId;
+
     @Version
     private Long version;
 
@@ -74,6 +76,13 @@ public class GroupInterviewSessionEntity {
         this.status = InterviewStatus.ANSWERING;
         this.answerStartedAt = startedAt;
         this.answerDeadlineAt = deadlineAt;
+    }
+
+    public void assignCurrentAnswer(Long answerId) {
+        if (this.status != InterviewStatus.ANSWERING) {
+            throw new IllegalStateException("답변 중인 상태에서만 answerId를 지정할 수 있습니다.");
+        }
+        this.currentAnswerId = answerId;
     }
 
 
@@ -119,6 +128,7 @@ public class GroupInterviewSessionEntity {
     private void clearAnswerTimer() {
         this.answerStartedAt = null;
         this.answerDeadlineAt = null;
+        this.currentAnswerId = null;
     }
 
     public enum AnswerCompletionResult {

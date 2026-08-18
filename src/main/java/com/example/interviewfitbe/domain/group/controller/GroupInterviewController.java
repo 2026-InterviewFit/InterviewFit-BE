@@ -2,17 +2,20 @@ package com.example.interviewfitbe.domain.group.controller;
 
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewSessionResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
 import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +35,8 @@ public class GroupInterviewController {
     private final GroupInterviewFlowService groupInterviewFlowService;
 
     private final LiveKitService liveKitService;
+
+    private final GroupInterviewAnswerService groupInterviewAnswerService;
 
 
 
@@ -238,6 +243,30 @@ public class GroupInterviewController {
             @PathVariable Long roomId
     ) {
         return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
+    }
+
+    @PostMapping(value = "/{roomId}/answers/{answerId}/video", consumes = "multipart/form-data")
+    public ResponseEntity<GroupInterviewAnswerResponse> uploadAnswerVideo(
+            @PathVariable Long roomId,
+            @PathVariable Long answerId,
+            @RequestPart("file") MultipartFile file
+    ) throws java.io.IOException {
+        return ResponseEntity.ok(groupInterviewAnswerService.uploadVideo(
+                roomId,
+                answerId,
+                AuthUtils.getCurrentUserId(),
+                file
+        ));
+    }
+
+    @GetMapping("/{roomId}/answers")
+    public ResponseEntity<List<GroupInterviewAnswerResponse>> getAnswers(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(groupInterviewAnswerService.getAnswers(
+                roomId,
+                AuthUtils.getCurrentUserId()
+        ));
     }
 
 }

@@ -21,6 +21,7 @@ public class InterviewProgressResponse {
     private InterviewStatus status;
     private Instant answerStartedAt;
     private Instant answerDeadlineAt;
+    private Long answerId;
 
     public static InterviewProgressResponse from(
             Long roomId,
@@ -40,6 +41,7 @@ public class InterviewProgressResponse {
                 .status(session.getStatus())
                 .answerStartedAt(session.getAnswerStartedAt())
                 .answerDeadlineAt(session.getAnswerDeadlineAt())
+                .answerId(session.getCurrentAnswerId())
                 .build();
     }
 }

@@ -4,8 +4,10 @@ import com.example.interviewfitbe.domain.group.controller.GroupInterviewControll
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.domain.user.client.KakaoApiClient;
@@ -26,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 
@@ -38,6 +41,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,6 +70,9 @@ class CookieAuthenticationIntegrationTest {
 
     @MockitoBean
     GroupInterviewFlowService groupInterviewFlowService;
+
+    @MockitoBean
+    GroupInterviewAnswerService groupInterviewAnswerService;
 
     @MockitoBean
     LiveKitService liveKitService;
@@ -175,6 +182,27 @@ class CookieAuthenticationIntegrationTest {
 
         verify(groupInterviewFlowService).start(1L, USER_ID);
         verify(groupInterviewFlowService).completeAnswer(1L, USER_ID);
+    }
+
+    @Test
+    void groupAnswerVideoUploadUsesAuthenticatedUserId() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "answer.webm", "video/webm", new byte[]{1, 2, 3}
+        );
+        when(groupInterviewAnswerService.uploadVideo(1L, 123L, USER_ID, file))
+                .thenReturn(GroupInterviewAnswerResponse.builder()
+                        .answerId(123L)
+                        .roomId(1L)
+                        .participantUserId(USER_ID)
+                        .videoUploaded(true)
+                        .build());
+
+        mockMvc.perform(multipart("/api/group-interviews/1/answers/123/video")
+                        .file(file)
+                        .cookie(accessCookie))
+                .andExpect(status().isOk());
+
+        verify(groupInterviewAnswerService).uploadVideo(1L, 123L, USER_ID, file);
     }
 
     @Test
