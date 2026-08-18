@@ -49,7 +49,7 @@ public class CoverLetterEventListener {
 
             processing.completed();
         } catch (Exception e) {
-            processing.failed();
+            processingService.fail(processing);
             throw new RuntimeException(e);
         }
     }

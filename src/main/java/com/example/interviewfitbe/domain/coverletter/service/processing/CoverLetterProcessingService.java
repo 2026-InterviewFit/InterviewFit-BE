@@ -7,6 +7,8 @@ import com.example.interviewfitbe.domain.coverletter.repository.CoverLetterProce
 import com.example.interviewfitbe.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Service
@@ -16,5 +18,11 @@ public class CoverLetterProcessingService {
     public CoverLetterProcessingEntity getProcessingByCoverLetter(CoverLetterEntity coverLetter) {
         return coverLetterProcessingRepository.findByCoverLetter(coverLetter).orElseThrow(() ->
                 new BaseException(CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_FOUND));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void fail(CoverLetterProcessingEntity processing) {
+        processing.failed();
+        coverLetterProcessingRepository.saveAndFlush(processing);
     }
 }
