@@ -4,6 +4,8 @@ import com.example.interviewfitbe.domain.group.dto.GroupInterviewSessionResponse
 import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewHistoryResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewMyAnswerResponse;
 import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
@@ -12,6 +14,7 @@ import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerAnalysisService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewDashboardService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.global.jwt.AuthUtils;
@@ -41,6 +44,8 @@ public class GroupInterviewController {
     private final GroupInterviewAnswerService groupInterviewAnswerService;
 
     private final GroupInterviewAnswerAnalysisService groupInterviewAnswerAnalysisService;
+
+    private final GroupInterviewDashboardService groupInterviewDashboardService;
 
 
 
@@ -299,6 +304,23 @@ public class GroupInterviewController {
                         AuthUtils.getCurrentUserId()
                 )
         );
+    }
+
+    @GetMapping("/me/history")
+    public ResponseEntity<List<GroupInterviewHistoryResponse>> getMyHistory() {
+        return ResponseEntity.ok(groupInterviewDashboardService.getMyHistory(
+                AuthUtils.getCurrentUserId()
+        ));
+    }
+
+    @GetMapping("/{roomId}/answers/me")
+    public ResponseEntity<List<GroupInterviewMyAnswerResponse>> getMyAnswers(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(groupInterviewDashboardService.getMyAnswers(
+                roomId,
+                AuthUtils.getCurrentUserId()
+        ));
     }
 
 }

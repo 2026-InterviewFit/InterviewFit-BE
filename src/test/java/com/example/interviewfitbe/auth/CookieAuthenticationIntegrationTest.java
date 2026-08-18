@@ -9,6 +9,7 @@ import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerAnalysisService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewDashboardService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.domain.user.client.KakaoApiClient;
@@ -77,6 +78,9 @@ class CookieAuthenticationIntegrationTest {
 
     @MockitoBean
     GroupInterviewAnswerAnalysisService groupInterviewAnswerAnalysisService;
+
+    @MockitoBean
+    GroupInterviewDashboardService groupInterviewDashboardService;
 
     @MockitoBean
     LiveKitService liveKitService;
@@ -207,6 +211,28 @@ class CookieAuthenticationIntegrationTest {
                 .andExpect(status().isOk());
 
         verify(groupInterviewAnswerService).uploadVideo(1L, 123L, USER_ID, file);
+    }
+
+    @Test
+    void groupDashboardApisUseAuthenticatedUserId() throws Exception {
+        when(groupInterviewDashboardService.getMyHistory(USER_ID)).thenReturn(List.of());
+        when(groupInterviewDashboardService.getMyAnswers(1L, USER_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/group-interviews/me/history").cookie(accessCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/group-interviews/1/answers/me").cookie(accessCookie))
+                .andExpect(status().isOk());
+
+        verify(groupInterviewDashboardService).getMyHistory(USER_ID);
+        verify(groupInterviewDashboardService).getMyAnswers(1L, USER_ID);
+    }
+
+    @Test
+    void groupDashboardApisWithoutCookieReturn401() throws Exception {
+        mockMvc.perform(get("/api/group-interviews/me/history"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/group-interviews/1/answers/me"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
