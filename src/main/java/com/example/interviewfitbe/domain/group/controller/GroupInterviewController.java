@@ -216,31 +216,10 @@ public class GroupInterviewController {
     /**
      * 답변 종료
      */
-    @PostMapping("/{roomId}/answer/end")
-    public ResponseEntity<GroupInterviewSessionResponse> endAnswer(
+    @PostMapping({"/{roomId}/answer-complete", "/{roomId}/answer/end"})
+    public ResponseEntity<GroupInterviewSessionResponse> completeAnswer(
             @PathVariable Long roomId) {
-        groupInterviewFlowService.endAnswer(roomId, AuthUtils.getCurrentUserId());
-        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
-    }
-
-    /**
-     * 다음 질문 이동
-     */
-    @PostMapping("/{roomId}/next-question")
-    public ResponseEntity<GroupInterviewSessionResponse> nextQuestion(
-            @PathVariable Long roomId) {
-        groupInterviewFlowService.nextQuestion(roomId, AuthUtils.getCurrentUserId());
-        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
-    }
-
-    /**
-     * 다음 라운드 이동
-     */
-    @PostMapping("/{roomId}/next-round")
-    public ResponseEntity<GroupInterviewSessionResponse> nextRound(
-            @PathVariable Long roomId) {
-
-        groupInterviewFlowService.nextRound(roomId, AuthUtils.getCurrentUserId());
+        groupInterviewFlowService.completeAnswer(roomId, AuthUtils.getCurrentUserId());
         return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 

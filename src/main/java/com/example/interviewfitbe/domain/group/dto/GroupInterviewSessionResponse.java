@@ -5,6 +5,8 @@ import com.example.interviewfitbe.domain.group.entity.InterviewStatus;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.Instant;
+
 @Getter
 @Builder
 public class GroupInterviewSessionResponse {
@@ -18,6 +20,8 @@ public class GroupInterviewSessionResponse {
     private Integer currentParticipantIndex;
     private Long currentParticipantUserId;
     private InterviewStatus status;
+    private Instant answerStartedAt;
+    private Instant answerDeadlineAt;
 
     public static GroupInterviewSessionResponse from(
             GroupInterviewSessionEntity session,
@@ -35,6 +39,8 @@ public class GroupInterviewSessionResponse {
                 .currentParticipantIndex(session.getCurrentParticipantIndex())
                 .currentParticipantUserId(currentParticipantUserId)
                 .status(session.getStatus())
+                .answerStartedAt(session.getAnswerStartedAt())
+                .answerDeadlineAt(session.getAnswerDeadlineAt())
                 .build();
     }
 }

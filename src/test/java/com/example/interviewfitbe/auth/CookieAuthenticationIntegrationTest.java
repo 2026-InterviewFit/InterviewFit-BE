@@ -174,7 +174,7 @@ class CookieAuthenticationIntegrationTest {
                 .andExpect(status().isOk());
 
         verify(groupInterviewFlowService).start(1L, USER_ID);
-        verify(groupInterviewFlowService).endAnswer(1L, USER_ID);
+        verify(groupInterviewFlowService).completeAnswer(1L, USER_ID);
     }
 
     @Test
