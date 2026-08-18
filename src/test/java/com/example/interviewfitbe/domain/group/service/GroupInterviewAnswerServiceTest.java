@@ -21,19 +21,22 @@ class GroupInterviewAnswerServiceTest {
     private GroupInterviewAnswerRepository answerRepository;
     private VideoService videoService;
     private GroupInterviewAnswerService service;
+    private GroupInterviewAnswerAnalysisService analysisService;
     private GroupInterviewEntity interview;
 
     @BeforeEach
     void setUp() {
         answerRepository = mock(GroupInterviewAnswerRepository.class);
         videoService = mock(VideoService.class);
+        analysisService = mock(GroupInterviewAnswerAnalysisService.class);
         interview = mock(GroupInterviewEntity.class);
         when(interview.getId()).thenReturn(10L);
         service = new GroupInterviewAnswerService(
                 answerRepository,
                 mock(GroupInterviewRepository.class),
                 mock(GroupParticipantRepository.class),
-                videoService
+                videoService,
+                analysisService
         );
     }
 
@@ -59,6 +62,7 @@ class GroupInterviewAnswerServiceTest {
         assertThat(response.getVideoObjectKey()).isEqualTo("videos/group-answer.webm");
         assertThat(answer.getVideoContentType()).isEqualTo("video/webm");
         verify(answerRepository).saveAndFlush(answer);
+        verify(analysisService).createForUploadedAnswer(answer);
     }
 
     @Test

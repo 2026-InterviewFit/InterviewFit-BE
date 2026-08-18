@@ -8,6 +8,7 @@ import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerAnalysisService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.domain.user.client.KakaoApiClient;
@@ -73,6 +74,9 @@ class CookieAuthenticationIntegrationTest {
 
     @MockitoBean
     GroupInterviewAnswerService groupInterviewAnswerService;
+
+    @MockitoBean
+    GroupInterviewAnswerAnalysisService groupInterviewAnswerAnalysisService;
 
     @MockitoBean
     LiveKitService liveKitService;

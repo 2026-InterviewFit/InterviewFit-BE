@@ -23,6 +23,7 @@ public class GroupInterviewAnswerService {
     private final GroupInterviewRepository interviewRepository;
     private final GroupParticipantRepository participantRepository;
     private final VideoService videoService;
+    private final GroupInterviewAnswerAnalysisService analysisService;
 
     @Transactional
     public GroupInterviewAnswerResponse uploadVideo(
@@ -50,6 +51,7 @@ public class GroupInterviewAnswerService {
                 file.getSize()
         );
         answerRepository.saveAndFlush(answer);
+        analysisService.createForUploadedAnswer(answer);
         return GroupInterviewAnswerResponse.from(answer);
     }
 
