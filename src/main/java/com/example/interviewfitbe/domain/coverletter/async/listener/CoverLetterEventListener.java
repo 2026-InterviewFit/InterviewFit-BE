@@ -59,6 +59,10 @@ public class CoverLetterEventListener {
         CoverLetterEntity coverLetter = coverLetterService.getCoverLetter(event.getCoverLetterId());
         CoverLetterProcessingEntity processing = processingService.getProcessingByCoverLetter(coverLetter);
 
+        if (processing.isCompleted()) {
+            return;
+        }
+
         try {
             // 임베딩 없는 자소서 문항 조회
             List<CoverLetterQuestionEntity> questions = coverLetterQuestionService.getQuestionsWithoutEmbedding(coverLetter.getId());
