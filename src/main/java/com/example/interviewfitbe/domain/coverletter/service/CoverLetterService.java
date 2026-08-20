@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.coverletter.service;
 
+import com.example.interviewfitbe.domain.coverletter.async.event.CoverLetterEmbeddingRetryEvent;
 import com.example.interviewfitbe.domain.coverletter.dto.CoverLetterCheckResult;
 import com.example.interviewfitbe.domain.coverletter.dto.analysis.CoverLetterAnalysisResponse;
 import com.example.interviewfitbe.domain.coverletter.dto.client.CoverLetterClientResponse;
@@ -84,6 +85,12 @@ public class CoverLetterService {
 //            log.info("embedding: {}ms", System.currentTimeMillis() - start);
         } else {
             recommendedJob = recommendJobService.getRecommendedJobByCoverLetter(coverLetter);
+
+            eventPublisher.publishEvent(
+                    CoverLetterEmbeddingRetryEvent.builder()
+                            .coverLetterId(coverLetter.getId())
+                            .build()
+            );
         }
 
         return coverLetterMapper.toResponse(coverLetter.getId(), recommendedJob);
