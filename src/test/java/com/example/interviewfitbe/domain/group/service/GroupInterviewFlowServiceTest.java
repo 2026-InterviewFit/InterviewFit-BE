@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -137,7 +138,7 @@ class GroupInterviewFlowServiceTest {
     }
 
     @Test
-    void answerMetadataFailureDoesNotRollbackInterviewTransition() {
+    void answerCompletionFailurePreventsInterviewTransition() {
         GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
         when(interview.getId()).thenReturn(10L);
         GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
@@ -156,11 +157,15 @@ class GroupInterviewFlowServiceTest {
         doThrow(new IllegalStateException("db unavailable"))
                 .when(completionService).complete(anyLong(), any(), any());
 
-        service.completeAnswer(10L, 5L);
+        assertThatThrownBy(() -> service.completeAnswer(10L, 5L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("db unavailable");
 
-        assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
-        assertThat(session.getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
-        verify(sessionRepository).saveAndFlush(session);
+        assertThat(session.getCurrentParticipantIndex()).isZero();
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.ANSWERING);
+        assertThat(session.getCurrentAnswerId()).isEqualTo(123L);
+        verify(sessionRepository, never()).saveAndFlush(session);
+        verifyNoInteractions(messagingTemplate);
     }
 
     private GroupParticipantEntity participant(Long userId) {
