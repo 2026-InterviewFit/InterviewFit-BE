@@ -11,7 +11,6 @@ import com.example.interviewfitbe.domain.group.repository.GroupParticipantReposi
 import com.example.interviewfitbe.domain.group.repository.GroupQuestionRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -25,7 +24,6 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class GroupInterviewFlowService {
 
 
@@ -265,26 +263,18 @@ public class GroupInterviewFlowService {
             boolean timedOut
     ) {
         Long completedAnswerId = session.getCurrentAnswerId();
+        answerCompletionService.complete(
+                completedAnswerId,
+                timedOut ? GroupAnswerCompletionType.TIMED_OUT : GroupAnswerCompletionType.COMPLETED,
+                Instant.now()
+        );
+
         GroupInterviewSessionEntity.AnswerCompletionResult result =
                 session.completeCurrentAnswer(participantCount(roomId));
         if (result == GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED) {
             session.getInterview().finishInterview();
         }
         sessionRepository.saveAndFlush(session);
-
-        try {
-            answerCompletionService.complete(
-                    completedAnswerId,
-                    timedOut ? GroupAnswerCompletionType.TIMED_OUT : GroupAnswerCompletionType.COMPLETED,
-                    Instant.now()
-            );
-        } catch (RuntimeException exception) {
-            log.error(
-                    "그룹 면접 답변 완료 정보 저장 실패. 진행 상태는 유지합니다. answerId={}",
-                    completedAnswerId,
-                    exception
-            );
-        }
 
         String type = switch (result) {
             case NEXT_PARTICIPANT -> timedOut
