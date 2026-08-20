@@ -29,7 +29,7 @@ public class QuestionController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping(value = "/one-to-one/create")
+    @PostMapping("/one-to-one/create")
     public ResponseEntity<List<QuestionResponse>> createQuestions(@RequestBody QuestionRequest request) {
         Long userId = AuthUtils.getCurrentUserId();
         List<QuestionResponse> responses = questionService.createQuestions(userId, request);

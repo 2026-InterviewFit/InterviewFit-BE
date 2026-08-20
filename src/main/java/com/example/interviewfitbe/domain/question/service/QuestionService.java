@@ -87,7 +87,11 @@ public class QuestionService {
                     : data.getReusableQuestions().size();
             int generateCount = Math.max(request.getCount() - reusableCount, 0);
 
-            QuestionResult result = getDefaultQuestions(request.getJobName(), generateCount);
+            String jobName = request.getJobRoleId() == 11L
+                    ? "기타"
+                    : request.getJobName();
+
+            QuestionResult result = getDefaultQuestions(jobName, generateCount);
             entities = questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
         }
 
