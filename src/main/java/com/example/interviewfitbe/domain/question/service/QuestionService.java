@@ -84,19 +84,13 @@ public class QuestionService {
             }
             else if (e.getErrorCode() == CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_FAILED
                     && request.getCoverLetterId() != null) {
-                entities = generateQuestionsAfterProcessingFailure(request, data);
+                try {
+                    entities = generateQuestionsAfterProcessingFailure(request, data);
+                } catch (BaseException ignored) {
+                    entities = generateFallbackQuestions(request, data);
+                }
             } else {
-                int reusableCount = data.getReusableQuestions() == null
-                        ? 0
-                        : data.getReusableQuestions().size();
-                int generateCount = Math.max(request.getCount() - reusableCount, 0);
-
-                String jobName = request.getJobRoleId() == 11L
-                        ? "기타"
-                        : request.getJobName();
-
-                QuestionResult result = getDefaultQuestions(jobName, generateCount);
-                entities = questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
+                entities = generateFallbackQuestions(request, data);
             }
         }
 
@@ -296,12 +290,7 @@ public class QuestionService {
         }
 
         List<CoverLetterQuestionAnalysisEntity> analyses = resolveAnalyses(request.getCoverLetterId(), data).stream()
-                .sorted(
-                        Comparator.comparing(
-                                CoverLetterQuestionAnalysisEntity::getImportanceScore,
-                                Comparator.nullsLast(Float::compareTo)
-                        ).reversed()
-                )
+                .sorted(Comparator.comparingDouble(a -> Math.random()))
                 .limit(request.getCount())
                 .toList();
 
@@ -334,5 +323,19 @@ public class QuestionService {
         List<CoverLetterQuestionEntity> questions = coverLetterQuestionService.getCoverLetterQuestions(coverLetter);
 
         return coverLetterQuestionAnalysisService.getCoverLetterQuestionAnalyses(questions);
+    }
+
+    private List<QuestionEntity> generateFallbackQuestions(QuestionRequest request, QuestionCreateData data) {
+        int reusableCount = data.getReusableQuestions() == null
+                ? 0
+                : data.getReusableQuestions().size();
+        int generateCount = Math.max(request.getCount() - reusableCount, 0);
+
+        String jobName = request.getJobRoleId() == 11L
+                ? "기타"
+                : request.getJobName();
+
+        QuestionResult result = getDefaultQuestions(jobName, generateCount);
+        return questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
     }
 }
