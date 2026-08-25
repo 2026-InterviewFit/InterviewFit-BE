@@ -47,7 +47,9 @@ public class PtDocumentAnalysisJobService {
                         result.slideNumber(),
                         result.title(),
                         result.extractedText(),
-                        result.summary()
+                        result.summary(),
+                        result.imageObjectKey(),
+                        null
                 );
 
                 ptSlideRepository.save(slide);

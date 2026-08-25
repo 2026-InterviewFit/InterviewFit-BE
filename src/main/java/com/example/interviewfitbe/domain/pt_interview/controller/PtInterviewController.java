@@ -8,18 +8,24 @@ import com.example.interviewfitbe.domain.pt_interview.dto.PtInterviewCreateReque
 import com.example.interviewfitbe.domain.pt_interview.dto.PtInterviewResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtQuestionResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtReportResponse;
-import com.example.interviewfitbe.domain.pt_interview.service.PtAnswerService;
-import com.example.interviewfitbe.domain.pt_interview.service.PtDocumentService;
-import com.example.interviewfitbe.domain.pt_interview.service.PtInterviewService;
-import com.example.interviewfitbe.domain.pt_interview.service.PtQuestionService;
-import com.example.interviewfitbe.domain.pt_interview.service.PtReportService;
+import com.example.interviewfitbe.domain.pt_interview.dto.PtSlideResponse;
+import com.example.interviewfitbe.domain.pt_interview.service.*;
+import io.minio.GetObjectArgs;
+import io.minio.MinioClient;
+import io.minio.StatObjectArgs;
+import io.minio.StatObjectResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 @RestController
@@ -32,6 +38,15 @@ public class PtInterviewController {
     private final PtQuestionService ptQuestionService;
     private final PtAnswerService ptAnswerService;
     private final PtReportService ptReportService;
+    private final PtPresentationService ptPresentationService;
+
+    /*
+     * MinIO
+     */
+    private final MinioClient minioClient;
+
+    @Value("${minio.bucket}")
+    private String bucketName;
 
     /*
      * PT 면접 생성
@@ -98,6 +113,125 @@ public class PtInterviewController {
     }
 
     /*
+     * PT 슬라이드 이미지 조회
+     *
+     * DA에서 PDF 페이지를 PNG로 변환해
+     * MinIO에 저장한 이미지를 브라우저에 반환한다.
+     */
+    @GetMapping(
+            "/{ptInterviewId}/slides/{slideNumber}/image"
+    )
+    public ResponseEntity<StreamingResponseBody> getSlideImage(
+            @PathVariable Long ptInterviewId,
+            @PathVariable Integer slideNumber
+    ) {
+
+        PtDocumentDetailResponse document =
+                ptDocumentService.getDocumentDetail(
+                        ptInterviewId
+                );
+
+        PtSlideResponse slide =
+                document.slides()
+                        .stream()
+                        .filter(item ->
+                                item.slideNumber() != null
+                                        && item.slideNumber().equals(slideNumber)
+                        )
+                        .findFirst()
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "존재하지 않는 PT 슬라이드입니다. slideNumber="
+                                                + slideNumber
+                                )
+                        );
+
+        String objectKey =
+                slide.imageObjectKey();
+
+        if (
+                objectKey == null
+                        || objectKey.isBlank()
+        ) {
+
+            return ResponseEntity
+                    .notFound()
+                    .build();
+        }
+
+        try {
+
+            StatObjectResponse stat =
+                    minioClient.statObject(
+                            StatObjectArgs.builder()
+                                    .bucket(bucketName)
+                                    .object(objectKey)
+                                    .build()
+                    );
+
+            StreamingResponseBody responseBody =
+                    outputStream -> {
+
+                        try (
+                                InputStream inputStream =
+                                        minioClient.getObject(
+                                                GetObjectArgs.builder()
+                                                        .bucket(bucketName)
+                                                        .object(objectKey)
+                                                        .build()
+                                        )
+                        ) {
+
+                            inputStream.transferTo(
+                                    outputStream
+                            );
+
+                        } catch (Exception e) {
+
+                            throw new IOException(
+                                    "PT 슬라이드 이미지 스트리밍 실패",
+                                    e
+                            );
+                        }
+                    };
+
+            HttpHeaders headers =
+                    new HttpHeaders();
+
+            /*
+             * 현재 DA에서 PDF 페이지를 PNG로 저장하므로
+             * PNG 타입으로 반환.
+             */
+            headers.setContentType(
+                    MediaType.IMAGE_PNG
+            );
+
+            headers.setContentLength(
+                    stat.size()
+            );
+
+            headers.set(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    "inline"
+            );
+
+            return new ResponseEntity<>(
+                    responseBody,
+                    headers,
+                    HttpStatus.OK
+            );
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                    "PT 슬라이드 이미지 조회 실패: "
+                            + e.getMessage(),
+                    e
+            );
+        }
+    }
+
+    /*
      * PT 발표자료 기반 예상 질문 생성
      */
     @PostMapping(
@@ -150,7 +284,7 @@ public class PtInterviewController {
     )
     public ResponseEntity<PtAnswerUploadResponse> uploadAnswer(
             @PathVariable Long ptInterviewId,
-            @RequestPart("ptQuestionId") Long ptQuestionId,
+            @RequestParam("ptQuestionId") Long ptQuestionId,
             @RequestPart("file") MultipartFile file
     ) throws IOException {
 
@@ -210,9 +344,6 @@ public class PtInterviewController {
 
     /*
      * PT 종합 리포트 생성
-     *
-     * 발표자료, 질문, 답변 및 분석 결과를 기반으로
-     * FastAPI를 호출하여 종합 리포트를 생성한다.
      */
     @PostMapping(
             "/{ptInterviewId}/report/generate"
@@ -248,6 +379,32 @@ public class PtInterviewController {
 
         return ResponseEntity.ok(
                 response
+        );
+    }
+
+    /*
+     * PT 발표 전체 영상 업로드
+     *
+     * 발표 종료 시 FE에서 녹화된 전체 영상을 전달한다.
+     * 업로드 후 Speech/STT 분석을 실행한다.
+     */
+    @PostMapping(
+            value = "/{ptInterviewId}/presentation",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<Long> uploadPresentation(
+            @PathVariable Long ptInterviewId,
+            @RequestPart("file") MultipartFile file
+    ) throws IOException {
+
+        Long speechReportId =
+                ptPresentationService.uploadAndAnalyze(
+                        ptInterviewId,
+                        file
+                );
+
+        return ResponseEntity.ok(
+                speechReportId
         );
     }
 }

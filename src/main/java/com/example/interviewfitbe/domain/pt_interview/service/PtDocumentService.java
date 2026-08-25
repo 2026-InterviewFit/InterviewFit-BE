@@ -195,9 +195,10 @@ public class PtDocumentService {
                                 slide.slideNumber(),
                                 slide.title(),
                                 slide.extractedText(),
-                                slide.summary()
+                                slide.summary(),
+                                slide.imageObjectKey(),
+                                null
                         );
-
                 ptSlideRepository.save(slideEntity);
             }
 

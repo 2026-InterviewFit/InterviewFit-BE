@@ -26,17 +26,28 @@ public class PtReportEntity {
     private PtInterviewEntity ptInterview;
 
     private Integer contentScore;
-
     private Integer structureScore;
-
     private Integer deliveryScore;
-
     private Integer qaScore;
-
     private Integer overallScore;
 
+    /**
+     * 업로드한 PPT/PDF 자체 요약
+     */
     @Column(columnDefinition = "TEXT")
-    private String presentationSummary;
+    private String presentationMaterialSummary;
+
+    /**
+     * 사용자가 실제 발표한 내용 요약
+     */
+    @Column(columnDefinition = "TEXT")
+    private String actualPresentationSummary;
+
+    /**
+     * 발표자료와 실제 발표 비교 분석
+     */
+    @Column(columnDefinition = "TEXT")
+    private String presentationComparison;
 
     @Column(columnDefinition = "TEXT")
     private String strengths;
@@ -47,6 +58,9 @@ public class PtReportEntity {
     @Column(columnDefinition = "TEXT")
     private String improvement;
 
+    /**
+     * 질문별 상세 분석 JSON
+     */
     @Column(columnDefinition = "TEXT")
     private String resultJson;
 
@@ -63,7 +77,9 @@ public class PtReportEntity {
             Integer deliveryScore,
             Integer qaScore,
             Integer overallScore,
-            String presentationSummary,
+            String presentationMaterialSummary,
+            String actualPresentationSummary,
+            String presentationComparison,
             String strengths,
             String weaknesses,
             String improvement,
@@ -80,7 +96,9 @@ public class PtReportEntity {
                 deliveryScore,
                 qaScore,
                 overallScore,
-                presentationSummary,
+                presentationMaterialSummary,
+                actualPresentationSummary,
+                presentationComparison,
                 strengths,
                 weaknesses,
                 improvement,
@@ -101,7 +119,9 @@ public class PtReportEntity {
             Integer deliveryScore,
             Integer qaScore,
             Integer overallScore,
-            String presentationSummary,
+            String presentationMaterialSummary,
+            String actualPresentationSummary,
+            String presentationComparison,
             String strengths,
             String weaknesses,
             String improvement,
@@ -114,7 +134,9 @@ public class PtReportEntity {
                 deliveryScore,
                 qaScore,
                 overallScore,
-                presentationSummary,
+                presentationMaterialSummary,
+                actualPresentationSummary,
+                presentationComparison,
                 strengths,
                 weaknesses,
                 improvement,
@@ -130,7 +152,9 @@ public class PtReportEntity {
             Integer deliveryScore,
             Integer qaScore,
             Integer overallScore,
-            String presentationSummary,
+            String presentationMaterialSummary,
+            String actualPresentationSummary,
+            String presentationComparison,
             String strengths,
             String weaknesses,
             String improvement,
@@ -143,16 +167,36 @@ public class PtReportEntity {
         this.qaScore = qaScore;
         this.overallScore = overallScore;
 
-        this.presentationSummary = normalizeText(presentationSummary);
-        this.strengths = normalizeText(strengths);
-        this.weaknesses = normalizeText(weaknesses);
-        this.improvement = normalizeText(improvement);
-        this.resultJson = normalizeText(resultJson);
+        this.presentationMaterialSummary =
+                normalizeText(presentationMaterialSummary);
+
+        this.actualPresentationSummary =
+                normalizeText(actualPresentationSummary);
+
+        this.presentationComparison =
+                normalizeText(presentationComparison);
+
+        this.strengths =
+                normalizeText(strengths);
+
+        this.weaknesses =
+                normalizeText(weaknesses);
+
+        this.improvement =
+                normalizeText(improvement);
+
+        this.resultJson =
+                normalizeText(resultJson);
     }
 
-    private static String normalizeText(String value) {
+    private static String normalizeText(
+            String value
+    ) {
 
-        if (value == null || value.isBlank()) {
+        if (
+                value == null
+                        || value.isBlank()
+        ) {
             return null;
         }
 

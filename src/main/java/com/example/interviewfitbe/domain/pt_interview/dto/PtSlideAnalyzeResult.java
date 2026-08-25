@@ -12,7 +12,10 @@ public record PtSlideAnalyzeResult(
         @JsonProperty("extracted_text")
         String extractedText,
 
-        String summary
+        String summary,
+
+        @JsonProperty("image_object_key")
+        String imageObjectKey
 
 ) {
 }
