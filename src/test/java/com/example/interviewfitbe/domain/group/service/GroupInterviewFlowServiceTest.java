@@ -64,8 +64,7 @@ class GroupInterviewFlowServiceTest {
         when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
                 .thenReturn(List.of(participant(5L)));
-        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
-                .thenReturn(Optional.of(question));
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of(question));
         when(answerRepository.saveAndFlush(any())).thenReturn(
                 GroupInterviewAnswerEntity.builder().id(123L).build()
         );
@@ -94,8 +93,7 @@ class GroupInterviewFlowServiceTest {
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
                 .thenReturn(List.of(participant(5L), participant(6L)));
         when(participantRepository.countByRoomId(10L)).thenReturn(2L);
-        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
-                .thenReturn(Optional.empty());
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of());
 
         service.completeAnswer(10L, 5L);
 
@@ -127,8 +125,7 @@ class GroupInterviewFlowServiceTest {
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
                 .thenReturn(List.of(participant(5L), participant(6L)));
         when(participantRepository.countByRoomId(10L)).thenReturn(2L);
-        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
-                .thenReturn(Optional.empty());
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of());
 
         service.completeExpiredAnswer(99L);
 
@@ -155,8 +152,7 @@ class GroupInterviewFlowServiceTest {
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
                 .thenReturn(List.of(participant(5L), participant(6L)));
         when(participantRepository.countByRoomId(10L)).thenReturn(2L);
-        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
-                .thenReturn(Optional.empty());
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of());
         doThrow(new IllegalStateException("db unavailable"))
                 .when(completionService).complete(anyLong(), any(), any());
 
@@ -190,12 +186,10 @@ class GroupInterviewFlowServiceTest {
         when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L)).thenReturn(participants);
         when(participantRepository.countByRoomId(10L)).thenReturn(2L);
-        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
-                .thenReturn(Optional.of(firstQuestion));
-        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(2))
-                .thenReturn(Optional.of(secondQuestion));
-        when(questionRepository.findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(3, 2L))
-                .thenReturn(Optional.of(thirdQuestion));
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of(firstQuestion));
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(2)).thenReturn(List.of(secondQuestion));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(3, 2L))
+                .thenReturn(List.of(thirdQuestion));
         when(answerRepository.saveAndFlush(any())).thenAnswer(invocation ->
                 GroupInterviewAnswerEntity.builder().id(answerId.getAndIncrement()).build()
         );
@@ -246,8 +240,8 @@ class GroupInterviewFlowServiceTest {
         when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
                 .thenReturn(List.of(participant(5L), participant(6L)));
-        when(questionRepository.findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId))
-                .thenReturn(Optional.of(thirdQuestion));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId))
+                .thenReturn(List.of(thirdQuestion));
 
         var response = service.getSession(10L);
 
@@ -256,7 +250,7 @@ class GroupInterviewFlowServiceTest {
         assertThat(response.getCurrentQuestionId()).isEqualTo(questionId);
         assertThat(response.getCurrentQuestionText()).isEqualTo("직무 " + jobRoleId + " 질문");
         verify(questionRepository)
-                .findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId);
+                .findAllByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId);
     }
 
     private void answer(GroupInterviewFlowService service, Long userId) {

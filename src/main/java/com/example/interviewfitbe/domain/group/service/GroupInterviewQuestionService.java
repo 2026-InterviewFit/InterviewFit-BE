@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,16 +28,16 @@ public class GroupInterviewQuestionService {
     public List<GroupQuestionResponse> getGroupInterviewQuestions(Long jobRoleId) {
         List<GroupQuestionEntity> selectedQuestions = new ArrayList<>();
 
-        // 1라운드: 공통 역량 질문 (랜덤 또는 첫 번째 항목)
+        // 1라운드: 공통 역량 질문
         List<GroupQuestionEntity> round1 = groupQuestionRepository.findByRoundNumber(1);
         if (!round1.isEmpty()) {
-            selectedQuestions.add(round1.get(0));
+            selectedQuestions.add(randomQuestion(round1));
         }
 
         // 2라운드: 압박 면접 질문
         List<GroupQuestionEntity> round2 = groupQuestionRepository.findByRoundNumber(2);
         if (!round2.isEmpty()) {
-            selectedQuestions.add(round2.get(0));
+            selectedQuestions.add(randomQuestion(round2));
         }
 
         // 3라운드: 직무 토의형 질문 (선택한 직무 연동)
@@ -45,11 +46,17 @@ public class GroupInterviewQuestionService {
 
         List<GroupQuestionEntity> round3 = groupQuestionRepository.findByRoundNumberAndJobRole(3, jobRole);
         if (!round3.isEmpty()) {
-            selectedQuestions.add(round3.get(0));
+            selectedQuestions.add(randomQuestion(round3));
         }
 
         return selectedQuestions.stream()
                 .map(GroupQuestionResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    private GroupQuestionEntity randomQuestion(List<GroupQuestionEntity> questions) {
+        List<GroupQuestionEntity> shuffled = new ArrayList<>(questions);
+        Collections.shuffle(shuffled);
+        return shuffled.get(0);
     }
 }
