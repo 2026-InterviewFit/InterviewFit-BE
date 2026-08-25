@@ -5,6 +5,8 @@ import com.example.interviewfitbe.domain.group.entity.*;
 import com.example.interviewfitbe.domain.group.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -228,9 +230,47 @@ class GroupInterviewFlowServiceTest {
         verify(interview).finishInterview();
     }
 
+    @ParameterizedTest
+    @ValueSource(longs = {1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L})
+    void thirdRoundResolvesQuestionForEveryJobRole(Long jobRoleId) {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        when(interview.getJobRoleId()).thenReturn(jobRoleId);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .interview(interview)
+                .build();
+        moveToThirdRound(session);
+
+        long questionId = 300L + jobRoleId;
+        GroupQuestionEntity thirdQuestion = question(questionId, "직무 " + jobRoleId + " 질문");
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+        when(questionRepository.findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId))
+                .thenReturn(Optional.of(thirdQuestion));
+
+        var response = service.getSession(10L);
+
+        assertThat(response.getCurrentRound()).isEqualTo(3);
+        assertThat(response.getCurrentQuestionIndex()).isEqualTo(2);
+        assertThat(response.getCurrentQuestionId()).isEqualTo(questionId);
+        assertThat(response.getCurrentQuestionText()).isEqualTo("직무 " + jobRoleId + " 질문");
+        verify(questionRepository)
+                .findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId);
+    }
+
     private void answer(GroupInterviewFlowService service, Long userId) {
         service.startAnswer(10L, userId);
         service.completeAnswer(10L, userId);
+    }
+
+    private void moveToThirdRound(GroupInterviewSessionEntity session) {
+        session.start();
+        for (int completedAnswers = 0; completedAnswers < 4; completedAnswers++) {
+            var now = java.time.Instant.now();
+            session.startAnswer(now, now.plusSeconds(60));
+            session.completeCurrentAnswer(2);
+        }
     }
 
     private void assertProgress(
