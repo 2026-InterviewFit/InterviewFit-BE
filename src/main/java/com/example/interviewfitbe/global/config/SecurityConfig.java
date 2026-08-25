@@ -185,6 +185,7 @@ public class SecurityConfig {
                                         HttpMethod.GET,
                                         "/api/group-interviews/*/participants",
                                         "/api/group-interviews/*/session",
+                                        "/api/group-interviews/*/comparisons/**",
                                         "/api/group-interviews/me/**",
                                         "/api/group-interviews/*/answers/**"
                                 )

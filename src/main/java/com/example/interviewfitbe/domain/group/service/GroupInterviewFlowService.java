@@ -17,6 +17,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -42,6 +43,9 @@ public class GroupInterviewFlowService {
     private final GroupInterviewAnswerCompletionService answerCompletionService;
 
     private final SimpMessagingTemplate messagingTemplate;
+
+    @Autowired(required = false)
+    private GroupInterviewComparisonService comparisonService;
 
     @Value("${app.group-interview.answer-limit-seconds:60}")
     private long answerLimitSeconds;
@@ -178,6 +182,7 @@ public class GroupInterviewFlowService {
         sessionRepository.saveAndFlush(session);
 
         broadcastProgress("INTERVIEW_FINISHED", roomId, actorUserId, session);
+        triggerComparison(roomId);
 
     }
 
@@ -310,6 +315,15 @@ public class GroupInterviewFlowService {
                     : "ANSWER_COMPLETED_INTERVIEW_FINISHED";
         };
         broadcastProgress(type, roomId, actorUserId, session);
+        if (result == GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED) {
+            triggerComparison(roomId);
+        }
+    }
+
+    private void triggerComparison(Long roomId) {
+        if (comparisonService != null) {
+            comparisonService.generateAvailableComparisons(roomId);
+        }
     }
 
     private void validateCurrentParticipant(

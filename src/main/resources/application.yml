@@ -47,6 +47,8 @@ minio:
 
 app:
   upload-dir: uploads/
+  group-interview:
+    comparison-feedback-enabled: ${GROUP_INTERVIEW_COMPARISON_FEEDBACK_ENABLED:true}
 
 jwt:
   secret: ${JWT_SECRET:local-dev-only-not-a-real-secret-just-for-testing-12345}

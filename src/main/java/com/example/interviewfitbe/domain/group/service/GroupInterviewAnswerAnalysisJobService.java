@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -35,6 +36,9 @@ public class GroupInterviewAnswerAnalysisJobService {
     private final SpeechAnalysisService speechAnalysisService;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+
+    @Autowired(required = false)
+    private GroupInterviewComparisonService comparisonService;
 
     @Async("analysisExecutor")
     public void analyzeAsync(Long answerId) {
@@ -68,6 +72,7 @@ public class GroupInterviewAnswerAnalysisJobService {
                     toJson(gaze),
                     toJson(pose)
             );
+            triggerComparison(context.roomId());
             log.info("그룹 답변 분석 완료: answerId={}", answerId);
         } catch (AnalysisAlreadyClaimedException exception) {
             log.info("이미 실행 또는 완료된 그룹 답변 분석을 건너뜁니다. answerId={}", answerId);
@@ -147,8 +152,21 @@ public class GroupInterviewAnswerAnalysisJobService {
                 analysis.markFailed(errorMessage, Instant.now());
                 analysisRepository.save(analysis);
             });
+            analysisRepository.findByAnswerId(answerId).ifPresent(analysis ->
+                    triggerComparison(analysis.getAnswer().getGroupInterview().getId()));
         } catch (Exception persistenceException) {
             log.error("그룹 답변 분석 실패 상태 저장 실패: answerId={}", answerId, persistenceException);
+        }
+    }
+
+    private void triggerComparison(Long roomId) {
+        if (comparisonService != null) {
+            try {
+                comparisonService.generateAvailableComparisons(roomId);
+            } catch (Exception exception) {
+                log.warn("그룹 상대 비교 생성은 다음 시도로 연기합니다. roomId={}, error={}",
+                        roomId, exception.getMessage());
+            }
         }
     }
 
