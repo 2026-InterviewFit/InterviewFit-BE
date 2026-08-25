@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.pt_interview.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * PT 종합 리포트 조회 응답
@@ -21,7 +22,13 @@ public record PtReportResponse(
 
         Integer overallScore,
 
-        String presentationSummary,
+        String presentationMaterialSummary,
+
+        String actualPresentationSummary,
+
+        String presentationComparison,
+
+        List<PtQuestionAnalysisResponse> questionAnalyses,
 
         String strengths,
 

@@ -31,16 +31,19 @@ public class PtQuestionService {
     private final PtQuestionRepository ptQuestionRepository;
     private final PtQuestionAnalysisService ptQuestionAnalysisService;
 
-    /*
+    /**
      * PT 발표자료를 기반으로 예상 질문 생성
+     *
+     * 동일 PT 면접에 대해 이미 질문이 생성되어 있으면
+     * Gemini를 다시 호출하지 않고 기존 질문을 반환한다.
      */
     @Transactional
-    public List<PtQuestionResponse> generateQuestions(
+    public synchronized List<PtQuestionResponse> generateQuestions(
             Long ptInterviewId
     ) {
 
         /*
-         * 1. PT 면접 조회
+         * 1. PT 면접 존재 여부 확인
          */
         PtInterviewEntity ptInterview =
                 ptInterviewRepository
@@ -53,7 +56,27 @@ public class PtQuestionService {
                         );
 
         /*
-         * 2. 발표자료 조회
+         * 2. 이미 생성된 질문이 있으면 그대로 반환
+         *
+         * waiting 페이지에서 API가 중복 호출되더라도
+         * 질문을 다시 생성/저장하지 않는다.
+         */
+        List<PtQuestionEntity> existingQuestions =
+                ptQuestionRepository
+                        .findAllByPtInterviewIdOrderByQuestionNumberAsc(
+                                ptInterviewId
+                        );
+
+        if (!existingQuestions.isEmpty()) {
+
+            return existingQuestions
+                    .stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
+
+        /*
+         * 3. 발표자료 조회
          */
         PtDocumentEntity document =
                 ptDocumentRepository
@@ -66,10 +89,12 @@ public class PtQuestionService {
                         );
 
         /*
-         * 문서 분석 완료 여부 확인
+         * 4. 문서 분석 완료 여부 확인
          */
-        if (document.getAnalysisStatus()
-                != PtDocumentStatus.COMPLETED) {
+        if (
+                document.getAnalysisStatus()
+                        != PtDocumentStatus.COMPLETED
+        ) {
 
             throw new IllegalStateException(
                     "PT 발표자료 분석이 완료되지 않았습니다. 현재 상태="
@@ -78,7 +103,7 @@ public class PtQuestionService {
         }
 
         /*
-         * 3. 슬라이드 조회
+         * 5. 슬라이드 조회
          */
         List<PtSlideEntity> slides =
                 ptSlideRepository
@@ -87,18 +112,22 @@ public class PtQuestionService {
                         );
 
         if (slides.isEmpty()) {
+
             throw new IllegalStateException(
                     "분석된 PT 슬라이드가 없습니다."
             );
         }
 
         /*
-         * 4. Gemini에 전달할 슬라이드 내용 구성
+         * 6. Gemini에 전달할 슬라이드 내용 구성
          */
         String slidesText =
-                buildSlidesText(slides);
+                buildSlidesText(
+                        slides
+                );
 
         if (slidesText.isBlank()) {
+
             throw new IllegalStateException(
                     "PT 슬라이드에서 질문 생성에 사용할 내용을 찾을 수 없습니다."
             );
@@ -109,17 +138,19 @@ public class PtQuestionService {
 
         /*
          * 전체 요약이 비어 있으면
-         * 슬라이드 텍스트를 대신 사용
+         * 슬라이드 원문을 대신 사용
          */
-        if (documentSummary == null
-                || documentSummary.isBlank()) {
+        if (
+                documentSummary == null
+                        || documentSummary.isBlank()
+        ) {
 
             documentSummary =
                     slidesText;
         }
 
         /*
-         * 5. FastAPI → Gemini 질문 생성
+         * 7. FastAPI → Gemini 질문 생성
          */
         PtQuestionGenerateResponse response =
                 ptQuestionAnalysisService
@@ -129,28 +160,22 @@ public class PtQuestionService {
                                 DEFAULT_QUESTION_COUNT
                         );
 
-        validateQuestionResponse(response);
+        validateQuestionResponse(
+                response
+        );
 
         /*
-         * 기존 질문 삭제
-         *
-         * 질문을 재생성할 경우 중복 저장 방지
-         */
-        ptQuestionRepository
-                .deleteAllByPtInterviewId(
-                        ptInterviewId
-                );
-
-        /*
-         * 6. 질문 DB 저장
+         * 8. 생성된 질문 DB 저장
          */
         List<PtQuestionResponse> results =
                 new ArrayList<>();
 
         int questionNumber = 1;
 
-        for (PtQuestionResult questionResult
-                : response.questions()) {
+        for (
+                PtQuestionResult questionResult
+                : response.questions()
+        ) {
 
             if (questionResult == null) {
                 continue;
@@ -179,24 +204,31 @@ public class PtQuestionService {
                     );
 
             PtQuestionEntity saved =
-                    ptQuestionRepository.save(entity);
+                    ptQuestionRepository.save(
+                            entity
+                    );
 
             results.add(
-                    toResponse(saved)
+                    toResponse(
+                            saved
+                    )
             );
 
             questionNumber++;
 
             /*
-             * 요청한 기본 질문 개수를 초과하면 중단
+             * 기본 질문 개수까지만 저장
              */
-            if (questionNumber
-                    > DEFAULT_QUESTION_COUNT) {
+            if (
+                    questionNumber
+                            > DEFAULT_QUESTION_COUNT
+            ) {
                 break;
             }
         }
 
         if (results.isEmpty()) {
+
             throw new IllegalStateException(
                     "저장할 수 있는 PT 예상 질문이 없습니다."
             );
@@ -205,7 +237,7 @@ public class PtQuestionService {
         return results;
     }
 
-    /*
+    /**
      * 저장된 PT 질문 조회
      */
     @Transactional(readOnly = true)
@@ -213,8 +245,12 @@ public class PtQuestionService {
             Long ptInterviewId
     ) {
 
-        if (!ptInterviewRepository
-                .existsById(ptInterviewId)) {
+        if (
+                !ptInterviewRepository
+                        .existsById(
+                                ptInterviewId
+                        )
+        ) {
 
             throw new IllegalArgumentException(
                     "존재하지 않는 PT 면접입니다. ptInterviewId="
@@ -231,7 +267,7 @@ public class PtQuestionService {
                 .toList();
     }
 
-    /*
+    /**
      * FastAPI 질문 생성 응답 검증
      */
     private void validateQuestionResponse(
@@ -239,13 +275,16 @@ public class PtQuestionService {
     ) {
 
         if (response == null) {
+
             throw new IllegalStateException(
                     "FastAPI 질문 생성 응답이 없습니다."
             );
         }
 
-        if (response.questions() == null
-                || response.questions().isEmpty()) {
+        if (
+                response.questions() == null
+                        || response.questions().isEmpty()
+        ) {
 
             throw new IllegalStateException(
                     "PT 예상 질문 생성 결과가 없습니다."
@@ -253,8 +292,8 @@ public class PtQuestionService {
         }
     }
 
-    /*
-     * PtQuestionEntity를 응답 DTO로 변환
+    /**
+     * Entity → Response
      */
     private PtQuestionResponse toResponse(
             PtQuestionEntity question
@@ -268,7 +307,7 @@ public class PtQuestionService {
         );
     }
 
-    /*
+    /**
      * Gemini에 전달할 슬라이드별 내용 구성
      */
     private String buildSlidesText(
@@ -278,11 +317,20 @@ public class PtQuestionService {
         StringBuilder builder =
                 new StringBuilder();
 
-        for (PtSlideEntity slide : slides) {
+        for (
+                PtSlideEntity slide
+                : slides
+        ) {
 
-            builder.append("[슬라이드 ")
-                    .append(slide.getSlideNumber())
-                    .append("]\n");
+            builder.append(
+                            "[슬라이드 "
+                    )
+                    .append(
+                            slide.getSlideNumber()
+                    )
+                    .append(
+                            "]\n"
+                    );
 
             String title =
                     normalizeText(
@@ -290,9 +338,16 @@ public class PtQuestionService {
                     );
 
             if (title != null) {
-                builder.append("제목: ")
-                        .append(title)
-                        .append("\n");
+
+                builder.append(
+                                "제목: "
+                        )
+                        .append(
+                                title
+                        )
+                        .append(
+                                "\n"
+                        );
             }
 
             String extractedText =
@@ -301,9 +356,16 @@ public class PtQuestionService {
                     );
 
             if (extractedText != null) {
-                builder.append("원본 내용:\n")
-                        .append(extractedText)
-                        .append("\n");
+
+                builder.append(
+                                "원본 내용:\n"
+                        )
+                        .append(
+                                extractedText
+                        )
+                        .append(
+                                "\n"
+                        );
             }
 
             String summary =
@@ -312,29 +374,39 @@ public class PtQuestionService {
                     );
 
             if (summary != null) {
-                builder.append("요약:\n")
-                        .append(summary)
-                        .append("\n");
+
+                builder.append(
+                                "요약:\n"
+                        )
+                        .append(
+                                summary
+                        )
+                        .append(
+                                "\n"
+                        );
             }
 
-            builder.append("\n");
+            builder.append(
+                    "\n"
+            );
         }
 
-        return builder.toString()
+        return builder
+                .toString()
                 .trim();
     }
 
-    /*
+    /**
      * 문자열 공백 정리
-     *
-     * null 또는 빈 문자열이면 null 반환
      */
     private String normalizeText(
             String value
     ) {
 
-        if (value == null
-                || value.isBlank()) {
+        if (
+                value == null
+                        || value.isBlank()
+        ) {
 
             return null;
         }

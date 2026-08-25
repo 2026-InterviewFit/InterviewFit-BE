@@ -97,7 +97,7 @@ public class PtAnswerService {
                 videoService.saveVideoFile(
                         interview.getId(),
                         videoFile,
-                        VideoType.PT_PRESENTATION
+                        VideoType.PT_ANSWER
                 );
 
         String videoObjectKey =

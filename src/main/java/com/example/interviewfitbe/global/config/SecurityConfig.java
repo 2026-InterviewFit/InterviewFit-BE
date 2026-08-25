@@ -3,20 +3,22 @@ package com.example.interviewfitbe.global.config;
 import com.example.interviewfitbe.global.jwt.JwtAuthenticationFilter;
 import com.example.interviewfitbe.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -26,54 +28,197 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
 
+    @Value("${app.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000,http://172.20.14.83:3000,http://localhost:63343}")
+    private String allowedOrigins;
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http
+    ) throws Exception {
+
         http
-                .cors(cors -> {})
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .httpBasic(httpBasic -> httpBasic.disable())
-                .formLogin(formLogin -> formLogin.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        .requestMatchers(
-                                "/error",
-                                "/api/users/kakao-login",
-                                "/api/job-role/**",
-                                "/webhook/**",
-                                "/api/group/**",
-                                "/ws-interview/**"
-                        ).permitAll()
-
-                        // 방 목록/상세/참가자 목록은 로그인 없이 조회 가능
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/group-interviews/**"
-                        ).permitAll()
-
-                        // 생성/참여/진행 제어는 로그인 필요
-                        .requestMatchers(
-                                "/api/group-interviews/**"
-                        ).authenticated()
-
-                        // LiveKit 관련 API도 로그인 필요
-                        .requestMatchers(
-                                "/api/livekit/**"
-                        ).authenticated()
-
-                        // 나머지 API는 JWT 필요
-                        .anyRequest().authenticated()
-                )
-                .exceptionHandling(exception ->
-                        exception.authenticationEntryPoint(
-                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)
+                /*
+                 * CORS
+                 */
+                .cors(cors ->
+                        cors.configurationSource(
+                                corsConfigurationSource()
                         )
                 )
+
+                /*
+                 * CSRF
+                 */
+                .csrf(csrf ->
+                        csrf.disable()
+                )
+
+                /*
+                 * JWT Stateles?
+                 */
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
+
+                /*
+                 * Spring 기본 로그인 비활성화
+                 */
+                .httpBasic(httpBasic ->
+                        httpBasic.disable()
+                )
+
+                .formLogin(formLogin ->
+                        formLogin.disable()
+                )
+
+                /*
+                 * 401 / 403
+                 */
+                .exceptionHandling(exception ->
+                        exception
+                                .authenticationEntryPoint(
+                                        (
+                                                request,
+                                                response,
+                                                authException
+                                        ) -> {
+
+                                            response.setStatus(401);
+
+                                            response.setCharacterEncoding(
+                                                    StandardCharsets.UTF_8.name()
+                                            );
+
+                                            response.setContentType(
+                                                    MediaType.APPLICATION_JSON_VALUE
+                                            );
+
+                                            response
+                                                    .getWriter()
+                                                    .write(
+                                                            """
+                                                            {
+                                                              "status": 401,
+                                                              "code": "UNAUTHORIZED",
+                                                              "message": "로그인이 필요합니다."
+                                                            }
+                                                            """
+                                                    );
+                                        }
+                                )
+
+                                .accessDeniedHandler(
+                                        (
+                                                request,
+                                                response,
+                                                accessDeniedException
+                                        ) -> {
+
+                                            response.setStatus(403);
+
+                                            response.setCharacterEncoding(
+                                                    StandardCharsets.UTF_8.name()
+                                            );
+
+                                            response.setContentType(
+                                                    MediaType.APPLICATION_JSON_VALUE
+                                            );
+
+                                            response
+                                                    .getWriter()
+                                                    .write(
+                                                            """
+                                                            {
+                                                              "status": 403,
+                                                              "code": "FORBIDDEN",
+                                                              "message": "해당 요청에 접근할 권한이 없습니다."
+                                                            }
+                                                            """
+                                                    );
+                                        }
+                                )
+                )
+
+                /*
+                 * API 접근 권한
+                 */
+                .authorizeHttpRequests(auth ->
+                        auth
+
+                                // CORS Preflight
+                                .requestMatchers(
+                                        HttpMethod.OPTIONS,
+                                        "/**"
+                                )
+                                .permitAll()
+
+                                // 로그인 관련 공개 API
+                                .requestMatchers(
+                                        "/api/users/kakao-login",
+                                        "/api/users/refresh",
+                                        "/api/users/logout"
+                                )
+                                .permitAll()
+
+                                // 기타 공개 API
+                                .requestMatchers(
+                                        "/error",
+                                        "/api/job-role/**",
+                                        "/webhook/**",
+                                        "/api/group/**",
+                                        "/ws-interview/**",
+
+                                        // PT 면접 테스트용
+                                        "/api/interview/**",
+                                        "/api/pt-interview/**",
+                                        "/api/pt-interviews/**",
+                                        "/api/pt-document/**",
+                                        "/api/pt-question/**",
+                                        "/api/pt-report/**"
+                                )
+                                .permitAll()
+
+                                // 그룹 면접 참가자/세션 조회
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/group-interviews/*/participants",
+                                        "/api/group-interviews/*/session"
+                                )
+                                .authenticated()
+
+                                // 그룹 면접 일반 GET
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/group-interviews/**"
+                                )
+                                .permitAll()
+
+                                // 그룹 면접 생성/참여/제어
+                                .requestMatchers(
+                                        "/api/group-interviews/**"
+                                )
+                                .authenticated()
+
+                                // LiveKit
+                                .requestMatchers(
+                                        "/api/livekit/**"
+                                )
+                                .authenticated()
+
+                                // 나머지 API
+                                .anyRequest()
+                                .authenticated()
+                )
+
+                /*
+                 * JWT Filter
+                 */
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtTokenProvider),
+                        new JwtAuthenticationFilter(
+                                jwtTokenProvider
+                        ),
                         UsernamePasswordAuthenticationFilter.class
                 );
 
@@ -82,32 +227,47 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://172.20.14.83:3000",
-                "http://localhost:63343"
-        ));
+        CorsConfiguration configuration =
+                new CorsConfiguration();
 
-        configuration.setAllowedMethods(List.of(
-                "GET",
-                "POST",
-                "PUT",
-                "PATCH",
-                "DELETE",
-                "OPTIONS"
-        ));
+        configuration.setAllowedOrigins(
+                Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .filter(origin -> !origin.isBlank())
+                        .toList()
+        );
 
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowedMethods(
+                List.of(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE",
+                        "OPTIONS"
+                )
+        );
+
+        configuration.setAllowedHeaders(
+                List.of("*")
+        );
+
+        configuration.setExposedHeaders(
+                List.of(
+                        "Authorization"
+                )
+        );
+
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration(
+                "/**",
+                configuration
+        );
 
         return source;
     }

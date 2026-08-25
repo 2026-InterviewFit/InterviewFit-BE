@@ -1,0 +1,57 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/interview_fit
+    username: interview
+    password: interview1234
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  sql:
+    init:
+      mode: always
+
+  defer-datasource-initialization: true
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            redirect-uri: http://localhost:3000/oauth/kakao/callback
+            client-id: ${KAKAO_REST_API_KEY:}
+            client-secret: ${KAKAO_CLIENT_SECRET:}
+
+fastapi:
+  base-url: ${FASTAPI_BASE_URL:http://localhost:8000}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+  bucket: ${MINIO_BUCKET:videos}
+
+app:
+  upload-dir: uploads/
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-only-not-a-real-secret-just-for-testing-12345}
+  expiration-ms: 3600000
+
+livekit:
+  api-key: ${LIVEKIT_API_KEY}
+  api-secret: ${LIVEKIT_API_SECRET}
+  url: ${LIVEKIT_URL}
