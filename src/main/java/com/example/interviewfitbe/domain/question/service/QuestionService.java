@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -51,23 +52,15 @@ public class QuestionService {
 
     private final UserService userService;
 
-    public List<QuestionDto> getAllQuestions() {
-        return questionRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(questionMapper::toDto)
-                .toList();
-    }
-
-    public QuestionDto getQuestion(Long id) {
-        return questionMapper.toDto(
-                questionRepository.findById(id).orElseThrow(() ->
-                        new BaseException(QuestionErrorCode.QUESTION_NOT_FOUND))
-        );
+    public QuestionEntity getQuestion(Long id) {
+        return questionRepository.findById(id).orElseThrow(() ->
+                new BaseException(QuestionErrorCode.QUESTION_NOT_FOUND));
     }
 
     @Transactional
     public List<QuestionResponse> createQuestions(Long userId, QuestionRequest request) {
         QuestionCreateData data = new QuestionCreateData();
-        List<QuestionEntity> entities;
+        List<QuestionEntity> entities = List.of();
 
         try {
             data = loadQuestionData(userId, request);
@@ -81,14 +74,16 @@ public class QuestionService {
             if (e.getErrorCode() == CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_COMPLETED) {
                 throw e;
             }
-
-            int reusableCount = data.getReusableQuestions() == null
-                    ? 0
-                    : data.getReusableQuestions().size();
-            int generateCount = Math.max(request.getCount() - reusableCount, 0);
-
-            QuestionResult result = getDefaultQuestions(request.getJobName(), generateCount);
-            entities = questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
+            else if (e.getErrorCode() == CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_FAILED
+                    && request.getCoverLetterId() != null) {
+                try {
+                    entities = generateQuestionsAfterProcessingFailure(request, data);
+                } catch (BaseException ignored) {
+                    entities = generateFallbackQuestions(request, data);
+                }
+            } else {
+                entities = generateFallbackQuestions(request, data);
+            }
         }
 
         List<QuestionEntity> saved = saveQuestions(entities);
@@ -276,5 +271,63 @@ public class QuestionService {
                 )
                 .type(QuestionType.DEFAULT)
                 .build();
+    }
+
+    private List<QuestionEntity> generateQuestionsAfterProcessingFailure(QuestionRequest request, QuestionCreateData data) {
+        JobRoleEntity jobRole = jobRoleService.getJobRoleEntity(request.getJobRoleId());
+
+        if (request.getCoverLetterId() == null) {
+            QuestionResult result = getDefaultQuestions(jobRole.getName(), request.getCount());
+            return questionMapper.toEntities(result, jobRole, List.of());
+        }
+
+        List<CoverLetterQuestionAnalysisEntity> analyses = resolveAnalyses(request.getCoverLetterId(), data).stream()
+                .sorted(Comparator.comparingDouble(a -> Math.random()))
+                .limit(request.getCount())
+                .toList();
+
+        QuestionResult result = QuestionResult.builder()
+                .questions(
+                        questionClientService.createQuestions(
+                                request.getCount(),
+                                request.getJobName(),
+                                analyses,
+                                null,
+                                null
+                        ).getQuestions()
+                )
+                .type(QuestionType.AI_GENERATED)
+                .build();
+
+        return questionMapper.toEntities(result, jobRole, analyses);
+    }
+
+    private List<CoverLetterQuestionAnalysisEntity> resolveAnalyses(Long coverLetterId, QuestionCreateData data) {
+        if (data.getSelectedCoverLetterQuestionAnalyses() != null && !data.getSelectedCoverLetterQuestionAnalyses().isEmpty()) {
+            return data.getSelectedCoverLetterQuestionAnalyses();
+        }
+
+        if (data.getCoverLetterQuestionAnalyses() != null && !data.getCoverLetterQuestionAnalyses().isEmpty()) {
+            return data.getCoverLetterQuestionAnalyses();
+        }
+
+        CoverLetterEntity coverLetter = coverLetterService.getCoverLetter(coverLetterId);
+        List<CoverLetterQuestionEntity> questions = coverLetterQuestionService.getCoverLetterQuestions(coverLetter);
+
+        return coverLetterQuestionAnalysisService.getCoverLetterQuestionAnalyses(questions);
+    }
+
+    private List<QuestionEntity> generateFallbackQuestions(QuestionRequest request, QuestionCreateData data) {
+        int reusableCount = data.getReusableQuestions() == null
+                ? 0
+                : data.getReusableQuestions().size();
+        int generateCount = Math.max(request.getCount() - reusableCount, 0);
+
+        String jobName = request.getJobRoleId() == 11L
+                ? "기타"
+                : request.getJobName();
+
+        QuestionResult result = getDefaultQuestions(jobName, generateCount);
+        return questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
     }
 }

@@ -4,7 +4,6 @@ import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.calculator.PoseScoreCalculator;
 import com.example.interviewfitbe.domain.pose.calculator.PoseStatisticsCalculator;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResponse;
-import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseLogs;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseNotDetectedStatistics;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseScoreResult;
@@ -37,17 +36,9 @@ public class PoseService {
     private final PoseStatisticsCalculator poseStatisticsCalculator;
     private final PoseScoreCalculator poseScoreCalculator;
 
-    public List<PoseAnalysisResultDto> getAllPostureAnalysis() {
-        return poseReportRepository.findAll().stream()
-                .map(poseMapper::toDto)
-                .toList();
-    }
-
-    public PoseAnalysisResultDto getPoseAnalysis(Long id) {
-        return poseMapper.toDto(
-                poseReportRepository.findById(id).orElseThrow(() ->
-                        new BaseException(PoseErrorCode.POSE_ANALYSIS_RESULT_NOT_FOUND))
-        );
+    public PoseReportEntity getPoseAnalysis(Long id) {
+        return poseReportRepository.findById(id).orElseThrow(() ->
+                        new BaseException(PoseErrorCode.POSE_ANALYSIS_RESULT_NOT_FOUND));
     }
 
     public void processPostureAnalysis(String videoObjectKey, InterviewEntity interview) {

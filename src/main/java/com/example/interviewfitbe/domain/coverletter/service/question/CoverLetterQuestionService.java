@@ -7,6 +7,7 @@ import com.example.interviewfitbe.domain.coverletter.mapper.CoverLetterQuestionM
 import com.example.interviewfitbe.domain.coverletter.repository.CoverLetterQuestionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +23,7 @@ public class CoverLetterQuestionService {
         return coverLetterQuestionRepository.findAllByCoverLetter(coverLetter);
     }
 
+    @Transactional
     public List<CoverLetterQuestionEntity> saveCoverLetterQuestions(List<CoverLetterQuestionAnalysisItem> questionsAnalysis, CoverLetterEntity coverLetter) {
         List<CoverLetterQuestionEntity> savedQuestions = new ArrayList<>();
 
@@ -35,5 +37,10 @@ public class CoverLetterQuestionService {
         }
 
         return savedQuestions;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CoverLetterQuestionEntity> getQuestionsWithoutEmbedding(Long coverLetterId) {
+        return coverLetterQuestionRepository.findQuestionsWithoutEmbedding(coverLetterId);
     }
 }

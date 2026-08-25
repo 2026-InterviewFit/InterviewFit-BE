@@ -1,0 +1,71 @@
+package com.example.interviewfitbe.domain.group.entity;
+
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class GroupInterviewSessionEntityTest {
+
+    @Test
+    void completionMovesParticipantThenQuestionAndFinallyFinishes() {
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder().build();
+        Instant now = Instant.parse("2026-08-18T00:00:00Z");
+        session.start();
+        assertThat(session.getCurrentQuestionIndex()).isZero();
+
+        assertThat(complete(session, now, 2))
+                .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.NEXT_PARTICIPANT);
+        assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
+        assertThat(session.getCurrentRound()).isEqualTo(1);
+
+        assertThat(complete(session, now, 2))
+                .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.NEXT_QUESTION);
+        assertThat(session.getCurrentParticipantIndex()).isZero();
+        assertThat(session.getCurrentRound()).isEqualTo(2);
+        assertThat(session.getCurrentQuestionIndex()).isEqualTo(1);
+
+        complete(session, now, 2);
+        complete(session, now, 2);
+        assertThat(session.getCurrentRound()).isEqualTo(3);
+        assertThat(session.getCurrentQuestionIndex()).isEqualTo(2);
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
+        complete(session, now, 2);
+        assertThat(complete(session, now, 2))
+                .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED);
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.FINISHED);
+        assertThat(session.getAnswerDeadlineAt()).isNull();
+    }
+
+    @Test
+    void answerCanOnlyCompleteWhileAnswering() {
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder().build();
+        session.start();
+
+        assertThatThrownBy(() -> session.completeCurrentAnswer(2))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void answerCompletionStoresTypeAndTimestampOnce() {
+        Instant completedAt = Instant.parse("2026-08-18T00:01:00Z");
+        GroupInterviewAnswerEntity answer = GroupInterviewAnswerEntity.builder().build();
+
+        answer.complete(GroupAnswerCompletionType.TIMED_OUT, completedAt);
+        answer.complete(GroupAnswerCompletionType.COMPLETED, completedAt.plusSeconds(1));
+
+        assertThat(answer.getCompletionType()).isEqualTo(GroupAnswerCompletionType.TIMED_OUT);
+        assertThat(answer.getAnswerCompletedAt()).isEqualTo(completedAt);
+    }
+
+    private GroupInterviewSessionEntity.AnswerCompletionResult complete(
+            GroupInterviewSessionEntity session,
+            Instant now,
+            int participantCount
+    ) {
+        session.startAnswer(now, now.plusSeconds(60));
+        return session.completeCurrentAnswer(participantCount);
+    }
+}

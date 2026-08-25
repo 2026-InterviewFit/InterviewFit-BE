@@ -42,4 +42,8 @@ public class CoverLetterProcessingEntity {
     public void failed() {
         this.status = ProcessingStatus.FAILED;
     }
+
+    public boolean isCompleted() {
+        return status == ProcessingStatus.COMPLETED;
+    }
 }

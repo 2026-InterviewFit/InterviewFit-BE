@@ -3,6 +3,8 @@ package com.example.interviewfitbe.domain.group.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "group_interview_sessions")
 @Getter
@@ -10,6 +12,8 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class GroupInterviewSessionEntity {
+
+    private static final int LAST_ROUND = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,7 +36,7 @@ public class GroupInterviewSessionEntity {
 
 
     /**
-     * 현재 질문 번호
+     * 현재 질문 index (0-based)
      */
     private Integer currentQuestionIndex;
 
@@ -46,93 +50,93 @@ public class GroupInterviewSessionEntity {
     @Enumerated(EnumType.STRING)
     private InterviewStatus status;
 
+    private Instant answerStartedAt;
+
+    private Instant answerDeadlineAt;
+
+    private Long currentAnswerId;
+
+    @Version
+    private Long version;
+
 
 
     public void start() {
 
         this.currentRound = 1;
-        this.currentQuestionIndex = 1;
+        this.currentQuestionIndex = 0;
         this.currentParticipantIndex = 0;
         this.status = InterviewStatus.QUESTION_VIEW;
 
     }
 
 
-    public void startAnswer() {
-
+    public void startAnswer(Instant startedAt, Instant deadlineAt) {
+        if (this.status != InterviewStatus.QUESTION_VIEW) {
+            throw new IllegalStateException("답변을 시작할 수 있는 상태가 아닙니다.");
+        }
         this.status = InterviewStatus.ANSWERING;
-
+        this.answerStartedAt = startedAt;
+        this.answerDeadlineAt = deadlineAt;
     }
 
-
-    public void nextParticipant(int totalParticipants) {
-
-
-        if(currentParticipantIndex + 1 < totalParticipants){
-
-            currentParticipantIndex++;
-
-        } else {
-
-            currentParticipantIndex = 0;
-            currentQuestionIndex++;
-
+    public void assignCurrentAnswer(Long answerId) {
+        if (this.status != InterviewStatus.ANSWERING) {
+            throw new IllegalStateException("답변 중인 상태에서만 answerId를 지정할 수 있습니다.");
         }
-
-
+        this.currentAnswerId = answerId;
     }
 
-    public void endAnswer(int participantCount) {
-
-        // 답변 종료 후 참가자 전환
-        this.status = InterviewStatus.TRANSITION;
-
-        nextParticipant(participantCount);
-
-        // 다음 참가자 답변 준비
-        this.status = InterviewStatus.QUESTION_VIEW;
-
-    }
-
-    public void nextQuestion() {
-
-        this.currentQuestionIndex++;
-
-        this.currentParticipantIndex = 0;
-
-        this.status = InterviewStatus.QUESTION_VIEW;
-
-    }
-
-    /**
-     * 다음 라운드로 이동한다.
-     * 라운드가 바뀔 때마다 첫 답변자를 한 명씩 순환시킨다.
-     */
-    public void moveToNextRound(int participantCount) {
-
-        if (participantCount <= 0) {
-            throw new IllegalArgumentException("라운드 전환을 위해 최소 1명의 참가자가 필요합니다.");
-        }
-
-        if (this.currentRound == null || this.currentQuestionIndex == null) {
-            throw new IllegalStateException("아직 시작되지 않은 면접 세션입니다.");
-        }
-
-        if (this.currentRound >= 3) {
-            this.status = InterviewStatus.FINISHED;
-            return;
-        }
-
-        this.currentRound++;
-        this.currentQuestionIndex++;
-        this.currentParticipantIndex = (this.currentRound - 1) % participantCount;
-        this.status = InterviewStatus.QUESTION_VIEW;
-    }
 
     public void finish(){
 
         this.status = InterviewStatus.FINISHED;
 
+        clearAnswerTimer();
+
+    }
+
+    /**
+     * 현재 질문의 답변을 완료하고 서버가 다음 상태를 결정한다.
+     * 현재 질문은 라운드당 하나이며 참가자는 id 오름차순으로 답변한다.
+     */
+    public AnswerCompletionResult completeCurrentAnswer(int participantCount) {
+        if (participantCount <= 0) {
+            throw new IllegalArgumentException("답변 완료를 위해 최소 1명의 참가자가 필요합니다.");
+        }
+        if (this.status != InterviewStatus.ANSWERING) {
+            throw new IllegalStateException("현재 답변 중인 상태가 아닙니다.");
+        }
+
+        clearAnswerTimer();
+        if (this.currentParticipantIndex + 1 < participantCount) {
+            this.currentParticipantIndex++;
+            this.status = InterviewStatus.QUESTION_VIEW;
+            return AnswerCompletionResult.NEXT_PARTICIPANT;
+        }
+
+        if (this.currentRound < LAST_ROUND) {
+            this.currentRound++;
+            this.currentQuestionIndex++;
+            this.currentParticipantIndex = 0;
+            this.status = InterviewStatus.QUESTION_VIEW;
+            return AnswerCompletionResult.NEXT_QUESTION;
+        }
+
+        this.status = InterviewStatus.FINISHED;
+        return AnswerCompletionResult.INTERVIEW_FINISHED;
+    }
+
+    private void clearAnswerTimer() {
+        this.answerStartedAt = null;
+        this.answerDeadlineAt = null;
+        this.currentAnswerId = null;
+    }
+
+    public enum AnswerCompletionResult {
+        NEXT_PARTICIPANT,
+        NEXT_QUESTION,
+        INTERVIEW_FINISHED
     }
 
 

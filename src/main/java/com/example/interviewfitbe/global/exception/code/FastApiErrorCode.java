@@ -8,6 +8,7 @@ import lombok.Getter;
 @Getter
 public enum FastApiErrorCode implements ErrorCode {
     FRAME_NOT_FOUND(400, "FRAME_NOT_FOUND", "프레임이 존재하지 않습니다."),
+    STT_NO_SPEECH(422, "STT_NO_SPEECH", "음성에서 텍스트를 인식하지 못했습니다. 다시 답변해주세요."),
     FASTAPI_SERVER_ERROR(500, "FASTAPI_SERVER_ERROR", "분석 서버 오류가 발생했습니다.");
 
     private final int status;

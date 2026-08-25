@@ -2,7 +2,11 @@ package com.example.interviewfitbe.domain.group.repository;
 
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 
@@ -11,5 +15,10 @@ public interface GroupInterviewSessionRepository
 
     Optional<GroupInterviewSessionEntity>
     findByInterviewId(Long interviewId);
+
+    @Query("select s.id from GroupInterviewSessionEntity s " +
+            "where s.status = com.example.interviewfitbe.domain.group.entity.InterviewStatus.ANSWERING " +
+            "and s.answerDeadlineAt <= :now")
+    List<Long> findExpiredAnswerSessionIds(@Param("now") Instant now);
 
 }

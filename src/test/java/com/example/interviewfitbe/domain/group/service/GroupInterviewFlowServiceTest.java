@@ -1,0 +1,263 @@
+package com.example.interviewfitbe.domain.group.service;
+
+import com.example.interviewfitbe.domain.group.dto.GroupRoomEvent;
+import com.example.interviewfitbe.domain.group.entity.*;
+import com.example.interviewfitbe.domain.group.repository.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class GroupInterviewFlowServiceTest {
+
+    private GroupInterviewSessionRepository sessionRepository;
+    private GroupParticipantRepository participantRepository;
+    private GroupQuestionRepository questionRepository;
+    private GroupInterviewAnswerRepository answerRepository;
+    private GroupInterviewAnswerCompletionService completionService;
+    private SimpMessagingTemplate messagingTemplate;
+    private GroupInterviewFlowService service;
+
+    @BeforeEach
+    void setUp() {
+        sessionRepository = mock(GroupInterviewSessionRepository.class);
+        participantRepository = mock(GroupParticipantRepository.class);
+        questionRepository = mock(GroupQuestionRepository.class);
+        answerRepository = mock(GroupInterviewAnswerRepository.class);
+        completionService = mock(GroupInterviewAnswerCompletionService.class);
+        messagingTemplate = mock(SimpMessagingTemplate.class);
+        service = new GroupInterviewFlowService(
+                mock(GroupInterviewRepository.class),
+                sessionRepository,
+                participantRepository,
+                questionRepository,
+                answerRepository,
+                completionService,
+                messagingTemplate
+        );
+        ReflectionTestUtils.setField(service, "answerLimitSeconds", 60L);
+    }
+
+    @Test
+    void startAnswerCreatesServerAnswerIdAndBroadcastsIt() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .interview(interview)
+                .build();
+        session.start();
+        GroupQuestionEntity question = mock(GroupQuestionEntity.class);
+        when(question.getId()).thenReturn(30L);
+
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L)));
+        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
+                .thenReturn(Optional.of(question));
+        when(answerRepository.saveAndFlush(any())).thenReturn(
+                GroupInterviewAnswerEntity.builder().id(123L).build()
+        );
+
+        service.startAnswer(10L, 5L);
+
+        assertThat(session.getCurrentAnswerId()).isEqualTo(123L);
+        ArgumentCaptor<GroupRoomEvent> eventCaptor = ArgumentCaptor.forClass(GroupRoomEvent.class);
+        verify(messagingTemplate).convertAndSend(eq("/topic/room/10"), eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getType()).isEqualTo("ANSWER_STARTED");
+        assertThat(eventCaptor.getValue().getProgress().getAnswerId()).isEqualTo(123L);
+    }
+
+    @Test
+    void normalCompletionMarksCurrentAnswerWithoutBlockingTransition() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .interview(interview)
+                .build();
+        session.start();
+        session.startAnswer(java.time.Instant.now(), java.time.Instant.now().plusSeconds(60));
+        session.assignCurrentAnswer(123L);
+
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+        when(participantRepository.countByRoomId(10L)).thenReturn(2L);
+        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
+                .thenReturn(Optional.empty());
+
+        service.completeAnswer(10L, 5L);
+
+        assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
+        verify(completionService).complete(
+                eq(123L),
+                eq(GroupAnswerCompletionType.COMPLETED),
+                any()
+        );
+    }
+
+    @Test
+    void timeoutMarksCurrentAnswerAsTimedOut() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .id(99L)
+                .interview(interview)
+                .build();
+        session.start();
+        session.startAnswer(
+                java.time.Instant.now().minusSeconds(120),
+                java.time.Instant.now().minusSeconds(60)
+        );
+        session.assignCurrentAnswer(123L);
+
+        when(sessionRepository.findById(99L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+        when(participantRepository.countByRoomId(10L)).thenReturn(2L);
+        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
+                .thenReturn(Optional.empty());
+
+        service.completeExpiredAnswer(99L);
+
+        verify(completionService).complete(
+                eq(123L),
+                eq(GroupAnswerCompletionType.TIMED_OUT),
+                any()
+        );
+        assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
+    }
+
+    @Test
+    void answerCompletionFailurePreventsInterviewTransition() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .interview(interview)
+                .build();
+        session.start();
+        session.startAnswer(java.time.Instant.now(), java.time.Instant.now().plusSeconds(60));
+        session.assignCurrentAnswer(123L);
+
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+        when(participantRepository.countByRoomId(10L)).thenReturn(2L);
+        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
+                .thenReturn(Optional.empty());
+        doThrow(new IllegalStateException("db unavailable"))
+                .when(completionService).complete(anyLong(), any(), any());
+
+        assertThatThrownBy(() -> service.completeAnswer(10L, 5L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("db unavailable");
+
+        assertThat(session.getCurrentParticipantIndex()).isZero();
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.ANSWERING);
+        assertThat(session.getCurrentAnswerId()).isEqualTo(123L);
+        verify(sessionRepository, never()).saveAndFlush(session);
+        verifyNoInteractions(messagingTemplate);
+    }
+
+    @Test
+    void twoParticipantsCompleteAllThreeQuestionsBeforeInterviewFinishes() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        when(interview.getJobRoleId()).thenReturn(2L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .interview(interview)
+                .build();
+        session.start();
+
+        GroupQuestionEntity firstQuestion = question(31L, "질문 1");
+        GroupQuestionEntity secondQuestion = question(32L, "질문 2");
+        GroupQuestionEntity thirdQuestion = question(33L, "질문 3");
+        List<GroupParticipantEntity> participants = List.of(participant(5L), participant(6L));
+        AtomicLong answerId = new AtomicLong(100L);
+
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L)).thenReturn(participants);
+        when(participantRepository.countByRoomId(10L)).thenReturn(2L);
+        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(1))
+                .thenReturn(Optional.of(firstQuestion));
+        when(questionRepository.findFirstByRoundNumberOrderByIdAsc(2))
+                .thenReturn(Optional.of(secondQuestion));
+        when(questionRepository.findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(3, 2L))
+                .thenReturn(Optional.of(thirdQuestion));
+        when(answerRepository.saveAndFlush(any())).thenAnswer(invocation ->
+                GroupInterviewAnswerEntity.builder().id(answerId.getAndIncrement()).build()
+        );
+
+        answer(service, 5L);
+        assertProgress(session, 1, 0, 1, InterviewStatus.QUESTION_VIEW);
+        answer(service, 6L);
+        assertProgress(session, 2, 1, 0, InterviewStatus.QUESTION_VIEW);
+
+        answer(service, 5L);
+        assertProgress(session, 2, 1, 1, InterviewStatus.QUESTION_VIEW);
+        answer(service, 6L);
+        assertProgress(session, 3, 2, 0, InterviewStatus.QUESTION_VIEW);
+
+        ArgumentCaptor<GroupRoomEvent> eventCaptor = ArgumentCaptor.forClass(GroupRoomEvent.class);
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/room/10"), eventCaptor.capture());
+        GroupRoomEvent questionThreeEvent = eventCaptor.getAllValues().stream()
+                .filter(event -> "ANSWER_COMPLETED_QUESTION_CHANGED".equals(event.getType()))
+                .filter(event -> Integer.valueOf(3).equals(event.getProgress().getCurrentRound()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(questionThreeEvent.getProgress().getCurrentQuestionIndex()).isEqualTo(2);
+        assertThat(questionThreeEvent.getProgress().getCurrentParticipantIndex()).isZero();
+        assertThat(questionThreeEvent.getProgress().getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
+        assertThat(questionThreeEvent.getProgress().getCurrentQuestionId()).isEqualTo(33L);
+        assertThat(questionThreeEvent.getProgress().getCurrentQuestionText()).isEqualTo("질문 3");
+
+        answer(service, 5L);
+        assertProgress(session, 3, 2, 1, InterviewStatus.QUESTION_VIEW);
+        answer(service, 6L);
+        assertProgress(session, 3, 2, 1, InterviewStatus.FINISHED);
+        verify(interview).finishInterview();
+    }
+
+    private void answer(GroupInterviewFlowService service, Long userId) {
+        service.startAnswer(10L, userId);
+        service.completeAnswer(10L, userId);
+    }
+
+    private void assertProgress(
+            GroupInterviewSessionEntity session,
+            int round,
+            int questionIndex,
+            int participantIndex,
+            InterviewStatus status
+    ) {
+        assertThat(session.getCurrentRound()).isEqualTo(round);
+        assertThat(session.getCurrentQuestionIndex()).isEqualTo(questionIndex);
+        assertThat(session.getCurrentParticipantIndex()).isEqualTo(participantIndex);
+        assertThat(session.getStatus()).isEqualTo(status);
+    }
+
+    private GroupQuestionEntity question(Long id, String text) {
+        return GroupQuestionEntity.builder()
+                .id(id)
+                .questionText(text)
+                .build();
+    }
+
+    private GroupParticipantEntity participant(Long userId) {
+        return GroupParticipantEntity.builder()
+                .roomId(10L)
+                .userId(userId)
+                .status("READY")
+                .build();
+    }
+}
