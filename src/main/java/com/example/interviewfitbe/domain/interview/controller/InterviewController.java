@@ -6,6 +6,7 @@ import com.example.interviewfitbe.domain.interview.dto.InterviewStartRequest;
 import com.example.interviewfitbe.domain.interview.dto.InterviewStartResponse;
 import com.example.interviewfitbe.domain.interview.service.InterviewAnswerService;
 import com.example.interviewfitbe.domain.interview.service.InterviewService;
+import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,14 +22,12 @@ public class InterviewController {
     private final InterviewService interviewService;
     private final InterviewAnswerService interviewAnswerService;
 
-    // PT 테스트용 임시 사용자 ID
-    private static final Long TEST_USER_ID = 5L;
-
     @PostMapping("/start")
     public ResponseEntity<InterviewStartResponse> startInterview(
             @RequestBody InterviewStartRequest request
     ) {
-        Long userId = TEST_USER_ID;
+
+        Long userId = AuthUtils.getCurrentUserId();
 
         InterviewStartResponse response =
                 interviewService.startInterview(
@@ -65,8 +64,8 @@ public class InterviewController {
             )
             Double endTime
     ) throws IOException {
-
-        Long userId = TEST_USER_ID;
+        // 🔑 수정: JWT 토큰에서 현재 유저 ID 추출
+        Long userId = AuthUtils.getCurrentUserId();
 
         InterviewAnswerUploadResponse response =
                 interviewAnswerService.uploadAnswerVideo(
@@ -86,7 +85,8 @@ public class InterviewController {
     public ResponseEntity<InterviewReportResponse> getInterviewReport(
             @PathVariable Long interviewId
     ) {
-        Long userId = TEST_USER_ID;
+        // 🔑 수정: JWT 토큰에서 현재 유저 ID 추출
+        Long userId = AuthUtils.getCurrentUserId();
 
         InterviewReportResponse response =
                 interviewService.getInterviewReport(
