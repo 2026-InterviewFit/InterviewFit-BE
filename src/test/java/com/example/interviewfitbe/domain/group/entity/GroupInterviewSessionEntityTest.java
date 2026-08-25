@@ -14,6 +14,7 @@ class GroupInterviewSessionEntityTest {
         GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder().build();
         Instant now = Instant.parse("2026-08-18T00:00:00Z");
         session.start();
+        assertThat(session.getCurrentQuestionIndex()).isZero();
 
         assertThat(complete(session, now, 2))
                 .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.NEXT_PARTICIPANT);
@@ -24,10 +25,13 @@ class GroupInterviewSessionEntityTest {
                 .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.NEXT_QUESTION);
         assertThat(session.getCurrentParticipantIndex()).isZero();
         assertThat(session.getCurrentRound()).isEqualTo(2);
-        assertThat(session.getCurrentQuestionIndex()).isEqualTo(2);
+        assertThat(session.getCurrentQuestionIndex()).isEqualTo(1);
 
         complete(session, now, 2);
         complete(session, now, 2);
+        assertThat(session.getCurrentRound()).isEqualTo(3);
+        assertThat(session.getCurrentQuestionIndex()).isEqualTo(2);
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
         complete(session, now, 2);
         assertThat(complete(session, now, 2))
                 .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED);
