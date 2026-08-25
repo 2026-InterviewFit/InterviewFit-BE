@@ -52,17 +52,9 @@ public class QuestionService {
 
     private final UserService userService;
 
-    public List<QuestionDto> getAllQuestions() {
-        return questionRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(questionMapper::toDto)
-                .toList();
-    }
-
-    public QuestionDto getQuestion(Long id) {
-        return questionMapper.toDto(
-                questionRepository.findById(id).orElseThrow(() ->
-                        new BaseException(QuestionErrorCode.QUESTION_NOT_FOUND))
-        );
+    public QuestionEntity getQuestion(Long id) {
+        return questionRepository.findById(id).orElseThrow(() ->
+                new BaseException(QuestionErrorCode.QUESTION_NOT_FOUND));
     }
 
     @Transactional
