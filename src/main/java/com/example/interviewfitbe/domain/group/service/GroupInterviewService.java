@@ -6,6 +6,7 @@ import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupParticipantRepository;
+import com.example.interviewfitbe.domain.job.repository.JobRoleRepository;
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class GroupInterviewService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final GroupParticipantJoinWriter groupParticipantJoinWriter;
+    private final JobRoleRepository jobRoleRepository;
 
 
     /**
@@ -53,6 +55,14 @@ public class GroupInterviewService {
                     "다대일 면접 인원 제한은 최소 2명부터 최대 4명까지 설정 가능합니다."
             );
         }
+
+        if (jobRoleId == null) {
+            throw new IllegalArgumentException("직무 ID는 필수입니다.");
+        }
+        jobRoleRepository.findById(jobRoleId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "존재하지 않는 직무 ID입니다: " + jobRoleId
+                ));
 
 
         // 면접 방 생성

@@ -85,6 +85,12 @@ public class LiveKitService {
             );
         }
 
+        if ("COMPLETED".equals(interview.getRoomStatus())) {
+            throw new IllegalStateException(
+                    "종료된 면접 방에는 입장할 수 없습니다."
+            );
+        }
+
         String token = createToken(
                 interview.getLivekitRoomName(),
                 userId

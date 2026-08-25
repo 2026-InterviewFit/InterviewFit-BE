@@ -184,7 +184,9 @@ public class SecurityConfig {
                                 .requestMatchers(
                                         HttpMethod.GET,
                                         "/api/group-interviews/*/participants",
-                                        "/api/group-interviews/*/session"
+                                        "/api/group-interviews/*/session",
+                                        "/api/group-interviews/me/**",
+                                        "/api/group-interviews/*/answers/**"
                                 )
                                 .authenticated()
 
