@@ -10,6 +10,7 @@ import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerAnalysisService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewDashboardService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewComparisonService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.domain.user.client.KakaoApiClient;
@@ -81,6 +82,9 @@ class CookieAuthenticationIntegrationTest {
 
     @MockitoBean
     GroupInterviewDashboardService groupInterviewDashboardService;
+
+    @MockitoBean
+    GroupInterviewComparisonService groupInterviewComparisonService;
 
     @MockitoBean
     LiveKitService liveKitService;
@@ -228,10 +232,26 @@ class CookieAuthenticationIntegrationTest {
     }
 
     @Test
+    void groupComparisonApisUseAuthenticatedUserId() throws Exception {
+        when(groupInterviewComparisonService.getOverall(1L, USER_ID)).thenReturn(List.of());
+        when(groupInterviewComparisonService.getQuestion(1L, 0, USER_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/group-interviews/1/comparisons").cookie(accessCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/group-interviews/1/comparisons/questions/0").cookie(accessCookie))
+                .andExpect(status().isOk());
+
+        verify(groupInterviewComparisonService).getOverall(1L, USER_ID);
+        verify(groupInterviewComparisonService).getQuestion(1L, 0, USER_ID);
+    }
+
+    @Test
     void groupDashboardApisWithoutCookieReturn401() throws Exception {
         mockMvc.perform(get("/api/group-interviews/me/history"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/group-interviews/1/answers/me"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/group-interviews/1/comparisons"))
                 .andExpect(status().isUnauthorized());
     }
 

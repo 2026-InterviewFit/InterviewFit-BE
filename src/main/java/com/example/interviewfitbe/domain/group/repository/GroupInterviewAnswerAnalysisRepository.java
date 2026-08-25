@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface GroupInterviewAnswerAnalysisRepository
         extends JpaRepository<GroupInterviewAnswerAnalysisEntity, Long> {
@@ -22,5 +23,14 @@ public interface GroupInterviewAnswerAnalysisRepository
     @Query("select a from GroupInterviewAnswerAnalysisEntity a where a.answer.id = :answerId")
     Optional<GroupInterviewAnswerAnalysisEntity> findByAnswerIdForUpdate(
             @Param("answerId") Long answerId
+    );
+
+    @EntityGraph(attributePaths = {"answer", "answer.groupInterview"})
+    @Query("select a from GroupInterviewAnswerAnalysisEntity a " +
+            "where a.answer.groupInterview.id = :roomId " +
+            "and a.answer.questionIndex = :questionIndex")
+    List<GroupInterviewAnswerAnalysisEntity> findAllForComparison(
+            @Param("roomId") Long roomId,
+            @Param("questionIndex") Integer questionIndex
     );
 }
