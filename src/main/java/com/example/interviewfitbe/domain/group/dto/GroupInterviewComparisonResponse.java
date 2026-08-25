@@ -12,6 +12,7 @@ public class GroupInterviewComparisonResponse {
     private Long reportId;
     private Long roomId;
     private Long participantUserId;
+    private String participantName;
     private GroupComparisonScope scope;
     private Integer questionIndex;
     private BigDecimal contentScore;
@@ -26,10 +27,14 @@ public class GroupInterviewComparisonResponse {
     private String improvementSummary;
     private GroupComparisonStatus status;
 
-    public static GroupInterviewComparisonResponse from(GroupInterviewComparisonReportEntity report) {
+    public static GroupInterviewComparisonResponse from(
+            GroupInterviewComparisonReportEntity report,
+            String participantName
+    ) {
         return GroupInterviewComparisonResponse.builder()
                 .reportId(report.getId()).roomId(report.getRoomId())
-                .participantUserId(report.getParticipantUserId()).scope(report.getScope())
+                .participantUserId(report.getParticipantUserId()).participantName(participantName)
+                .scope(report.getScope())
                 .questionIndex(report.getQuestionIndex()).contentScore(report.getContentScore())
                 .speechScore(report.getSpeechScore()).gazeScore(report.getGazeScore())
                 .poseScore(report.getPoseScore()).blinkScore(report.getBlinkScore())
