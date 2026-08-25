@@ -11,6 +11,7 @@ import com.example.interviewfitbe.domain.group.repository.GroupParticipantReposi
 import com.example.interviewfitbe.domain.group.repository.GroupQuestionRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,6 +25,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class GroupInterviewFlowService {
 
 
@@ -185,13 +187,24 @@ public class GroupInterviewFlowService {
             Long actorUserId,
             GroupInterviewSessionEntity session
     ) {
+        InterviewProgressResponse progress = toProgress(roomId, session);
+        log.info(
+                "Group interview WebSocket progress: destination={}, type={}, roomId={}, currentRound={}, currentQuestionIndex={}, currentParticipantIndex={}, status={}",
+                "/topic/room/" + roomId,
+                type,
+                roomId,
+                progress.getCurrentRound(),
+                progress.getCurrentQuestionIndex(),
+                progress.getCurrentParticipantIndex(),
+                progress.getStatus()
+        );
         messagingTemplate.convertAndSend(
                 "/topic/room/" + roomId,
                 GroupRoomEvent.progress(
                         type,
                         roomId,
                         actorUserId,
-                        toProgress(roomId, session)
+                        progress
                 )
         );
     }
@@ -275,6 +288,15 @@ public class GroupInterviewFlowService {
             session.getInterview().finishInterview();
         }
         sessionRepository.saveAndFlush(session);
+        log.info(
+                "Group interview state saved after answer completion: roomId={}, result={}, currentRound={}, currentQuestionIndex={}, currentParticipantIndex={}, status={}",
+                roomId,
+                result,
+                session.getCurrentRound(),
+                session.getCurrentQuestionIndex(),
+                session.getCurrentParticipantIndex(),
+                session.getStatus()
+        );
 
         String type = switch (result) {
             case NEXT_PARTICIPANT -> timedOut

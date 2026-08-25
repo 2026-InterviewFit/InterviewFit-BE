@@ -13,6 +13,8 @@ import java.time.Instant;
 @Builder
 public class GroupInterviewSessionEntity {
 
+    private static final int LAST_ROUND = 3;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -34,7 +36,7 @@ public class GroupInterviewSessionEntity {
 
 
     /**
-     * 현재 질문 번호
+     * 현재 질문 index (0-based)
      */
     private Integer currentQuestionIndex;
 
@@ -62,7 +64,7 @@ public class GroupInterviewSessionEntity {
     public void start() {
 
         this.currentRound = 1;
-        this.currentQuestionIndex = 1;
+        this.currentQuestionIndex = 0;
         this.currentParticipantIndex = 0;
         this.status = InterviewStatus.QUESTION_VIEW;
 
@@ -113,7 +115,7 @@ public class GroupInterviewSessionEntity {
             return AnswerCompletionResult.NEXT_PARTICIPANT;
         }
 
-        if (this.currentRound < 3) {
+        if (this.currentRound < LAST_ROUND) {
             this.currentRound++;
             this.currentQuestionIndex++;
             this.currentParticipantIndex = 0;
