@@ -174,6 +174,12 @@ public class FollowUpTranscriptionService {
                     e.getResponseBodyAsString()
             );
 
+            if (e.getStatusCode().value() == 422) {
+                throw new BaseException(
+                        FastApiErrorCode.STT_NO_SPEECH
+                );
+            }
+
             throw new BaseException(
                     FastApiErrorCode.FASTAPI_SERVER_ERROR
             );
