@@ -3,6 +3,8 @@ package com.example.interviewfitbe.domain.group.service;
 import com.example.interviewfitbe.domain.group.entity.*;
 import com.example.interviewfitbe.domain.group.repository.*;
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.user.entity.UserEntity;
+import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +20,7 @@ class GroupInterviewComparisonServiceTest {
     private GroupInterviewComparisonReportRepository reportRepository;
     private GroupInterviewComparisonScoreCalculator calculator;
     private GroupComparisonFeedbackClient feedbackClient;
+    private UserRepository userRepository;
     private GroupInterviewComparisonService service;
     private final List<GroupInterviewComparisonReportEntity> saved = new ArrayList<>();
 
@@ -30,13 +33,16 @@ class GroupInterviewComparisonServiceTest {
         reportRepository = mock(GroupInterviewComparisonReportRepository.class);
         calculator = mock(GroupInterviewComparisonScoreCalculator.class);
         feedbackClient = mock(GroupComparisonFeedbackClient.class);
+        userRepository = mock(UserRepository.class);
 
         GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
         when(interview.getRoomStatus()).thenReturn("COMPLETED");
         GroupInterviewSessionEntity session = mock(GroupInterviewSessionEntity.class);
         when(session.getStatus()).thenReturn(InterviewStatus.FINISHED);
         when(interviewRepository.findById(10L)).thenReturn(Optional.of(interview));
+        when(interviewRepository.existsById(10L)).thenReturn(true);
         when(sessionRepository.findByInterviewIdForUpdate(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.existsByRoomIdAndUserId(10L, 1L)).thenReturn(true);
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L)).thenReturn(List.of(
                 GroupParticipantEntity.builder().roomId(10L).userId(1L).build(),
                 GroupParticipantEntity.builder().roomId(10L).userId(2L).build()));
@@ -45,8 +51,10 @@ class GroupInterviewComparisonServiceTest {
         when(reportRepository.findByRoomIdAndParticipantUserIdAndScopeAndQuestionIndexIsNull(
                 anyLong(), anyLong(), any())).thenReturn(Optional.empty());
         when(reportRepository.findAllByRoomIdAndScopeOrderByRankAscParticipantUserIdAsc(
-                10L, GroupComparisonScope.QUESTION)).thenAnswer(invocation -> saved.stream()
-                .filter(r -> r.getScope() == GroupComparisonScope.QUESTION).toList());
+                eq(10L), any())).thenAnswer(invocation -> {
+            GroupComparisonScope scope = invocation.getArgument(1);
+            return saved.stream().filter(r -> r.getScope() == scope).toList();
+        });
         when(reportRepository.save(any())).thenAnswer(invocation -> {
             GroupInterviewComparisonReportEntity report = invocation.getArgument(0);
             if (!saved.contains(report)) saved.add(report);
@@ -55,7 +63,8 @@ class GroupInterviewComparisonServiceTest {
         when(feedbackClient.createFeedback(any())).thenReturn(List.of());
 
         service = new GroupInterviewComparisonService(interviewRepository, sessionRepository,
-                participantRepository, analysisRepository, reportRepository, calculator, feedbackClient);
+                participantRepository, analysisRepository, reportRepository, calculator,
+                feedbackClient, userRepository);
     }
 
     @Test
@@ -67,9 +76,6 @@ class GroupInterviewComparisonServiceTest {
         when(analysisRepository.findAllForComparison(10L, 2)).thenReturn(List.of());
         when(calculator.calculate(first)).thenReturn(scores("90"));
         when(calculator.calculate(second)).thenReturn(scores("80"));
-        when(feedbackClient.createFeedback(any())).thenReturn(List.of(
-                new GroupComparisonFeedbackClient.Feedback(1L, "질문 강점 1", "질문 개선 1"),
-                new GroupComparisonFeedbackClient.Feedback(2L, "질문 강점 2", "질문 개선 2")));
 
         service.generateAvailableComparisons(10L);
 
@@ -79,10 +85,9 @@ class GroupInterviewComparisonServiceTest {
                 .singleElement().extracting(GroupInterviewComparisonReportEntity::getRank).isEqualTo(1);
         assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(2L))
                 .singleElement().extracting(GroupInterviewComparisonReportEntity::getRank).isEqualTo(2);
-        assertThat(saved).allSatisfy(report -> {
-            assertThat(report.getStrengthSummary()).isNotBlank();
-            assertThat(report.getImprovementSummary()).isNotBlank();
-        });
+        assertThat(saved).allMatch(report -> report.getStrengthSummary() == null
+                && report.getImprovementSummary() == null);
+        verifyNoInteractions(feedbackClient);
     }
 
     @Test
@@ -99,6 +104,7 @@ class GroupInterviewComparisonServiceTest {
                 new GroupComparisonFeedbackClient.Feedback(2L, "종합 강점 2", "종합 개선 2")));
 
         service.generateAvailableComparisons(10L);
+        service.generateAvailableComparisons(10L);
 
         assertThat(saved).hasSize(2).allMatch(r -> r.getScope() == GroupComparisonScope.OVERALL);
         assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(1L)).singleElement()
@@ -108,6 +114,7 @@ class GroupInterviewComparisonServiceTest {
                     assertThat(report.getStrengthSummary()).isEqualTo("종합 강점 1");
                     assertThat(report.getImprovementSummary()).isEqualTo("종합 개선 1");
                 });
+        verify(feedbackClient, times(1)).createFeedback(any());
     }
 
     @Test
@@ -147,6 +154,24 @@ class GroupInterviewComparisonServiceTest {
                 .containsExactlyInAnyOrder(1, 2);
         assertThat(saved).allMatch(r -> r.getStrengthSummary() == null
                 && r.getImprovementSummary() == null);
+    }
+
+    @Test
+    void lookupReturnsParticipantNamesWithoutRegeneratingComparisons() {
+        GroupInterviewComparisonReportEntity report = questionReport(1L, 0, "90");
+        when(reportRepository.findAllByRoomIdAndScopeAndQuestionIndexOrderByRankAscParticipantUserIdAsc(
+                10L, GroupComparisonScope.QUESTION, 0)).thenReturn(List.of(report));
+        when(userRepository.findAllById(List.of(1L))).thenReturn(List.of(
+                UserEntity.builder().id(1L).kakaoId(101L).name("홍길동").build()));
+
+        var response = service.getQuestion(10L, 0, 1L);
+
+        assertThat(response).singleElement().satisfies(item -> {
+            assertThat(item.getParticipantUserId()).isEqualTo(1L);
+            assertThat(item.getParticipantName()).isEqualTo("홍길동");
+        });
+        verify(analysisRepository, never()).findAllForComparison(anyLong(), anyInt());
+        verifyNoInteractions(feedbackClient);
     }
 
     private GroupInterviewAnswerAnalysisEntity analysis(Long participantId, AnalysisStatus status) {

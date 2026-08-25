@@ -250,6 +250,7 @@ class CookieAuthenticationIntegrationTest {
         mockMvc.perform(get("/api/group-interviews/1/comparisons/questions/0").cookie(accessCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].participantUserId").value(3))
+                .andExpect(jsonPath("$[0].participantName").value("홍길동"))
                 .andExpect(jsonPath("$[0].strengthSummary").value("질문 강점"))
                 .andExpect(jsonPath("$[0].improvementSummary").value("질문 개선"));
 
@@ -261,7 +262,7 @@ class CookieAuthenticationIntegrationTest {
             GroupComparisonScope scope, Integer questionIndex,
             String strength, String improvement) {
         return GroupInterviewComparisonResponse.builder()
-                .reportId(1L).roomId(1L).participantUserId(3L).scope(scope)
+                .reportId(1L).roomId(1L).participantUserId(3L).participantName("홍길동").scope(scope)
                 .questionIndex(questionIndex).contentScore(new BigDecimal("85.00"))
                 .speechScore(new BigDecimal("76.00")).gazeScore(new BigDecimal("88.00"))
                 .poseScore(new BigDecimal("80.00")).blinkScore(new BigDecimal("74.00"))

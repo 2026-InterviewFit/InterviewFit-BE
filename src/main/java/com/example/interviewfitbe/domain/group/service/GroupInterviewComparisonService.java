@@ -5,6 +5,8 @@ import com.example.interviewfitbe.domain.group.dto.GroupInterviewComparisonRespo
 import com.example.interviewfitbe.domain.group.entity.*;
 import com.example.interviewfitbe.domain.group.repository.*;
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.user.entity.UserEntity;
+import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class GroupInterviewComparisonService {
     private final GroupInterviewComparisonReportRepository reportRepository;
     private final GroupInterviewComparisonScoreCalculator scoreCalculator;
     private final GroupComparisonFeedbackClient feedbackClient;
+    private final UserRepository userRepository;
 
     @Transactional
     public void generateAvailableComparisons(Long roomId) {
@@ -46,24 +49,20 @@ public class GroupInterviewComparisonService {
         generateOverallIfReady(roomId, participantIds);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<GroupInterviewComparisonResponse> getOverall(Long roomId, Long userId) {
         validateParticipant(roomId, userId);
-        generateAvailableComparisons(roomId);
-        return reportRepository.findAllByRoomIdAndScopeOrderByRankAscParticipantUserIdAsc(
-                        roomId, GroupComparisonScope.OVERALL).stream()
-                .map(GroupInterviewComparisonResponse::from).toList();
+        return toResponses(reportRepository.findAllByRoomIdAndScopeOrderByRankAscParticipantUserIdAsc(
+                roomId, GroupComparisonScope.OVERALL));
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<GroupInterviewComparisonResponse> getQuestion(Long roomId, int questionIndex, Long userId) {
         validateQuestionIndex(questionIndex);
         validateParticipant(roomId, userId);
-        generateAvailableComparisons(roomId);
-        return reportRepository
+        return toResponses(reportRepository
                 .findAllByRoomIdAndScopeAndQuestionIndexOrderByRankAscParticipantUserIdAsc(
-                        roomId, GroupComparisonScope.QUESTION, questionIndex).stream()
-                .map(GroupInterviewComparisonResponse::from).toList();
+                        roomId, GroupComparisonScope.QUESTION, questionIndex));
     }
 
     private void generateQuestionIfTerminal(Long roomId, int questionIndex, List<Long> participantIds) {
@@ -89,16 +88,14 @@ public class GroupInterviewComparisonService {
         Map<Long, Integer> ranks = complete ? rank(scores) : Collections.emptyMap();
         GroupComparisonStatus status = complete ? GroupComparisonStatus.DONE : GroupComparisonStatus.PARTIAL;
 
-        List<GroupInterviewComparisonReportEntity> saved = new ArrayList<>();
         for (Long participantId : participantIds) {
             var value = scores.get(participantId);
             var report = findOrCreate(roomId, participantId, GroupComparisonScope.QUESTION, questionIndex,
                     participantIds.size(), status);
             report.updateScores(value.content(), value.speech(), value.gaze(), value.pose(), value.blink(),
                     value.total(), ranks.get(participantId), participantIds.size(), status);
-            saved.add(reportRepository.save(report));
+            reportRepository.save(report);
         }
-        if (complete) applyFeedback(roomId, questionIndex, saved);
     }
 
     private void generateOverallIfReady(Long roomId, List<Long> participantIds) {
@@ -108,6 +105,14 @@ public class GroupInterviewComparisonService {
                 .filter(r -> r.getStatus() == GroupComparisonStatus.DONE)
                 .collect(Collectors.groupingBy(GroupInterviewComparisonReportEntity::getParticipantUserId));
         if (participantIds.stream().anyMatch(id -> byParticipant.getOrDefault(id, List.of()).size() != QUESTION_COUNT)) {
+            return;
+        }
+        List<GroupInterviewComparisonReportEntity> existingOverall = reportRepository
+                .findAllByRoomIdAndScopeOrderByRankAscParticipantUserIdAsc(
+                        roomId, GroupComparisonScope.OVERALL);
+        if (existingOverall.size() == participantIds.size()
+                && existingOverall.stream().map(GroupInterviewComparisonReportEntity::getParticipantUserId)
+                .collect(Collectors.toSet()).containsAll(participantIds)) {
             return;
         }
         Map<Long, GroupInterviewComparisonScoreCalculator.Scores> averages = new LinkedHashMap<>();
@@ -189,6 +194,18 @@ public class GroupInterviewComparisonService {
                 reportRepository.save(report);
             }
         });
+    }
+
+    private List<GroupInterviewComparisonResponse> toResponses(
+            List<GroupInterviewComparisonReportEntity> reports
+    ) {
+        Map<Long, String> participantNames = userRepository.findAllById(
+                        reports.stream().map(GroupInterviewComparisonReportEntity::getParticipantUserId).toList())
+                .stream().collect(Collectors.toMap(UserEntity::getId, UserEntity::getName));
+        return reports.stream()
+                .map(report -> GroupInterviewComparisonResponse.from(
+                        report, participantNames.get(report.getParticipantUserId())))
+                .toList();
     }
 
     private void validateParticipant(Long roomId, Long userId) {
