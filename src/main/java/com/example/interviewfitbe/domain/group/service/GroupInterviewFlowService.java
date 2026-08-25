@@ -245,17 +245,24 @@ public class GroupInterviewFlowService {
         if (session.getCurrentRound() == null) {
             return null;
         }
+        List<GroupQuestionEntity> candidates;
         if (session.getCurrentRound() == 3) {
-            return groupQuestionRepository
-                    .findFirstByRoundNumberAndJobRoleIdOrderByIdAsc(
-                            3,
-                            session.getInterview().getJobRoleId()
-                    )
-                    .orElse(null);
+            candidates = groupQuestionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(
+                    3,
+                    session.getInterview().getJobRoleId()
+            );
+        } else {
+            candidates = groupQuestionRepository.findAllByRoundNumberOrderByIdAsc(session.getCurrentRound());
         }
-        return groupQuestionRepository
-                .findFirstByRoundNumberOrderByIdAsc(session.getCurrentRound())
-                .orElse(null);
+        if (candidates.isEmpty()) {
+            return null;
+        }
+
+        // 같은 방에서는 모든 참가자에게 동일한 질문을 유지하고,
+        // 새 방에서는 질문 풀의 다른 항목이 선택되도록 roomId와 round를 seed로 사용한다.
+        long roomId = session.getInterview().getId();
+        int index = Math.floorMod(Long.hashCode(roomId * 31 + session.getCurrentRound()), candidates.size());
+        return candidates.get(index);
     }
 
     private Long currentParticipantUserId(Long roomId, Integer index) {
