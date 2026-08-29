@@ -60,11 +60,9 @@ public class FollowUpController {
     public FollowUpAnswerCreateResponse createFollowUpAnswer(
             @RequestBody FollowUpAnswerCreateRequest request
     ) {
-        // JWT 검증만 하고 서비스에 위임
-        // TODO: 소유권 검증 추가 (interview.user == JWT user)
-        AuthUtils.getCurrentUserId();
+        Long userId = AuthUtils.getCurrentUserId();
 
-        return followUpAnswerService.create(request);
+        return followUpAnswerService.create(userId, request);
     }
 
 
