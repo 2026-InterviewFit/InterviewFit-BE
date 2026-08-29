@@ -5,11 +5,15 @@ import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupParticipantEntity;
 import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewComparisonResponse;
+import com.example.interviewfitbe.domain.group.entity.GroupComparisonScope;
+import com.example.interviewfitbe.domain.group.entity.GroupComparisonStatus;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewFlowService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerAnalysisService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewDashboardService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewComparisonService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.domain.user.client.KakaoApiClient;
@@ -33,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,6 +51,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @WebMvcTest({GroupInterviewController.class, UserController.class})
 @Import({SecurityConfig.class, JwtTokenProvider.class, JwtCookieProvider.class})
@@ -81,6 +87,9 @@ class CookieAuthenticationIntegrationTest {
 
     @MockitoBean
     GroupInterviewDashboardService groupInterviewDashboardService;
+
+    @MockitoBean
+    GroupInterviewComparisonService groupInterviewComparisonService;
 
     @MockitoBean
     LiveKitService liveKitService;
@@ -228,10 +237,47 @@ class CookieAuthenticationIntegrationTest {
     }
 
     @Test
+    void groupComparisonApisUseAuthenticatedUserId() throws Exception {
+        var overall = comparisonResponse(GroupComparisonScope.OVERALL, null, "종합 강점", "종합 개선");
+        var question = comparisonResponse(GroupComparisonScope.QUESTION, 0, "질문 강점", "질문 개선");
+        when(groupInterviewComparisonService.getOverall(1L, USER_ID)).thenReturn(List.of(overall));
+        when(groupInterviewComparisonService.getQuestion(1L, 0, USER_ID)).thenReturn(List.of(question));
+
+        mockMvc.perform(get("/api/group-interviews/1/comparisons").cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].strengthSummary").value("종합 강점"))
+                .andExpect(jsonPath("$[0].improvementSummary").value("종합 개선"));
+        mockMvc.perform(get("/api/group-interviews/1/comparisons/questions/0").cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].participantUserId").value(3))
+                .andExpect(jsonPath("$[0].participantName").value("홍길동"))
+                .andExpect(jsonPath("$[0].strengthSummary").value("질문 강점"))
+                .andExpect(jsonPath("$[0].improvementSummary").value("질문 개선"));
+
+        verify(groupInterviewComparisonService).getOverall(1L, USER_ID);
+        verify(groupInterviewComparisonService).getQuestion(1L, 0, USER_ID);
+    }
+
+    private GroupInterviewComparisonResponse comparisonResponse(
+            GroupComparisonScope scope, Integer questionIndex,
+            String strength, String improvement) {
+        return GroupInterviewComparisonResponse.builder()
+                .reportId(1L).roomId(1L).participantUserId(3L).participantName("홍길동").scope(scope)
+                .questionIndex(questionIndex).contentScore(new BigDecimal("85.00"))
+                .speechScore(new BigDecimal("76.00")).gazeScore(new BigDecimal("88.00"))
+                .poseScore(new BigDecimal("80.00")).blinkScore(new BigDecimal("74.00"))
+                .totalScore(new BigDecimal("82.00")).rank(1).participantCount(2)
+                .strengthSummary(strength).improvementSummary(improvement)
+                .status(GroupComparisonStatus.DONE).build();
+    }
+
+    @Test
     void groupDashboardApisWithoutCookieReturn401() throws Exception {
         mockMvc.perform(get("/api/group-interviews/me/history"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/group-interviews/1/answers/me"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/group-interviews/1/comparisons"))
                 .andExpect(status().isUnauthorized());
     }
 

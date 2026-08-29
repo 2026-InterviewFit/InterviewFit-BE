@@ -26,6 +26,7 @@ public class InterviewController {
     public ResponseEntity<InterviewStartResponse> startInterview(
             @RequestBody InterviewStartRequest request
     ) {
+
         Long userId = AuthUtils.getCurrentUserId();
 
         InterviewStartResponse response =
@@ -42,12 +43,6 @@ public class InterviewController {
             @PathVariable Long interviewId,
             @RequestPart("file") MultipartFile file,
 
-            /*
-             * 현재 프론트는 전체 면접을 하나의 영상으로 녹화하기 때문에
-             * 특정 질문 하나의 ID를 반드시 전달하기 어렵다.
-             *
-             * 따라서 questionId를 선택값으로 받는다.
-             */
             @RequestParam(
                     value = "questionId",
                     required = false
@@ -69,7 +64,7 @@ public class InterviewController {
             )
             Double endTime
     ) throws IOException {
-
+        // 🔑 수정: JWT 토큰에서 현재 유저 ID 추출
         Long userId = AuthUtils.getCurrentUserId();
 
         InterviewAnswerUploadResponse response =
@@ -90,6 +85,7 @@ public class InterviewController {
     public ResponseEntity<InterviewReportResponse> getInterviewReport(
             @PathVariable Long interviewId
     ) {
+        // 🔑 수정: JWT 토큰에서 현재 유저 ID 추출
         Long userId = AuthUtils.getCurrentUserId();
 
         InterviewReportResponse response =

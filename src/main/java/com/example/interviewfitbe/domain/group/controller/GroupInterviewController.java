@@ -6,6 +6,7 @@ import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewHistoryResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewMyAnswerResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupInterviewComparisonResponse;
 import com.example.interviewfitbe.domain.group.dto.RoomCreateRequest;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
@@ -15,6 +16,7 @@ import com.example.interviewfitbe.domain.group.service.GroupInterviewService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewAnswerAnalysisService;
 import com.example.interviewfitbe.domain.group.service.GroupInterviewDashboardService;
+import com.example.interviewfitbe.domain.group.service.GroupInterviewComparisonService;
 import com.example.interviewfitbe.domain.livekit.dto.LiveKitTokenResponse;
 import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.global.jwt.AuthUtils;
@@ -46,6 +48,8 @@ public class GroupInterviewController {
     private final GroupInterviewAnswerAnalysisService groupInterviewAnswerAnalysisService;
 
     private final GroupInterviewDashboardService groupInterviewDashboardService;
+
+    private final GroupInterviewComparisonService groupInterviewComparisonService;
 
 
 
@@ -321,6 +325,23 @@ public class GroupInterviewController {
                 roomId,
                 AuthUtils.getCurrentUserId()
         ));
+    }
+
+    @GetMapping("/{roomId}/comparisons")
+    public ResponseEntity<List<GroupInterviewComparisonResponse>> getOverallComparisons(
+            @PathVariable Long roomId
+    ) {
+        return ResponseEntity.ok(groupInterviewComparisonService.getOverall(
+                roomId, AuthUtils.getCurrentUserId()));
+    }
+
+    @GetMapping("/{roomId}/comparisons/questions/{questionIndex}")
+    public ResponseEntity<List<GroupInterviewComparisonResponse>> getQuestionComparisons(
+            @PathVariable Long roomId,
+            @PathVariable Integer questionIndex
+    ) {
+        return ResponseEntity.ok(groupInterviewComparisonService.getQuestion(
+                roomId, questionIndex, AuthUtils.getCurrentUserId()));
     }
 
 }
