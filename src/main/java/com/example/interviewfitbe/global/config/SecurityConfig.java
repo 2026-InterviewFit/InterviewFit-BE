@@ -54,7 +54,7 @@ public class SecurityConfig {
                 )
 
                 /*
-                 * JWT Stateles?
+                 * JWT Stateless
                  */
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -180,7 +180,28 @@ public class SecurityConfig {
                                 )
                                 .permitAll()
 
-                                // 그룹 면접 참가자/세션 조회
+                                /*
+                                 * =================================
+                                 * 커뮤니티 공개 조회 API
+                                 * =================================
+                                 *
+                                 * 위키 / 우수답변 / 랭킹 조회는
+                                 * 비로그인 사용자도 볼 수 있도록 GET만 공개한다.
+                                 * POST / PATCH / DELETE는 아래 anyRequest() 규칙에 따라
+                                 * 로그인 사용자만 접근할 수 있다.
+                                 */
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/community/**"
+                                )
+                                .permitAll()
+
+                                /*
+                                 * 그룹 면접
+                                 *
+                                 * 참가자/세션/비교/내 정보/답변 관련 조회는
+                                 * 로그인 사용자만 접근한다.
+                                 */
                                 .requestMatchers(
                                         HttpMethod.GET,
                                         "/api/group-interviews/*/participants",
