@@ -14,6 +14,7 @@ import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
 import com.example.interviewfitbe.domain.question.repository.QuestionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -107,6 +108,20 @@ public class FollowUpService {
             interview =
                     sourceAnswer.getInterviewSafely();
         }
+
+
+        /*
+         * JWT 사용자 / Interview / Question 관계 검증.
+         *
+         * 질문 생성 단계에서 Question.interview가 연결되므로
+         * 다른 면접의 질문 ID를 꼬리질문 원 질문으로 사용할 수 없도록 막는다.
+         */
+        validateOwnershipAndRelations(
+                request.getUserId(),
+                interview,
+                sourceQuestion,
+                sourceAnswer
+        );
 
 
         /*
@@ -374,6 +389,50 @@ public class FollowUpService {
                                                 + sourceAnswerId
                                 )
                 );
+    }
+
+
+    /**
+     * 로그인 사용자와 면접/질문의 연결 관계를 검증한다.
+     */
+    private void validateOwnershipAndRelations(
+            Long userId,
+            InterviewEntity interview,
+            QuestionEntity sourceQuestion,
+            InterviewAnswerEntity sourceAnswer
+    ) {
+
+        if (
+                interview != null
+                        && userId != null
+                        && !interview.getUser().getId().equals(userId)
+        ) {
+            throw new AccessDeniedException(
+                    "본인의 면접에서만 꼬리질문을 생성할 수 있습니다."
+            );
+        }
+
+        if (
+                interview != null
+                        && sourceQuestion != null
+                        && sourceQuestion.getInterview() != null
+                        && !sourceQuestion.getInterview().getId().equals(interview.getId())
+        ) {
+            throw new IllegalArgumentException(
+                    "sourceQuestionId가 현재 면접에 연결된 질문이 아닙니다."
+            );
+        }
+
+        if (
+                interview != null
+                        && sourceAnswer != null
+                        && sourceAnswer.getInterviewSafely() != null
+                        && !sourceAnswer.getInterviewSafely().getId().equals(interview.getId())
+        ) {
+            throw new IllegalArgumentException(
+                    "sourceAnswerId가 현재 면접의 답변이 아닙니다."
+            );
+        }
     }
 
 
