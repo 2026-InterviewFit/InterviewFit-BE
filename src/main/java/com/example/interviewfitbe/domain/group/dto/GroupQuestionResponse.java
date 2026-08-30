@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GroupQuestionResponse {
     private Long id;
-    private Integer roundNumber; // 1: 공통, 2: 압박, 3: 직무 토의
+    private Integer roundNumber; // 1: 자기소개, 2: 공통, 3: 압박, 4: 직무 토의
     private String questionText; // 질문 내용
 
     public static GroupQuestionResponse from(GroupQuestionEntity entity) {

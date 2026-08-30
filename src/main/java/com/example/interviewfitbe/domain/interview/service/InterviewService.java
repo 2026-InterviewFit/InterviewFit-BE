@@ -25,6 +25,7 @@ import com.example.interviewfitbe.domain.speech_coaching.entity.AiEvaluationEnti
 import com.example.interviewfitbe.domain.speech_coaching.entity.SpeechReportEntity;
 import com.example.interviewfitbe.domain.speech_coaching.repository.AiEvaluationRepository;
 import com.example.interviewfitbe.domain.speech_coaching.repository.SpeechReportRepository;
+import com.example.interviewfitbe.domain.speech_coaching.service.ExternalAiAnalysisJsonCodec;
 import com.example.interviewfitbe.domain.user.entity.UserEntity;
 import com.example.interviewfitbe.domain.user.repository.UserRepository;
 import com.example.interviewfitbe.global.exception.BaseException;
@@ -77,6 +78,8 @@ public class InterviewService {
      * FE가 기대하는 aiEvaluationJson 구조로 조립할 때 사용한다.
      */
     private final ObjectMapper objectMapper;
+
+    private final ExternalAiAnalysisJsonCodec externalAiAnalysisJsonCodec;
 
 
     /**
@@ -681,6 +684,14 @@ public class InterviewService {
                         aiEvaluation == null
                                 ? null
                                 : aiEvaluation.getModelAnswer()
+                )
+
+                .externalAiAnalysis(
+                        aiEvaluation == null
+                                ? null
+                                : externalAiAnalysisJsonCodec.deserializeSafely(
+                                        aiEvaluation.getExternalAiAnalysisJson()
+                                )
                 )
 
                 .build();

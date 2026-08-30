@@ -33,7 +33,16 @@ public record PtQuestionAnalysisResponse(
         String improvement,
 
         @JsonProperty("improved_answer")
-        String improvedAnswer
+        String improvedAnswer,
+
+        /*
+         * 기존 질문 답변 AI 평가에서 가져오는 상세 데이터
+         */
+        String aiFeedback,
+
+        String modelAnswer,
+
+        PtStarAnalysisResponse starAnalysis
 
 ) {
 }

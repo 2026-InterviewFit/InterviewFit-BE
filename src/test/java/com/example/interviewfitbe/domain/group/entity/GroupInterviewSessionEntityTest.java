@@ -34,6 +34,11 @@ class GroupInterviewSessionEntityTest {
         assertThat(session.getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
         complete(session, now, 2);
         assertThat(complete(session, now, 2))
+                .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.NEXT_QUESTION);
+        assertThat(session.getCurrentRound()).isEqualTo(4);
+        assertThat(session.getCurrentQuestionIndex()).isEqualTo(3);
+        complete(session, now, 2);
+        assertThat(complete(session, now, 2))
                 .isEqualTo(GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED);
         assertThat(session.getStatus()).isEqualTo(InterviewStatus.FINISHED);
         assertThat(session.getAnswerDeadlineAt()).isNull();

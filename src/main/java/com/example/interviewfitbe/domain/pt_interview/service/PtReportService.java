@@ -1,15 +1,13 @@
 package com.example.interviewfitbe.domain.pt_interview.service;
 
+import com.example.interviewfitbe.domain.eye_blinking.entity.EyeBlinkingReportEntity;
 import com.example.interviewfitbe.domain.eye_blinking.repository.EyeBlinkingReportRepository;
+import com.example.interviewfitbe.domain.eye_gaze.entity.EyeGazeReport;
 import com.example.interviewfitbe.domain.eye_gaze.repository.EyeGazeReportRepository;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
 import com.example.interviewfitbe.domain.pose.repository.PoseReportRepository;
-import com.example.interviewfitbe.domain.pt_interview.dto.PtQuestionAnalysisResponse;
-import com.example.interviewfitbe.domain.pt_interview.dto.PtQuestionAnswerRequest;
-import com.example.interviewfitbe.domain.pt_interview.dto.PtReportGenerateRequest;
-import com.example.interviewfitbe.domain.pt_interview.dto.PtReportGenerateResponse;
-import com.example.interviewfitbe.domain.pt_interview.dto.PtReportResponse;
+import com.example.interviewfitbe.domain.pt_interview.dto.*;
 import com.example.interviewfitbe.domain.pt_interview.entity.PtDocumentEntity;
 import com.example.interviewfitbe.domain.pt_interview.entity.PtInterviewEntity;
 import com.example.interviewfitbe.domain.pt_interview.entity.PtQuestionEntity;
@@ -18,8 +16,11 @@ import com.example.interviewfitbe.domain.pt_interview.repository.PtDocumentRepos
 import com.example.interviewfitbe.domain.pt_interview.repository.PtInterviewRepository;
 import com.example.interviewfitbe.domain.pt_interview.repository.PtQuestionRepository;
 import com.example.interviewfitbe.domain.pt_interview.repository.PtReportRepository;
+import com.example.interviewfitbe.domain.speech_coaching.entity.AiEvaluationEntity;
+import com.example.interviewfitbe.domain.speech_coaching.repository.AiEvaluationRepository;
 import com.example.interviewfitbe.domain.speech_coaching.repository.SpeechReportRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,11 @@ public class PtReportService {
     private final EyeGazeReportRepository eyeGazeReportRepository;
     private final EyeBlinkingReportRepository eyeBlinkingReportRepository;
     private final PoseReportRepository poseReportRepository;
+
+    /*
+     * 기존 질문별 AI 평가 조회
+     */
+    private final AiEvaluationRepository aiEvaluationRepository;
 
     private final ObjectMapper objectMapper;
 
@@ -123,12 +129,6 @@ public class PtReportService {
 
         /*
          * 7. 실제 발표 영상 음성 분석 결과
-         *
-         * textScript:
-         * 사용자가 실제 발표에서 말한 STT
-         *
-         * score:
-         * 음성 전달력 분석 점수
          */
         var speechReport =
                 speechReportRepository
@@ -214,6 +214,10 @@ public class PtReportService {
 
         /*
          * 14. 질문별 상세 분석 JSON 저장
+         *
+         * 여기에는 기존 PT FastAPI 분석 결과만 저장한다.
+         * STAR / modelAnswer / geminiFeedback은
+         * 조회 시 ai_evaluation 테이블에서 결합한다.
          */
         String resultJson =
                 serializeQuestionAnalyses(
@@ -273,6 +277,9 @@ public class PtReportService {
                         report
                 );
 
+        /*
+         * 17. API 응답 변환
+         */
         return toResponse(
                 saved
         );
@@ -500,11 +507,326 @@ public class PtReportService {
         } catch (Exception e) {
 
             /*
-             * 기존 데이터가 다른 형식일 수 있으므로
-             * 조회 자체가 실패하지 않도록 빈 배열 반환
+             * 기존 데이터가 다른 형식이어도
+             * 리포트 전체 조회는 실패시키지 않는다.
              */
             return List.of();
         }
+    }
+
+    /**
+     * 발표 전체 영상 상세 분석 생성
+     */
+    private PtPresentationAnalysisResponse buildPresentationAnalysis(
+            Long interviewId
+    ) {
+
+        /*
+         * 눈 깜빡임
+         *
+         * 발표 영상은 interviewAnswer가 null인 결과를 사용한다.
+         */
+        PtEyeBlinkingDetailResponse blinking =
+                eyeBlinkingReportRepository
+                        .findTopByInterview_IdAndInterviewAnswerIsNullOrderByCreatedAtDesc(
+                                interviewId
+                        )
+                        .map(this::toBlinkingDetail)
+                        .orElse(null);
+
+        /*
+         * 시선
+         */
+        PtEyeGazeDetailResponse gaze =
+                eyeGazeReportRepository
+                        .findTopByInterview_IdOrderByCreatedAtDesc(
+                                interviewId
+                        )
+                        .map(this::toGazeDetail)
+                        .orElse(null);
+
+        /*
+         * 음성
+         */
+        PtSpeechDetailResponse speech =
+                speechReportRepository
+                        .findByInterview_Id(
+                                interviewId
+                        )
+                        .map(report ->
+                                new PtSpeechDetailResponse(
+                                        report.getScore(),
+                                        report.getTextScript(),
+                                        report.getTotalFillerCount(),
+                                        report.getFillerDetailsJson(),
+                                        report.getRepeatedExpressionsJson(),
+                                        report.getPaceEvaluation(),
+                                        report.getPaceFeedback(),
+                                        report.getCharactersPerSecond(),
+                                        report.getTotalSilenceSeconds(),
+                                        report.getPauseRatePercent(),
+                                        report.getCriticalSilenceCount()
+                                )
+                        )
+                        .orElse(null);
+
+        return new PtPresentationAnalysisResponse(
+                blinking,
+                gaze,
+                speech
+        );
+    }
+
+    /**
+     * 눈 깜빡임 Entity -> DTO
+     */
+    private PtEyeBlinkingDetailResponse toBlinkingDetail(
+            EyeBlinkingReportEntity report
+    ) {
+
+        return new PtEyeBlinkingDetailResponse(
+                report.getScore(),
+                report.getDurationSeconds(),
+                report.getBlinkCount(),
+                report.getBlinkRate(),
+                report.getNotDetectedCount(),
+                report.getNotDetectedRatio(),
+                report.getGrade() == null
+                        ? null
+                        : report.getGrade().name(),
+                report.getFeedback()
+        );
+    }
+
+    /**
+     * 시선 Entity -> DTO
+     */
+    private PtEyeGazeDetailResponse toGazeDetail(
+            EyeGazeReport report
+    ) {
+
+        return new PtEyeGazeDetailResponse(
+                report.getScore(),
+                report.getDurationSeconds(),
+                report.getCenterRatio(),
+                report.getGazeAwayRatio(),
+                report.getGazeAwayCount(),
+                report.getNotDetectedCount(),
+                report.getNotDetectedRatio(),
+                report.getGrade() == null
+                        ? null
+                        : report.getGrade().name(),
+                report.getEvaluation()
+        );
+    }
+
+    /**
+     * 기존 PT 질문별 분석 결과와
+     * ai_evaluation의 STAR / 피드백 / 모범답안을 결합한다.
+     */
+    private List<PtQuestionAnalysisResponse> enrichQuestionAnalyses(
+            Long ptInterviewId,
+            List<PtQuestionAnalysisResponse> analyses
+    ) {
+
+        if (
+                analyses == null
+                        || analyses.isEmpty()
+        ) {
+            return List.of();
+        }
+
+        List<InterviewAnswerEntity> answers =
+                interviewAnswerRepository
+                        .findAllByPtQuestion_PtInterview_IdOrderByAnswerOrderAsc(
+                                ptInterviewId
+                        );
+
+        List<PtQuestionAnalysisResponse> result =
+                new ArrayList<>();
+
+        for (PtQuestionAnalysisResponse analysis : analyses) {
+
+            InterviewAnswerEntity matchedAnswer =
+                    answers.stream()
+                            .filter(answer -> {
+
+                                if (answer.getPtQuestion() == null) {
+                                    return false;
+                                }
+
+                                Integer questionNumber =
+                                        answer
+                                                .getPtQuestion()
+                                                .getQuestionNumber();
+
+                                return questionNumber != null
+                                        && questionNumber.equals(
+                                        analysis.questionNumber()
+                                );
+                            })
+                            .findFirst()
+                            .orElse(null);
+
+            AiEvaluationEntity aiEvaluation = null;
+
+            if (
+                    matchedAnswer != null
+                            && matchedAnswer.getId() != null
+            ) {
+
+                aiEvaluation =
+                        aiEvaluationRepository
+                                .findByInterviewAnswer_Id(
+                                        matchedAnswer.getId()
+                                )
+                                .orElse(null);
+            }
+
+            PtStarAnalysisResponse starAnalysis =
+                    aiEvaluation == null
+                            ? null
+                            : parseStarAnalysis(
+                            aiEvaluation.getStarEvaluationJson()
+                    );
+
+            String aiFeedback =
+                    aiEvaluation == null
+                            ? null
+                            : aiEvaluation.getGeminiFeedback();
+
+            String modelAnswer =
+                    aiEvaluation == null
+                            ? null
+                            : aiEvaluation.getModelAnswer();
+
+            result.add(
+                    new PtQuestionAnalysisResponse(
+                            analysis.questionNumber(),
+                            analysis.question(),
+                            analysis.answer(),
+                            analysis.understandingScore(),
+                            analysis.logicScore(),
+                            analysis.specificityScore(),
+                            analysis.evidenceScore(),
+                            analysis.overallScore(),
+                            analysis.strengths(),
+                            analysis.weaknesses(),
+                            analysis.improvement(),
+                            analysis.improvedAnswer(),
+                            aiFeedback,
+                            modelAnswer,
+                            starAnalysis
+                    )
+            );
+        }
+
+        return result;
+    }
+
+    /**
+     * DB에 저장된 STAR JSON:
+     *
+     * {
+     *   "S": 6,
+     *   "T": 7,
+     *   "A": 5,
+     *   "R": 5
+     * }
+     *
+     * 를 FE가 사용하기 쉬운 DTO로 변환한다.
+     */
+    private PtStarAnalysisResponse parseStarAnalysis(
+            String starJson
+    ) {
+
+        if (
+                starJson == null
+                        || starJson.isBlank()
+        ) {
+            return null;
+        }
+
+        try {
+
+            JsonNode root =
+                    objectMapper.readTree(
+                            starJson
+                    );
+
+            Integer situation =
+                    getIntegerValue(
+                            root,
+                            "S"
+                    );
+
+            Integer task =
+                    getIntegerValue(
+                            root,
+                            "T"
+                    );
+
+            Integer action =
+                    getIntegerValue(
+                            root,
+                            "A"
+                    );
+
+            Integer result =
+                    getIntegerValue(
+                            root,
+                            "R"
+                    );
+
+            int totalScore =
+                    safeInt(situation)
+                            + safeInt(task)
+                            + safeInt(action)
+                            + safeInt(result);
+
+            return new PtStarAnalysisResponse(
+                    situation,
+                    task,
+                    action,
+                    result,
+                    totalScore
+            );
+
+        } catch (Exception e) {
+
+            /*
+             * STAR JSON 하나가 깨져 있어도
+             * PT 리포트 전체 조회를 실패시키지 않는다.
+             */
+            return null;
+        }
+    }
+
+    private Integer getIntegerValue(
+            JsonNode root,
+            String fieldName
+    ) {
+
+        if (
+                root == null
+                        || !root.has(fieldName)
+                        || root.get(fieldName).isNull()
+        ) {
+            return null;
+        }
+
+        return root
+                .get(fieldName)
+                .asInt();
+    }
+
+    private int safeInt(
+            Integer value
+    ) {
+
+        return value == null
+                ? 0
+                : value;
     }
 
     /**
@@ -514,14 +836,57 @@ public class PtReportService {
             PtReportEntity report
     ) {
 
-        List<PtQuestionAnalysisResponse> questionAnalyses =
+        Long ptInterviewId =
+                report
+                        .getPtInterview()
+                        .getId();
+
+        if (
+                report.getPtInterview().getInterview() == null
+                        || report
+                        .getPtInterview()
+                        .getInterview()
+                        .getId() == null
+        ) {
+            throw new IllegalStateException(
+                    "PT 면접에 연결된 Interview 정보를 찾을 수 없습니다."
+            );
+        }
+
+        Long interviewId =
+                report
+                        .getPtInterview()
+                        .getInterview()
+                        .getId();
+
+        /*
+         * PT FastAPI 질문 분석 결과 복원
+         */
+        List<PtQuestionAnalysisResponse> storedQuestionAnalyses =
                 deserializeQuestionAnalyses(
                         report.getResultJson()
                 );
 
+        /*
+         * 기존 AI 평가 데이터 결합
+         */
+        List<PtQuestionAnalysisResponse> enrichedQuestionAnalyses =
+                enrichQuestionAnalyses(
+                        ptInterviewId,
+                        storedQuestionAnalyses
+                );
+
+        /*
+         * 발표 상세 분석 구성
+         */
+        PtPresentationAnalysisResponse presentationAnalysis =
+                buildPresentationAnalysis(
+                        interviewId
+                );
+
         return new PtReportResponse(
                 report.getId(),
-                report.getPtInterview().getId(),
+                ptInterviewId,
                 report.getContentScore(),
                 report.getStructureScore(),
                 report.getDeliveryScore(),
@@ -530,7 +895,8 @@ public class PtReportService {
                 report.getPresentationMaterialSummary(),
                 report.getActualPresentationSummary(),
                 report.getPresentationComparison(),
-                questionAnalyses,
+                presentationAnalysis,
+                enrichedQuestionAnalyses,
                 report.getStrengths(),
                 report.getWeaknesses(),
                 report.getImprovement(),

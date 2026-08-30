@@ -245,10 +245,18 @@ public class GroupInterviewFlowService {
         if (session.getCurrentRound() == null) {
             return null;
         }
+        if (session.getCurrentRound() == 1) {
+            return groupQuestionRepository
+                    .findFirstByRoundNumberAndQuestionText(
+                            1,
+                            GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
+                    )
+                    .orElseThrow(() -> new IllegalStateException("자기소개 질문 데이터가 없습니다."));
+        }
         List<GroupQuestionEntity> candidates;
-        if (session.getCurrentRound() == 3) {
+        if (session.getCurrentRound() == 4) {
             candidates = groupQuestionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(
-                    3,
+                    4,
                     session.getInterview().getJobRoleId()
             );
         } else {

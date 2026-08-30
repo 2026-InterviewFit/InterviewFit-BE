@@ -28,6 +28,14 @@ public record PtReportResponse(
 
         String presentationComparison,
 
+        /*
+         * 발표 영상 상세 분석
+         */
+        PtPresentationAnalysisResponse presentationAnalysis,
+
+        /*
+         * 질문별 상세 분석
+         */
         List<PtQuestionAnalysisResponse> questionAnalyses,
 
         String strengths,

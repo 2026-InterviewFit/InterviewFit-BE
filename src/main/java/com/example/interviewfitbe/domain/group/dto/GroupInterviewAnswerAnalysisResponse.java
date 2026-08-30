@@ -2,6 +2,7 @@ package com.example.interviewfitbe.domain.group.dto;
 
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewAnswerAnalysisEntity;
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.speech_coaching.dto.ExternalAiAnalysis;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -20,6 +21,7 @@ public class GroupInterviewAnswerAnalysisResponse {
     private String speechText;
     private String speechResultJson;
     private String aiEvaluationJson;
+    private ExternalAiAnalysis externalAiAnalysis;
     private String eyeBlinkingResultJson;
     private String eyeGazeResultJson;
     private String poseResultJson;
@@ -28,7 +30,8 @@ public class GroupInterviewAnswerAnalysisResponse {
     private Instant analysisCompletedAt;
 
     public static GroupInterviewAnswerAnalysisResponse from(
-            GroupInterviewAnswerAnalysisEntity analysis
+            GroupInterviewAnswerAnalysisEntity analysis,
+            ExternalAiAnalysis externalAiAnalysis
     ) {
         var answer = analysis.getAnswer();
         return GroupInterviewAnswerAnalysisResponse.builder()
@@ -42,6 +45,7 @@ public class GroupInterviewAnswerAnalysisResponse {
                 .speechText(analysis.getSpeechText())
                 .speechResultJson(analysis.getSpeechResultJson())
                 .aiEvaluationJson(analysis.getAiEvaluationJson())
+                .externalAiAnalysis(externalAiAnalysis)
                 .eyeBlinkingResultJson(analysis.getEyeBlinkingResultJson())
                 .eyeGazeResultJson(analysis.getEyeGazeResultJson())
                 .poseResultJson(analysis.getPoseResultJson())

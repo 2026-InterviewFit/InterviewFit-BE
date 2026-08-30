@@ -42,6 +42,9 @@ public class GroupInterviewAnswerAnalysisEntity {
     @Column(name = "ai_evaluation_json", columnDefinition = "TEXT")
     private String aiEvaluationJson;
 
+    @Column(name = "external_ai_analysis_json", columnDefinition = "TEXT")
+    private String externalAiAnalysisJson;
+
     @Column(name = "eye_blinking_result_json", columnDefinition = "TEXT")
     private String eyeBlinkingResultJson;
 
@@ -88,6 +91,7 @@ public class GroupInterviewAnswerAnalysisEntity {
             String speechText,
             String speechResultJson,
             String aiEvaluationJson,
+            String externalAiAnalysisJson,
             String eyeBlinkingResultJson,
             String eyeGazeResultJson,
             String poseResultJson,
@@ -96,6 +100,7 @@ public class GroupInterviewAnswerAnalysisEntity {
         this.speechText = speechText;
         this.speechResultJson = speechResultJson;
         this.aiEvaluationJson = aiEvaluationJson;
+        this.externalAiAnalysisJson = externalAiAnalysisJson;
         this.eyeBlinkingResultJson = eyeBlinkingResultJson;
         this.eyeGazeResultJson = eyeGazeResultJson;
         this.poseResultJson = poseResultJson;

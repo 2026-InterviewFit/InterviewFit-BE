@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.interview.dto;
 
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.speech_coaching.dto.ExternalAiAnalysis;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -168,5 +169,6 @@ public class InterviewReportResponse {
         private Double volumeDbStd;
         private String aiEvaluationJson;
         private String modelAnswer;
+        private ExternalAiAnalysis externalAiAnalysis;
     }
 }
