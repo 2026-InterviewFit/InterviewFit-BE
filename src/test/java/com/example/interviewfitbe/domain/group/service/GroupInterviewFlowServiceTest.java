@@ -168,7 +168,7 @@ class GroupInterviewFlowServiceTest {
     }
 
     @Test
-    void twoParticipantsCompleteAllThreeQuestionsBeforeInterviewFinishes() {
+    void twoParticipantsCompleteAllFourQuestionsBeforeInterviewFinishes() {
         GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
         when(interview.getId()).thenReturn(10L);
         when(interview.getJobRoleId()).thenReturn(2L);
@@ -180,6 +180,7 @@ class GroupInterviewFlowServiceTest {
         GroupQuestionEntity firstQuestion = question(31L, "질문 1");
         GroupQuestionEntity secondQuestion = question(32L, "질문 2");
         GroupQuestionEntity thirdQuestion = question(33L, "질문 3");
+        GroupQuestionEntity fourthQuestion = question(34L, "질문 4");
         List<GroupParticipantEntity> participants = List.of(participant(5L), participant(6L));
         AtomicLong answerId = new AtomicLong(100L);
 
@@ -188,8 +189,9 @@ class GroupInterviewFlowServiceTest {
         when(participantRepository.countByRoomId(10L)).thenReturn(2L);
         when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of(firstQuestion));
         when(questionRepository.findAllByRoundNumberOrderByIdAsc(2)).thenReturn(List.of(secondQuestion));
-        when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(3, 2L))
-                .thenReturn(List.of(thirdQuestion));
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(3)).thenReturn(List.of(thirdQuestion));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(4, 2L))
+                .thenReturn(List.of(fourthQuestion));
         when(answerRepository.saveAndFlush(any())).thenAnswer(invocation ->
                 GroupInterviewAnswerEntity.builder().id(answerId.getAndIncrement()).build()
         );
@@ -220,37 +222,42 @@ class GroupInterviewFlowServiceTest {
         answer(service, 5L);
         assertProgress(session, 3, 2, 1, InterviewStatus.QUESTION_VIEW);
         answer(service, 6L);
-        assertProgress(session, 3, 2, 1, InterviewStatus.FINISHED);
+        assertProgress(session, 4, 3, 0, InterviewStatus.QUESTION_VIEW);
+
+        answer(service, 5L);
+        assertProgress(session, 4, 3, 1, InterviewStatus.QUESTION_VIEW);
+        answer(service, 6L);
+        assertProgress(session, 4, 3, 1, InterviewStatus.FINISHED);
         verify(interview).finishInterview();
     }
 
     @ParameterizedTest
     @ValueSource(longs = {1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L})
-    void thirdRoundResolvesQuestionForEveryJobRole(Long jobRoleId) {
+    void fourthRoundResolvesQuestionForEveryJobRole(Long jobRoleId) {
         GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
         when(interview.getId()).thenReturn(10L);
         when(interview.getJobRoleId()).thenReturn(jobRoleId);
         GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
                 .interview(interview)
                 .build();
-        moveToThirdRound(session);
+        moveToFourthRound(session);
 
         long questionId = 300L + jobRoleId;
-        GroupQuestionEntity thirdQuestion = question(questionId, "직무 " + jobRoleId + " 질문");
+        GroupQuestionEntity fourthQuestion = question(questionId, "직무 " + jobRoleId + " 질문");
         when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
                 .thenReturn(List.of(participant(5L), participant(6L)));
-        when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId))
-                .thenReturn(List.of(thirdQuestion));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(4, jobRoleId))
+                .thenReturn(List.of(fourthQuestion));
 
         var response = service.getSession(10L);
 
-        assertThat(response.getCurrentRound()).isEqualTo(3);
-        assertThat(response.getCurrentQuestionIndex()).isEqualTo(2);
+        assertThat(response.getCurrentRound()).isEqualTo(4);
+        assertThat(response.getCurrentQuestionIndex()).isEqualTo(3);
         assertThat(response.getCurrentQuestionId()).isEqualTo(questionId);
         assertThat(response.getCurrentQuestionText()).isEqualTo("직무 " + jobRoleId + " 질문");
         verify(questionRepository)
-                .findAllByRoundNumberAndJobRoleIdOrderByIdAsc(3, jobRoleId);
+                .findAllByRoundNumberAndJobRoleIdOrderByIdAsc(4, jobRoleId);
     }
 
     private void answer(GroupInterviewFlowService service, Long userId) {
@@ -258,9 +265,9 @@ class GroupInterviewFlowServiceTest {
         service.completeAnswer(10L, userId);
     }
 
-    private void moveToThirdRound(GroupInterviewSessionEntity session) {
+    private void moveToFourthRound(GroupInterviewSessionEntity session) {
         session.start();
-        for (int completedAnswers = 0; completedAnswers < 4; completedAnswers++) {
+        for (int completedAnswers = 0; completedAnswers < 6; completedAnswers++) {
             var now = java.time.Instant.now();
             session.startAnswer(now, now.plusSeconds(60));
             session.completeCurrentAnswer(2);

@@ -246,9 +246,9 @@ public class GroupInterviewFlowService {
             return null;
         }
         List<GroupQuestionEntity> candidates;
-        if (session.getCurrentRound() == 3) {
+        if (session.getCurrentRound() == 4) {
             candidates = groupQuestionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(
-                    3,
+                    4,
                     session.getInterview().getJobRoleId()
             );
         } else {

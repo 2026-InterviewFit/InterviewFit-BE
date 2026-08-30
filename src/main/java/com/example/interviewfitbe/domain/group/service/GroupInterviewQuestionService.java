@@ -23,30 +23,36 @@ public class GroupInterviewQuestionService {
     private final JobRoleRepository jobRoleRepository;
 
     /**
-     * 다대일 면접 방 시작 시 1~3라운드 질문 세트를 구성하여 반환
+     * 다대일 면접 방 시작 시 1~4라운드 질문 세트를 구성하여 반환
      */
     public List<GroupQuestionResponse> getGroupInterviewQuestions(Long jobRoleId) {
         List<GroupQuestionEntity> selectedQuestions = new ArrayList<>();
 
-        // 1라운드: 공통 역량 질문
+        // 1라운드: 자기소개
         List<GroupQuestionEntity> round1 = groupQuestionRepository.findByRoundNumber(1);
         if (!round1.isEmpty()) {
             selectedQuestions.add(randomQuestion(round1));
         }
 
-        // 2라운드: 압박 면접 질문
+        // 2라운드: 공통 역량 질문
         List<GroupQuestionEntity> round2 = groupQuestionRepository.findByRoundNumber(2);
         if (!round2.isEmpty()) {
             selectedQuestions.add(randomQuestion(round2));
         }
 
-        // 3라운드: 직무 토의형 질문 (선택한 직무 연동)
+        // 3라운드: 압박 면접 질문
+        List<GroupQuestionEntity> round3 = groupQuestionRepository.findByRoundNumber(3);
+        if (!round3.isEmpty()) {
+            selectedQuestions.add(randomQuestion(round3));
+        }
+
+        // 4라운드: 직무 토의형 질문 (선택한 직무 연동)
         JobRoleEntity jobRole = jobRoleRepository.findById(jobRoleId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 직무 ID입니다: " + jobRoleId));
 
-        List<GroupQuestionEntity> round3 = groupQuestionRepository.findByRoundNumberAndJobRole(3, jobRole);
-        if (!round3.isEmpty()) {
-            selectedQuestions.add(randomQuestion(round3));
+        List<GroupQuestionEntity> round4 = groupQuestionRepository.findByRoundNumberAndJobRole(4, jobRole);
+        if (!round4.isEmpty()) {
+            selectedQuestions.add(randomQuestion(round4));
         }
 
         return selectedQuestions.stream()

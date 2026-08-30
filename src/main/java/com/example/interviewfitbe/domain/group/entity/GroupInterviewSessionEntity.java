@@ -13,7 +13,7 @@ import java.time.Instant;
 @Builder
 public class GroupInterviewSessionEntity {
 
-    private static final int LAST_ROUND = 3;
+    private static final int LAST_ROUND = 4;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,7 +30,7 @@ public class GroupInterviewSessionEntity {
 
     /**
      * 현재 ROUND
-     * 1~3
+     * 1~4
      */
     private Integer currentRound;
 
