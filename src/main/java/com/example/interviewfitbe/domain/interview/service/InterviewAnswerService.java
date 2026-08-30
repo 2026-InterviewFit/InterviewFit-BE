@@ -29,7 +29,18 @@ public class InterviewAnswerService {
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
     private final VideoService videoService;
+
+    /*
+     * 전체 면접 영상 분석 전담.
+     * eye / pose / speech / Gemini 전체 분석을 수행한다.
+     */
     private final InterviewAnswerAnalysisJobService interviewAnswerAnalysisJobService;
+
+    /*
+     * 일반 질문별 답변 분석 전담.
+     * audio/webm 기준 STT + Gemini 내용 평가만 비동기로 수행한다.
+     */
+    private final QuestionAnswerAnalysisJobService questionAnswerAnalysisJobService;
 
     @Transactional
     public InterviewAnswerUploadResponse uploadAnswerVideo(
@@ -81,14 +92,9 @@ public class InterviewAnswerService {
         }
 
         /*
-         * 핵심 변경점.
-         *
          * questionId는 재사용 가능한 QuestionEntity 원본 ID이다.
-         * 따라서 QuestionRepository에서 질문만 단독 조회하지 않고,
-         * 반드시 현재 interviewId와 questionId가 함께 존재하는
-         * interview_questions 매핑을 조회한다.
-         *
-         * 이 검증으로 다른 면접에서 사용한 질문을 잘못 연결하는 것도 막는다.
+         * 반드시 현재 interviewId + questionId 조합의
+         * InterviewQuestionEntity를 통해 이번 면접의 질문인지 검증한다.
          */
         InterviewQuestionEntity interviewQuestion = null;
         QuestionEntity question = null;
@@ -121,7 +127,6 @@ public class InterviewAnswerService {
                 InterviewAnswerEntity.builder()
                         .interview(interview)
                         .interviewQuestion(interviewQuestion)
-                        // 기존 분석/조회 코드 호환용. 기준 관계는 interviewQuestion.
                         .question(question)
                         .answerOrder(answerOrder)
                         .startTime(startTime)
@@ -136,31 +141,39 @@ public class InterviewAnswerService {
         Long answerId = saved.getId();
 
         /*
-         * 2단계: 질문별 답변은 "연결 + 저장"까지만 한다.
+         * 트랜잭션 커밋 후 분석을 시작한다.
          *
          * questionId != null
-         *   -> InterviewQuestion과 InterviewAnswer 연결
-         *   -> MinIO key 저장
-         *   -> 분석은 3단계에서 별도 비동기 Speech/Gemini Job으로 연결
+         *   -> 질문별 audio 답변
+         *   -> STT + Gemini 내용 평가 비동기 실행
+         *   -> InterviewAnswer.answerText + AiEvaluation 저장
          *
          * questionId == null
-         *   -> 기존 전체 면접 영상
-         *   -> eye / pose / speech 전체 분석 흐름은 그대로 유지
+         *   -> 전체 면접 video
+         *   -> 기존 eye / pose / speech / Gemini 전체 분석 비동기 실행
          */
-        if (questionId == null) {
-            TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            interviewAnswerAnalysisJobService
-                                    .analyzeAnswerAsync(
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+
+                        if (questionId != null) {
+                            questionAnswerAnalysisJobService
+                                    .analyzeQuestionAnswerAsync(
                                             answerId,
                                             videoObjectKey
                                     );
+                            return;
                         }
+
+                        interviewAnswerAnalysisJobService
+                                .analyzeAnswerAsync(
+                                        answerId,
+                                        videoObjectKey
+                                );
                     }
-            );
-        }
+                }
+        );
 
         return InterviewAnswerUploadResponse.builder()
                 .answerId(saved.getId())

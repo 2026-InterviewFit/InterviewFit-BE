@@ -23,12 +23,17 @@ public class InterviewReportResponse {
     private boolean completed;
 
     /**
-     * eye/pose는 interview 단위 리포트.
-     * gaze/speech는 아직 답변별. 팀원 리팩토링 이후 최상위로 이동 예정.
+     * 전체 면접 영상 기준 비언어/스피치 분석 결과.
      */
     private EyeReport eye;
     private PoseReport pose;
 
+    /**
+     * 질문별 결과.
+     *
+     * 신규 면접에서는 각 기본 질문의 InterviewAnswer를 반환하고,
+     * 기존 데이터에 질문별 답변이 없는 경우에는 전체 면접 Answer를 fallback으로 반환한다.
+     */
     private List<AnswerReport> answers;
 
     @Getter
@@ -37,6 +42,7 @@ public class InterviewReportResponse {
     public static class AnswerReport {
 
         private Long answerId;
+        private Long interviewQuestionId;
         private Long questionId;
         private String questionText;
         private String answerText;
@@ -46,9 +52,56 @@ public class InterviewReportResponse {
         private AnalysisStatus analysisStatus;
         private String errorMessage;
 
-        // 팀원 리팩토링 대기중
+        /**
+         * 질문별 Gemini 내용 평가.
+         */
+        private AiEvaluationReport aiEvaluation;
+
+        /**
+         * 이 기본 답변을 source_answer_id로 사용하는 꼬리질문 목록.
+         */
+        private List<FollowUpReport> followUps;
+
+        /**
+         * 기존 FE 호환용.
+         * gaze/speech의 정량 지표는 전체 면접 영상 결과를 공유하고,
+         * aiEvaluationJson/modelAnswer에는 현재 Answer의 질문별 AI 평가를 넣는다.
+         */
         private GazeReport gaze;
         private SpeechReport speech;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class FollowUpReport {
+        private Long followUpQuestionId;
+        private String questionText;
+        private LocalDateTime createdAt;
+        private List<FollowUpAnswerReport> answers;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class FollowUpAnswerReport {
+        private Long followUpAnswerId;
+        private String answerText;
+        private Double startTime;
+        private Double endTime;
+        private AnalysisStatus analysisStatus;
+        private String errorMessage;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class AiEvaluationReport {
+        private Long evaluationId;
+        private String starEvaluationJson;
+        private String geminiFeedback;
+        private String keywordsJson;
+        private String modelAnswer;
     }
 
     @Getter
