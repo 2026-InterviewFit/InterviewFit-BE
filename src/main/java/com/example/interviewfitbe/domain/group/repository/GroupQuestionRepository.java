@@ -17,6 +17,11 @@ public interface GroupQuestionRepository extends JpaRepository<GroupQuestionEnti
     // 4라운드용: 특정 직무에 매핑된 직무 토의 질문 조회
     List<GroupQuestionEntity> findByRoundNumberAndJobRole(Integer roundNumber, JobRoleEntity jobRole);
 
+    Optional<GroupQuestionEntity> findFirstByRoundNumberAndQuestionText(
+            Integer roundNumber,
+            String questionText
+    );
+
     List<GroupQuestionEntity> findAllByRoundNumberOrderByIdAsc(Integer roundNumber);
 
     List<GroupQuestionEntity> findAllByRoundNumberAndJobRoleIdOrderByIdAsc(
