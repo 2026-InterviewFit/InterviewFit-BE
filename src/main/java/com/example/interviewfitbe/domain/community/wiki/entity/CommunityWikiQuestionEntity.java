@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 public class CommunityWikiQuestionEntity {
 
-    public static final int REQUIRED_VERIFICATION_COUNT = 5;
+    public static final int REQUIRED_VERIFICATION_COUNT = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
