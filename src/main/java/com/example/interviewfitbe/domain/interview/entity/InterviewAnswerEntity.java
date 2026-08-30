@@ -25,10 +25,10 @@ public class InterviewAnswerEntity {
     private Long id;
 
     /*
-     * Interview 삭제 시 해당 면접 답변도 같이 삭제.
+     * 실제 면접 세션.
      *
-     * Question이 Interview와 Answer 사이를 관리하므로
-     * interview_id 자체는 nullable 허용.
+     * 전체 면접 영상처럼 특정 질문이 없는 답변도 있으므로
+     * interview_id는 그대로 유지한다.
      */
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
@@ -36,10 +36,25 @@ public class InterviewAnswerEntity {
     private InterviewEntity interview;
 
     /*
-     * 일반 면접 질문.
+     * 이번 면접에서 사용된 질문 연결 정보.
      *
-     * PT 면접 답변에서는 사용하지 않으므로
-     * nullable을 허용한다.
+     * QuestionEntity는 여러 면접에서 재사용되는 원본이므로
+     * 일반 면접 답변은 QuestionEntity 자체가 아니라
+     * InterviewQuestionEntity를 통해 이번 면접의 질문과 연결한다.
+     *
+     * 기존 데이터와 PT/전체영상 흐름 호환을 위해 nullable 허용.
+     */
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_question_id")
+    private InterviewQuestionEntity interviewQuestion;
+
+    /*
+     * 기존 코드 호환용 일반 질문 원본 참조.
+     *
+     * 신규 일반 면접 답변에서는 interviewQuestion을 기준 관계로 사용하고,
+     * 이 필드는 기존 조회/분석 코드가 바로 깨지지 않도록 함께 저장한다.
+     * 최종 정리 단계에서 필요 여부를 다시 판단한다.
      */
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
@@ -48,9 +63,7 @@ public class InterviewAnswerEntity {
 
     /*
      * PT 면접 질문.
-     *
-     * 일반 면접 답변에서는 null이며,
-     * PT 면접 답변을 저장할 때만 연결한다.
+     * 일반 면접 답변에서는 null.
      */
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne(fetch = FetchType.LAZY)
@@ -60,23 +73,21 @@ public class InterviewAnswerEntity {
     @Column(nullable = false)
     private Integer answerOrder;
 
-    /*
-     * 전체 면접 영상 기준 답변 시작 시각.
-     * 단위: 초
-     */
     private Double startTime;
 
-    /*
-     * 전체 면접 영상 기준 답변 종료 시각.
-     * 단위: 초
-     */
     private Double endTime;
 
-    /*
-     * STT 결과 또는 사용자의 답변 텍스트.
-     */
     @Column(columnDefinition = "TEXT")
     private String answerText;
+
+    /**
+     * 질문별/전체 답변 원본의 MinIO object key.
+     *
+     * 2단계에서는 질문별 답변을 먼저 저장만 하고,
+     * 3단계에서 이 key를 이용해 비동기 Speech/Gemini 분석을 시작한다.
+     */
+    @Column(name = "video_object_key", length = 500)
+    private String videoObjectKey;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
@@ -108,74 +119,60 @@ public class InterviewAnswerEntity {
     }
 
     public void markUploaded() {
-        this.analysisStatus =
-                AnalysisStatus.UPLOADED;
-
-        this.errorMessage =
-                null;
+        this.analysisStatus = AnalysisStatus.UPLOADED;
+        this.errorMessage = null;
     }
 
     public void markRunning() {
-        this.analysisStatus =
-                AnalysisStatus.RUNNING;
-
-        this.errorMessage =
-                null;
+        this.analysisStatus = AnalysisStatus.RUNNING;
+        this.errorMessage = null;
     }
 
     public void markDone() {
-        this.analysisStatus =
-                AnalysisStatus.DONE;
-
-        this.errorMessage =
-                null;
+        this.analysisStatus = AnalysisStatus.DONE;
+        this.errorMessage = null;
     }
 
     public void markFailed(
             String errorMessage
     ) {
-        this.analysisStatus =
-                AnalysisStatus.FAILED;
-
-        this.errorMessage =
-                errorMessage;
+        this.analysisStatus = AnalysisStatus.FAILED;
+        this.errorMessage = errorMessage;
     }
 
-    /*
-     * 일반 면접 또는 PT 면접에서
-     * 연결된 Interview ID 반환.
-     */
     public Long getInterviewIdSafely() {
-
-        InterviewEntity interviewEntity =
-                getInterviewSafely();
+        InterviewEntity interviewEntity = getInterviewSafely();
 
         return interviewEntity == null
                 ? null
                 : interviewEntity.getId();
     }
 
-    /*
-     * 일반 면접 또는 PT 면접에서
-     * 연결된 Interview 반환.
-     */
     public InterviewEntity getInterviewSafely() {
 
         if (this.interview != null) {
             return this.interview;
         }
 
+        if (
+                this.interviewQuestion != null
+                        && this.interviewQuestion.getInterview() != null
+        ) {
+            return this.interviewQuestion.getInterview();
+        }
+
+        /*
+         * 1단계 이전 데이터 호환용 fallback.
+         * Question.interview 제거 전까지만 유지한다.
+         */
         if (this.question != null) {
-            return this.question
-                    .getInterview();
+            return this.question.getInterview();
         }
 
         if (
                 this.ptQuestion != null
-                        && this.ptQuestion
-                        .getPtInterview() != null
+                        && this.ptQuestion.getPtInterview() != null
         ) {
-
             return this.ptQuestion
                     .getPtInterview()
                     .getInterview();
@@ -184,57 +181,68 @@ public class InterviewAnswerEntity {
         return null;
     }
 
-    /*
-     * 기존 일반 질문 ID 조회용.
+    /**
+     * 이번 면접에서 사용된 질문 연결 ID.
+     */
+    public Long getInterviewQuestionId() {
+        return this.interviewQuestion == null
+                ? null
+                : this.interviewQuestion.getId();
+    }
+
+    /**
+     * 일반 질문 원본 ID.
+     * 신규 데이터에서는 InterviewQuestion -> Question 경로를 우선 사용한다.
      */
     public Long getQuestionId() {
+
+        if (
+                this.interviewQuestion != null
+                        && this.interviewQuestion.getQuestion() != null
+        ) {
+            return this.interviewQuestion
+                    .getQuestion()
+                    .getId();
+        }
 
         return this.question == null
                 ? null
                 : this.question.getId();
     }
 
-    /*
-     * PT 질문 ID 조회용.
-     */
     public Long getPtQuestionId() {
-
         return this.ptQuestion == null
                 ? null
                 : this.ptQuestion.getId();
     }
 
-    /*
-     * 일반 면접과 PT 면접 모두에서
-     * 질문 내용을 반환한다.
-     */
     public String getQuestionText() {
 
-        if (this.question != null) {
-            return this.question
+        if (
+                this.interviewQuestion != null
+                        && this.interviewQuestion.getQuestion() != null
+        ) {
+            return this.interviewQuestion
+                    .getQuestion()
                     .getQuestion();
         }
 
+        if (this.question != null) {
+            return this.question.getQuestion();
+        }
+
         if (this.ptQuestion != null) {
-            return this.ptQuestion
-                    .getQuestion();
+            return this.ptQuestion.getQuestion();
         }
 
         return null;
     }
 
-    /*
-     * 현재 답변이 PT 면접 답변인지 확인.
-     */
     public boolean isPtAnswer() {
         return this.ptQuestion != null;
     }
 
-    /*
-     * 기존 코드 호환용.
-     * 최종 구조에서는 영상은 videos/interview에서 관리함.
-     */
     public String getVideoObjectKey() {
-        return null;
+        return this.videoObjectKey;
     }
 }

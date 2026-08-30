@@ -3,11 +3,12 @@ package com.example.interviewfitbe.domain.interview.service;
 import com.example.interviewfitbe.domain.interview.dto.InterviewAnswerUploadResponse;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewQuestionEntity;
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
+import com.example.interviewfitbe.domain.interview.repository.InterviewQuestionRepository;
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
 import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
-import com.example.interviewfitbe.domain.question.repository.QuestionRepository;
 import com.example.interviewfitbe.domain.video_storage.service.VideoService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class InterviewAnswerService {
 
     private final InterviewRepository interviewRepository;
     private final InterviewAnswerRepository interviewAnswerRepository;
-    private final QuestionRepository questionRepository;
+    private final InterviewQuestionRepository interviewQuestionRepository;
     private final VideoService videoService;
     private final InterviewAnswerAnalysisJobService interviewAnswerAnalysisJobService;
 
@@ -62,8 +63,7 @@ public class InterviewAnswerService {
                                 )
                         );
 
-        Long ownerUserId =
-                interview.getUser().getId();
+        Long ownerUserId = interview.getUser().getId();
 
         System.out.println("======================================");
         System.out.println("[답변 업로드 권한 확인]");
@@ -74,9 +74,6 @@ public class InterviewAnswerService {
         System.out.println("answerOrder = " + answerOrder);
         System.out.println("======================================");
 
-        /*
-         * 현재 로그인한 사용자가 생성한 면접인지 확인한다.
-         */
         if (!ownerUserId.equals(userId)) {
             throw new AccessDeniedException(
                     "본인의 면접에만 답변을 업로드할 수 있습니다."
@@ -84,22 +81,37 @@ public class InterviewAnswerService {
         }
 
         /*
-         * questionId가 전달된 경우에만 질문을 조회한다.
+         * 핵심 변경점.
          *
-         * 현재 프론트처럼 전체 면접 영상을 한 번에 업로드하면
-         * questionId는 null이어도 된다.
+         * questionId는 재사용 가능한 QuestionEntity 원본 ID이다.
+         * 따라서 QuestionRepository에서 질문만 단독 조회하지 않고,
+         * 반드시 현재 interviewId와 questionId가 함께 존재하는
+         * interview_questions 매핑을 조회한다.
+         *
+         * 이 검증으로 다른 면접에서 사용한 질문을 잘못 연결하는 것도 막는다.
          */
+        InterviewQuestionEntity interviewQuestion = null;
         QuestionEntity question = null;
 
         if (questionId != null) {
-            question =
-                    questionRepository.findById(questionId)
+
+            interviewQuestion =
+                    interviewQuestionRepository
+                            .findByInterview_IdAndQuestion_Id(
+                                    interviewId,
+                                    questionId
+                            )
                             .orElseThrow(() ->
                                     new EntityNotFoundException(
-                                            "해당 질문을 찾을 수 없습니다. questionId="
+                                            "해당 면접에 연결된 질문을 찾을 수 없습니다. "
+                                                    + "interviewId="
+                                                    + interviewId
+                                                    + ", questionId="
                                                     + questionId
                                     )
                             );
+
+            question = interviewQuestion.getQuestion();
         }
 
         String videoObjectKey =
@@ -108,10 +120,13 @@ public class InterviewAnswerService {
         InterviewAnswerEntity answer =
                 InterviewAnswerEntity.builder()
                         .interview(interview)
+                        .interviewQuestion(interviewQuestion)
+                        // 기존 분석/조회 코드 호환용. 기준 관계는 interviewQuestion.
                         .question(question)
                         .answerOrder(answerOrder)
                         .startTime(startTime)
                         .endTime(endTime)
+                        .videoObjectKey(videoObjectKey)
                         .analysisStatus(AnalysisStatus.UPLOADED)
                         .build();
 
@@ -120,22 +135,41 @@ public class InterviewAnswerService {
 
         Long answerId = saved.getId();
 
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        interviewAnswerAnalysisJobService
-                                .analyzeAnswerAsync(
-                                        answerId,
-                                        videoObjectKey
-                                );
+        /*
+         * 2단계: 질문별 답변은 "연결 + 저장"까지만 한다.
+         *
+         * questionId != null
+         *   -> InterviewQuestion과 InterviewAnswer 연결
+         *   -> MinIO key 저장
+         *   -> 분석은 3단계에서 별도 비동기 Speech/Gemini Job으로 연결
+         *
+         * questionId == null
+         *   -> 기존 전체 면접 영상
+         *   -> eye / pose / speech 전체 분석 흐름은 그대로 유지
+         */
+        if (questionId == null) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            interviewAnswerAnalysisJobService
+                                    .analyzeAnswerAsync(
+                                            answerId,
+                                            videoObjectKey
+                                    );
+                        }
                     }
-                }
-        );
+            );
+        }
 
         return InterviewAnswerUploadResponse.builder()
                 .answerId(saved.getId())
                 .interviewId(interview.getId())
+                .interviewQuestionId(
+                        interviewQuestion == null
+                                ? null
+                                : interviewQuestion.getId()
+                )
                 .questionId(
                         question == null
                                 ? null

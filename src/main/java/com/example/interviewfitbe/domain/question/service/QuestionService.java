@@ -13,6 +13,8 @@ import com.example.interviewfitbe.domain.coverletter.service.question.CoverLette
 import com.example.interviewfitbe.domain.coverletter.service.CoverLetterService;
 import com.example.interviewfitbe.domain.coverletter.service.embedding.CoverLetterQuestionEmbeddingService;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewQuestionEntity;
+import com.example.interviewfitbe.domain.interview.repository.InterviewQuestionRepository;
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.job.service.JobRoleService;
@@ -51,6 +53,7 @@ public class QuestionService {
     private final QuestionRepository questionRepository;
     private final QuestionMapper questionMapper;
     private final InterviewRepository interviewRepository;
+    private final InterviewQuestionRepository interviewQuestionRepository;
 
     private final CoverLetterQuestionSelector coverLetterQuestionSelector;
 
@@ -68,9 +71,21 @@ public class QuestionService {
         /*
          * FE는 면접을 먼저 생성한 뒤 질문 생성 API를 호출한다.
          * request.interviewId가 있으면 현재 로그인 사용자의 면접인지 확인하고
-         * 아래에서 최종 선택된 질문 3개를 해당 Interview에 연결한다.
+         * 최종 선택된 질문 원본은 건드리지 않은 채 interview_questions에 연결한다.
          */
         InterviewEntity interview = resolveInterview(userId, request);
+
+        /*
+         * 같은 interviewId로 질문 생성 API가 재호출된 경우
+         * 이미 확정된 질문 세트를 그대로 반환한다.
+         * 네트워크 재시도 때문에 질문 생성/Gemini 호출이 중복되는 것도 막는다.
+         */
+        List<QuestionResponse> existingInterviewQuestions =
+                getExistingInterviewQuestions(interview, request.getCount());
+
+        if (!existingInterviewQuestions.isEmpty()) {
+            return existingInterviewQuestions;
+        }
 
         QuestionCreateData data = new QuestionCreateData();
         List<QuestionEntity> entities = List.of();
@@ -158,6 +173,14 @@ public class QuestionService {
         return interview;
     }
 
+    /**
+     * 질문 원본을 수정하지 않고 이번 면접과의 사용 관계만 저장한다.
+     *
+     * QuestionEntity는 여러 면접에서 재사용 가능한 원본이므로
+     * interview_id / question_order를 QuestionEntity에 기록하지 않는다.
+     * 대신 interview_questions 연결 테이블에
+     * interview_id + question_id + question_order를 저장한다.
+     */
     private List<QuestionResponse> attachToInterviewAndMap(
             List<QuestionEntity> questions,
             InterviewEntity interview
@@ -169,27 +192,69 @@ public class QuestionService {
         if (interview != null) {
             for (int index = 0; index < questions.size(); index++) {
                 QuestionEntity question = questions.get(index);
+                int questionOrder = index + 1;
 
-                if (question.getInterview() != null
-                        && !question.getInterview().getId().equals(interview.getId())) {
-                    throw new IllegalStateException(
-                            "이미 다른 면접에 연결된 질문입니다. questionId=" + question.getId()
-                    );
+                InterviewQuestionEntity interviewQuestion =
+                        interviewQuestionRepository
+                                .findByInterview_IdAndQuestion_Id(
+                                        interview.getId(),
+                                        question.getId()
+                                )
+                                .orElseGet(
+                                        () -> InterviewQuestionEntity.builder()
+                                                .interview(interview)
+                                                .question(question)
+                                                .questionOrder(questionOrder)
+                                                .build()
+                                );
+
+                if (interviewQuestion.getQuestionOrder() == null
+                        || !interviewQuestion.getQuestionOrder().equals(questionOrder)) {
+                    interviewQuestion.changeOrder(questionOrder);
                 }
 
-                question.assignInterview(interview);
-                question.assignOrder(index + 1);
+                interviewQuestionRepository.save(interviewQuestion);
             }
-
-            /*
-             * 신규 질문뿐 아니라 재사용 질문도 interview_id/question_order 변경을
-             * 확실히 반영하기 위해 saveAll을 호출한다.
-             */
-            questionRepository.saveAll(questions);
         }
 
         return questions
                 .stream()
+                .map(questionMapper::toResponse)
+                .toList();
+    }
+
+    private List<QuestionResponse> getExistingInterviewQuestions(
+            InterviewEntity interview,
+            Integer expectedCount
+    ) {
+        if (interview == null) {
+            return List.of();
+        }
+
+        List<InterviewQuestionEntity> existing =
+                interviewQuestionRepository
+                        .findAllByInterview_IdOrderByQuestionOrderAsc(
+                                interview.getId()
+                        );
+
+        if (existing.isEmpty()) {
+            return List.of();
+        }
+
+        if (expectedCount != null && existing.size() != expectedCount) {
+            throw new IllegalStateException(
+                    "면접 질문 연결 개수가 요청 count와 다릅니다. interviewId="
+                            + interview.getId()
+                            + ", linkedCount="
+                            + existing.size()
+                            + ", requestedCount="
+                            + expectedCount
+            );
+        }
+
+        return existing
+                .stream()
+                .map(InterviewQuestionEntity::getQuestion)
                 .map(questionMapper::toResponse)
                 .toList();
     }

@@ -220,11 +220,35 @@ public class InterviewService {
         }
 
 
-        List<InterviewAnswerEntity> answers =
+        /*
+         * interview_answers에는 현재 두 종류의 레코드가 함께 저장된다.
+         *
+         * 1) questionId != null
+         *    - 각 기본 질문의 답변 원본
+         *    - 꼬리질문의 source_answer_id 연결을 위해 저장
+         *    - 현재 단계에서는 별도 분석 Job을 실행하지 않으므로 UPLOADED 상태로 유지
+         *
+         * 2) questionId == null
+         *    - 전체 면접 영상
+         *    - eye / pose / speech / Gemini 전체 분석 Job 실행 대상
+         *
+         * 따라서 리포트의 전체 분석 상태를 모든 interview_answers로 계산하면
+         * 질문별 저장용 답변이 UPLOADED로 남아 전체 리포트가 영원히
+         * "분석중"으로 표시된다.
+         *
+         * 리포트 및 전체 완료 상태는 실제 전체 분석 대상인
+         * "전체 면접 영상 답변"만 사용한다.
+         */
+        List<InterviewAnswerEntity> allAnswers =
                 interviewAnswerRepository
                         .findByInterview_IdOrderByAnswerOrderAsc(
                                 interviewId
                         );
+
+        List<InterviewAnswerEntity> answers =
+                allAnswers.stream()
+                        .filter(this::isFullInterviewVideoAnswer)
+                        .toList();
 
 
         /*
@@ -850,6 +874,23 @@ public class InterviewService {
 
 
         return root.toString();
+    }
+
+
+    /**
+     * 1:1 면접의 전체 분석 Job 대상인지 확인한다.
+     *
+     * 질문별 답변은 꼬리질문 source_answer_id 연결을 위한 저장용 레코드이고,
+     * 현재 전체 eye / pose / speech 분석은 questionId가 없는 전체 면접 영상에 대해
+     * 한 번 수행된다.
+     */
+    private boolean isFullInterviewVideoAnswer(
+            InterviewAnswerEntity answer
+    ) {
+
+        return answer.getInterviewQuestion() == null
+                && answer.getQuestion() == null
+                && answer.getPtQuestion() == null;
     }
 
 
