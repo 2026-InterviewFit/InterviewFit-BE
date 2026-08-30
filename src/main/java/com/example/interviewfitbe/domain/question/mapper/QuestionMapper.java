@@ -30,6 +30,7 @@ public class QuestionMapper {
         return QuestionResponse.builder()
                 .id(entity.getId())
                 .question(entity.getQuestion())
+                .questionOrder(entity.getQuestionOrder())
                 .build();
     }
 

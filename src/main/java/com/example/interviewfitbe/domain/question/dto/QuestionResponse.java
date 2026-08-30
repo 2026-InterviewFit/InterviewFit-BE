@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class QuestionResponse {
     private Long id;
     private String question;
+    private Integer questionOrder;
 }

@@ -68,6 +68,13 @@ public class FollowUpService {
                         request.getSourceQuestionId()
                 );
 
+        /*
+         * 자기소개 질문(question_order = 1)은 꼬리질문 생성 대상에서 제외한다.
+         * FE에서도 제외하지만, 잘못된 직접 호출이 들어와도 Gemini 호출/DB 저장이
+         * 일어나지 않도록 BE에서 한 번 더 방어한다.
+         */
+        validateFollowUpEligibleQuestion(sourceQuestion);
+
 
         /*
          * sourceAnswerId 역시 현재는 선택값.
@@ -244,6 +251,23 @@ public class FollowUpService {
                         saved.getInterviewStyle()
                 )
                 .build();
+    }
+
+
+    /**
+     * 자기소개 질문은 기본 답변 저장/분석까지만 수행하고
+     * 꼬리질문 생성 대상에서는 제외한다.
+     */
+    private void validateFollowUpEligibleQuestion(QuestionEntity sourceQuestion) {
+        if (sourceQuestion == null) {
+            return;
+        }
+
+        if (Integer.valueOf(1).equals(sourceQuestion.getQuestionOrder())) {
+            throw new IllegalArgumentException(
+                    "자기소개 질문은 꼬리질문 생성 대상이 아닙니다."
+            );
+        }
     }
 
 
