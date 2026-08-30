@@ -266,11 +266,8 @@ public class GroupInterviewFlowService {
             return null;
         }
 
-        // 같은 방에서는 모든 참가자에게 동일한 질문을 유지하고,
-        // 새 방에서는 질문 풀의 다른 항목이 선택되도록 roomId와 round를 seed로 사용한다.
         long roomId = session.getInterview().getId();
-        int index = Math.floorMod(Long.hashCode(roomId * 31 + session.getCurrentRound()), candidates.size());
-        return candidates.get(index);
+        return GroupQuestionSelector.select(candidates, roomId, session.getCurrentRound());
     }
 
     private Long currentParticipantUserId(Long roomId, Integer index) {

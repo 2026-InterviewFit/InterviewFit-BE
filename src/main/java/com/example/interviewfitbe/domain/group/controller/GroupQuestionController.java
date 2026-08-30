@@ -17,11 +17,15 @@ public class GroupQuestionController {
 
     /**
      * 다대일 면접 질문 세트 조회 API
-     * GET /api/group/questions?jobRoleId=2
+     * GET /api/group/questions?jobRoleId=2&roomId=10
      */
     @GetMapping
-    public ResponseEntity<List<GroupQuestionResponse>> getQuestions(@RequestParam Long jobRoleId) {
-        List<GroupQuestionResponse> response = groupInterviewQuestionService.getGroupInterviewQuestions(jobRoleId);
+    public ResponseEntity<List<GroupQuestionResponse>> getQuestions(
+            @RequestParam Long jobRoleId,
+            @RequestParam(required = false) Long roomId
+    ) {
+        List<GroupQuestionResponse> response =
+                groupInterviewQuestionService.getGroupInterviewQuestions(jobRoleId, roomId);
         return ResponseEntity.ok(response);
     }
 }
