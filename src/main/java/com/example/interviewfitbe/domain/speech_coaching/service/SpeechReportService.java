@@ -30,6 +30,8 @@ public class SpeechReportService {
 
     private final SpeechReportRepository speechReportRepository;
     private final AiEvaluationRepository aiEvaluationRepository;
+
+    private final ExternalAiAnalysisJsonCodec externalAiAnalysisJsonCodec;
     private final InterviewRepository interviewRepository;
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final ObjectMapper objectMapper;
@@ -480,16 +482,19 @@ public class SpeechReportService {
             return;
         }
 
-        if (
-                aiEvaluationRepository
-                        .findByInterviewAnswer_Id(
-                                interviewAnswer.getId()
-                        )
-                        .isPresent()
-        ) {
+        var existingAiEvaluation = aiEvaluationRepository
+                .findByInterviewAnswer_Id(interviewAnswer.getId());
+
+        if (existingAiEvaluation.isPresent()) {
+
+            AiEvaluationEntity existing = existingAiEvaluation.get();
+            existing.updateExternalAiAnalysisJson(
+                    externalAiAnalysisJsonCodec.serialize(request.getExternalAiAnalysis())
+            );
+            aiEvaluationRepository.save(existing);
 
             log.info(
-                    "[Speech] 기존 AiEvaluation 재사용 - answerId={}",
+                    "[Speech] 기존 AiEvaluation 재사용 및 external AI 갱신 - answerId={}",
                     interviewAnswer.getId()
             );
 
@@ -525,6 +530,11 @@ public class SpeechReportService {
                                 request
                                         .getAiEvaluation()
                                         .getModelAnswer()
+                        )
+                        .externalAiAnalysisJson(
+                                externalAiAnalysisJsonCodec.serialize(
+                                        request.getExternalAiAnalysis()
+                                )
                         )
                         .build();
 

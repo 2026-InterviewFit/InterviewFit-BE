@@ -5,6 +5,7 @@ import com.example.interviewfitbe.domain.group.entity.GroupInterviewAnswerAnalys
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerAnalysisRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerRepository;
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.speech_coaching.service.ExternalAiAnalysisJsonCodec;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ public class GroupInterviewAnswerAnalysisService {
     private final GroupInterviewAnswerRepository answerRepository;
     private final GroupInterviewAnswerAnalysisRepository analysisRepository;
     private final GroupInterviewAnswerAnalysisJobService analysisJobService;
+    private final ExternalAiAnalysisJsonCodec externalAiAnalysisJsonCodec;
 
     @Transactional
     public GroupInterviewAnswerAnalysisEntity createForUploadedAnswer(
@@ -57,13 +59,13 @@ public class GroupInterviewAnswerAnalysisService {
             throw new IllegalStateException("이미 분석 중인 답변입니다.");
         }
         if (analysis.getStatus() == AnalysisStatus.DONE) {
-            return GroupInterviewAnswerAnalysisResponse.from(analysis);
+            return toResponse(analysis);
         }
 
         analysis.markUploaded();
         analysisRepository.save(analysis);
         scheduleAfterCommit(answerId);
-        return GroupInterviewAnswerAnalysisResponse.from(analysis);
+        return toResponse(analysis);
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +81,18 @@ public class GroupInterviewAnswerAnalysisService {
             throw new IllegalArgumentException("해당 방의 답변 분석 정보가 아닙니다.");
         }
         validateOwner(answer.getParticipantUserId(), actorUserId);
-        return GroupInterviewAnswerAnalysisResponse.from(analysis);
+        return toResponse(analysis);
+    }
+
+    private GroupInterviewAnswerAnalysisResponse toResponse(
+            GroupInterviewAnswerAnalysisEntity analysis
+    ) {
+        return GroupInterviewAnswerAnalysisResponse.from(
+                analysis,
+                externalAiAnalysisJsonCodec.deserializeSafely(
+                        analysis.getExternalAiAnalysisJson()
+                )
+        );
     }
 
     private void scheduleAfterCommit(Long answerId) {

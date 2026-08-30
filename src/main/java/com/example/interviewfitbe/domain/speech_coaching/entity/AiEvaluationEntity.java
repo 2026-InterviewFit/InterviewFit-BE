@@ -50,7 +50,17 @@ public class AiEvaluationEntity {
     @Column(columnDefinition = "TEXT")
     private String modelAnswer;
 
+    /**
+     * 외부 학습 AI 분석 전체 JSON
+     */
+    @Column(name = "external_ai_analysis_json", columnDefinition = "TEXT")
+    private String externalAiAnalysisJson;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public void updateExternalAiAnalysisJson(String externalAiAnalysisJson) {
+        this.externalAiAnalysisJson = externalAiAnalysisJson;
+    }
 }
