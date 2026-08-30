@@ -33,6 +33,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
@@ -63,28 +64,14 @@ public class QuestionService {
 
     @Transactional
     public List<QuestionResponse> createQuestions(Long userId, QuestionRequest request) {
-        validateCreateRequest(request);
-
-        /*
-         * FE는 면접을 먼저 생성한 뒤 질문 생성 API를 호출한다.
-         * request.interviewId가 있으면 현재 로그인 사용자의 면접인지 확인하고
-         * 아래에서 최종 선택된 질문 3개를 해당 Interview에 연결한다.
-         */
-        InterviewEntity interview = resolveInterview(userId, request);
-
         QuestionCreateData data = new QuestionCreateData();
-        List<QuestionEntity> entities = List.of();
+        List<QuestionEntity> entities;
 
         try {
             data = loadQuestionData(userId, request);
 
             if (hasEnoughReusableQuestions(data, request)) {
-                List<QuestionEntity> selected = data.getReusableQuestions()
-                        .stream()
-                        .limit(request.getCount())
-                        .toList();
-
-                return attachToInterviewAndMap(selected, interview);
+                return getReusableQuestions(data, request);
             }
 
             entities = generateQuestions(request, data);
@@ -104,94 +91,17 @@ public class QuestionService {
             }
         }
 
+        entities = new ArrayList<>(entities);
+        entities.add(createSelfIntroductionQuestion(data.getJobRole()));
+
         List<QuestionEntity> saved = saveQuestions(entities);
 
-        List<QuestionEntity> finalQuestions = Stream.concat(
-                        data.getReusableQuestions() == null
-                                ? Stream.empty()
-                                : data.getReusableQuestions().stream(),
-                        saved.stream()
-                )
-                .limit(request.getCount())
-                .toList();
-
-        return attachToInterviewAndMap(finalQuestions, interview);
-    }
-
-    private void validateCreateRequest(QuestionRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("질문 생성 요청이 필요합니다.");
-        }
-
-        if (request.getCount() == null || request.getCount() <= 0) {
-            throw new IllegalArgumentException("count는 1 이상이어야 합니다.");
-        }
-
-        if (request.getJobRoleId() == null) {
-            throw new IllegalArgumentException("jobRoleId는 필수입니다.");
-        }
-    }
-
-    private InterviewEntity resolveInterview(Long userId, QuestionRequest request) {
-        if (request.getInterviewId() == null) {
-            return null;
-        }
-
-        InterviewEntity interview = interviewRepository
-                .findById(request.getInterviewId())
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "해당 면접을 찾을 수 없습니다. interviewId=" + request.getInterviewId()
-                ));
-
-        if (userId == null || !interview.getUser().getId().equals(userId)) {
-            throw new AccessDeniedException(
-                    "본인의 면접에만 질문을 연결할 수 있습니다."
-            );
-        }
-
-        if (!interview.getJobRole().getId().equals(request.getJobRoleId())) {
-            throw new IllegalArgumentException(
-                    "면접의 직무와 질문 생성 요청의 jobRoleId가 일치하지 않습니다."
-            );
-        }
-
-        return interview;
-    }
-
-    private List<QuestionResponse> attachToInterviewAndMap(
-            List<QuestionEntity> questions,
-            InterviewEntity interview
-    ) {
-        if (questions == null || questions.isEmpty()) {
-            return List.of();
-        }
-
-        if (interview != null) {
-            for (int index = 0; index < questions.size(); index++) {
-                QuestionEntity question = questions.get(index);
-
-                if (question.getInterview() != null
-                        && !question.getInterview().getId().equals(interview.getId())) {
-                    throw new IllegalStateException(
-                            "이미 다른 면접에 연결된 질문입니다. questionId=" + question.getId()
-                    );
-                }
-
-                question.assignInterview(interview);
-                question.assignOrder(index + 1);
-            }
-
-            /*
-             * 신규 질문뿐 아니라 재사용 질문도 interview_id/question_order 변경을
-             * 확실히 반영하기 위해 saveAll을 호출한다.
-             */
-            questionRepository.saveAll(questions);
-        }
-
-        return questions
-                .stream()
-                .map(questionMapper::toResponse)
-                .toList();
+        return mergeQuestions(
+                data.getReusableQuestions().isEmpty()
+                        ? List.of()
+                        : data.getReusableQuestions(),
+                saved
+        );
     }
 
     private boolean hasEnoughReusableQuestions(QuestionCreateData data, QuestionRequest request) {
@@ -268,8 +178,8 @@ public class QuestionService {
 
         List<QuestionEntity> reusableQuestions = questionRepository.findReusableQuestions(
                 coverLetterQuestions.stream()
-                                .map(CoverLetterQuestionEntity::getId)
-                                .toList(),
+                        .map(CoverLetterQuestionEntity::getId)
+                        .toList(),
                 QuestionType.AI_GENERATED.name(),
                 count
         );
@@ -285,10 +195,10 @@ public class QuestionService {
 
     private List<QuestionEntity> loadPreviousQuestions(UserEntity user, CoverLetterQuestionData data) {
         return coverLetterQuestionEmbeddingService.findPreviousQuestions(
-                        user,
-                        data.getCoverLetterQuestions(),
-                        data.getReusableQuestions()
-                );
+                user,
+                data.getCoverLetterQuestions(),
+                data.getReusableQuestions()
+        );
     }
 
     private List<QuestionEntity> generateQuestions(QuestionRequest request, QuestionCreateData data) {
@@ -321,6 +231,14 @@ public class QuestionService {
         return Stream.concat(
                         reusable == null ? Stream.empty() : reusable.stream(),
                         saved.stream()
+                )
+                .sorted(
+                        Comparator
+                                .comparing(
+                                        QuestionEntity::getQuestionOrder,
+                                        Comparator.nullsLast(Comparator.naturalOrder())
+                                )
+                                .thenComparing(QuestionEntity::getId)
                 )
                 .map(questionMapper::toResponse)
                 .toList();
@@ -427,5 +345,14 @@ public class QuestionService {
 
         QuestionResult result = getDefaultQuestions(jobName, generateCount);
         return questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
+    }
+
+    private QuestionEntity createSelfIntroductionQuestion(JobRoleEntity jobRole) {
+        return QuestionEntity.builder()
+                .question("간단하게 자기소개 부탁드립니다.")
+                .jobRole(jobRole)
+                .type(QuestionType.DEFAULT)
+                .questionOrder(1)
+                .build();
     }
 }
