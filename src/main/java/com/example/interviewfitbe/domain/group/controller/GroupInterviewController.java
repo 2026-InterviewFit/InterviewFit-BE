@@ -1,6 +1,8 @@
 package com.example.interviewfitbe.domain.group.controller;
 
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewSessionResponse;
+import com.example.interviewfitbe.domain.group.dto.GroupAnswerSkipRequest;
+import com.example.interviewfitbe.domain.group.entity.GroupAnswerCompletionType;
 import com.example.interviewfitbe.domain.group.dto.GroupParticipantResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerResponse;
 import com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse;
@@ -238,6 +240,21 @@ public class GroupInterviewController {
     public ResponseEntity<GroupInterviewSessionResponse> completeAnswer(
             @PathVariable Long roomId) {
         groupInterviewFlowService.completeAnswer(roomId, AuthUtils.getCurrentUserId());
+        return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
+    }
+
+    @PostMapping("/{roomId}/answer/skip")
+    public ResponseEntity<GroupInterviewSessionResponse> skipAnswer(
+            @PathVariable Long roomId,
+            @RequestBody(required = false) GroupAnswerSkipRequest request
+    ) {
+        groupInterviewFlowService.skipAnswer(
+                roomId,
+                AuthUtils.getCurrentUserId(),
+                request == null
+                        ? GroupAnswerCompletionType.SKIPPED
+                        : request.resolvedCompletionType()
+        );
         return ResponseEntity.ok(groupInterviewFlowService.getSession(roomId));
     }
 

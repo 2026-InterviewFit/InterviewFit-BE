@@ -19,7 +19,7 @@ public class GroupInterviewAnswerCompletionService {
         if (answerId == null) {
             throw new IllegalStateException("완료할 그룹 면접 답변 ID가 없습니다.");
         }
-        answerRepository.findById(answerId)
+        answerRepository.findByIdForUpdate(answerId)
                 .orElseThrow(() -> new IllegalStateException(
                         "완료할 그룹 면접 답변을 찾을 수 없습니다. answerId=" + answerId
                 ))

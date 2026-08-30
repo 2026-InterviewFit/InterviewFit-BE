@@ -42,6 +42,10 @@ public class GroupInterviewAnswerService {
         if (answer.isVideoUploaded()) {
             throw new IllegalStateException("이미 영상이 업로드된 답변입니다.");
         }
+        if (answer.getCompletionType() != null
+                && answer.getCompletionType().excludesAnalysis()) {
+            throw new IllegalStateException("건너뛴 답변에는 영상을 업로드할 수 없습니다.");
+        }
 
         String objectKey = videoService.uploadVideoToMinio(file);
         answer.attachVideo(

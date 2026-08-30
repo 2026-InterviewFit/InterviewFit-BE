@@ -23,6 +23,7 @@ public class GroupInterviewSessionResponse {
     private Long currentParticipantUserId;
     private InterviewStatus status;
     private Instant answerStartedAt;
+    private Instant answerStartDeadlineAt;
     private Instant answerDeadlineAt;
     private Long answerId;
 
@@ -46,6 +47,7 @@ public class GroupInterviewSessionResponse {
                 .currentParticipantUserId(currentParticipantUserId)
                 .status(session.getStatus())
                 .answerStartedAt(session.getAnswerStartedAt())
+                .answerStartDeadlineAt(session.getAnswerStartDeadlineAt())
                 .answerDeadlineAt(session.getAnswerDeadlineAt())
                 .answerId(session.getCurrentAnswerId())
                 .build();

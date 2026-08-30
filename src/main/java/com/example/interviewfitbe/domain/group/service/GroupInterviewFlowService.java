@@ -50,6 +50,9 @@ public class GroupInterviewFlowService {
     @Value("${app.group-interview.answer-limit-seconds:60}")
     private long answerLimitSeconds;
 
+    @Value("${app.group-interview.answer-start-grace-seconds:60}")
+    private long answerStartGraceSeconds;
+
 
 
     /**
@@ -78,6 +81,7 @@ public class GroupInterviewFlowService {
 
 
         session.start();
+        scheduleAnswerStartDeadline(session);
         interview.startInterview();
 
 
@@ -97,24 +101,14 @@ public class GroupInterviewFlowService {
     @Transactional
     public void startAnswer(Long roomId, Long actorUserId){
         GroupInterviewSessionEntity session =
-                sessionRepository.findByInterviewId(roomId)
+                sessionRepository.findByInterviewIdForUpdate(roomId)
                         .orElseThrow();
 
 
         validateCurrentParticipant(roomId, session, actorUserId);
         Instant startedAt = Instant.now();
         session.startAnswer(startedAt, startedAt.plus(answerLimitSeconds, ChronoUnit.SECONDS));
-        GroupQuestionEntity question = currentQuestion(session);
-        GroupInterviewAnswerEntity answer = answerRepository.saveAndFlush(
-                GroupInterviewAnswerEntity.builder()
-                        .groupInterview(session.getInterview())
-                        .participantUserId(actorUserId)
-                        .questionId(question == null ? null : question.getId())
-                        .round(session.getCurrentRound())
-                        .questionIndex(session.getCurrentQuestionIndex())
-                        .answerStartedAt(startedAt)
-                        .build()
-        );
+        GroupInterviewAnswerEntity answer = createAnswer(session, actorUserId, startedAt);
         session.assignCurrentAnswer(answer.getId());
         sessionRepository.saveAndFlush(session);
 
@@ -134,18 +128,52 @@ public class GroupInterviewFlowService {
     ){
 
         GroupInterviewSessionEntity session =
-                sessionRepository.findByInterviewId(roomId)
+                sessionRepository.findByInterviewIdForUpdate(roomId)
                         .orElseThrow();
 
 
         validateCurrentParticipant(roomId, session, actorUserId);
-        completeAnswer(roomId, actorUserId, session, false);
+        completeAnswer(roomId, actorUserId, session, GroupAnswerCompletionType.COMPLETED);
 
+    }
+
+    /**
+     * 녹음을 시작할 수 없거나 답변 도중 미디어 처리가 실패한 현재 참가자를 건너뛴다.
+     * QUESTION_VIEW와 ANSWERING 양쪽 상태에서 호출할 수 있다.
+     */
+    @Transactional
+    public void skipAnswer(
+            Long roomId,
+            Long actorUserId,
+            GroupAnswerCompletionType completionType
+    ) {
+        if (completionType != GroupAnswerCompletionType.SKIPPED
+                && completionType != GroupAnswerCompletionType.RECORDING_FAILED) {
+            throw new IllegalArgumentException(
+                    "skip completionType은 SKIPPED 또는 RECORDING_FAILED만 사용할 수 있습니다."
+            );
+        }
+
+        GroupInterviewSessionEntity session = sessionRepository
+                .findByInterviewIdForUpdate(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("면접 세션을 찾을 수 없습니다."));
+        validateCurrentParticipant(roomId, session, actorUserId);
+
+        if (session.getStatus() == InterviewStatus.QUESTION_VIEW) {
+            Instant now = Instant.now();
+            session.startAnswer(now, now);
+            GroupInterviewAnswerEntity answer = createAnswer(session, actorUserId, now);
+            session.assignCurrentAnswer(answer.getId());
+        } else if (session.getStatus() != InterviewStatus.ANSWERING) {
+            throw new IllegalStateException("현재 답변을 건너뛸 수 있는 상태가 아닙니다.");
+        }
+
+        completeAnswer(roomId, actorUserId, session, completionType);
     }
 
     @Transactional
     public void completeExpiredAnswer(Long sessionId) {
-        GroupInterviewSessionEntity session = sessionRepository.findById(sessionId).orElse(null);
+        GroupInterviewSessionEntity session = sessionRepository.findByIdForUpdate(sessionId).orElse(null);
         if (session == null
                 || session.getStatus() != InterviewStatus.ANSWERING
                 || session.getAnswerDeadlineAt() == null
@@ -154,12 +182,44 @@ public class GroupInterviewFlowService {
         }
         Long roomId = session.getInterview().getId();
         Long timedOutUserId = currentParticipantUserId(roomId, session.getCurrentParticipantIndex());
-        completeAnswer(roomId, timedOutUserId, session, true);
+        completeAnswer(roomId, timedOutUserId, session, GroupAnswerCompletionType.TIMED_OUT);
     }
 
     @Transactional(readOnly = true)
     public List<Long> findExpiredAnswerSessionIds(Instant now) {
         return sessionRepository.findExpiredAnswerSessionIds(now);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> findExpiredAnswerStartSessionIds(Instant now) {
+        return sessionRepository.findExpiredAnswerStartSessionIds(now);
+    }
+
+    @Transactional
+    public void skipExpiredAnswerStart(Long sessionId) {
+        GroupInterviewSessionEntity session = sessionRepository.findByIdForUpdate(sessionId).orElse(null);
+        if (session == null
+                || session.getStatus() != InterviewStatus.QUESTION_VIEW
+                || session.getAnswerStartDeadlineAt() == null
+                || session.getAnswerStartDeadlineAt().isAfter(Instant.now())) {
+            return;
+        }
+
+        Long roomId = session.getInterview().getId();
+        Long participantUserId = currentParticipantUserId(
+                roomId,
+                session.getCurrentParticipantIndex()
+        );
+        Instant now = Instant.now();
+        session.startAnswer(now, now);
+        GroupInterviewAnswerEntity answer = createAnswer(session, participantUserId, now);
+        session.assignCurrentAnswer(answer.getId());
+        completeAnswer(
+                roomId,
+                participantUserId,
+                session,
+                GroupAnswerCompletionType.RECORDING_FAILED
+        );
     }
 
     /**
@@ -300,17 +360,20 @@ public class GroupInterviewFlowService {
             Long roomId,
             Long actorUserId,
             GroupInterviewSessionEntity session,
-            boolean timedOut
+            GroupAnswerCompletionType completionType
     ) {
         Long completedAnswerId = session.getCurrentAnswerId();
         answerCompletionService.complete(
                 completedAnswerId,
-                timedOut ? GroupAnswerCompletionType.TIMED_OUT : GroupAnswerCompletionType.COMPLETED,
+                completionType,
                 Instant.now()
         );
 
         GroupInterviewSessionEntity.AnswerCompletionResult result =
                 session.completeCurrentAnswer(participantCount(roomId));
+        if (session.getStatus() == InterviewStatus.QUESTION_VIEW) {
+            scheduleAnswerStartDeadline(session);
+        }
         if (result == GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED) {
             session.getInterview().finishInterview();
         }
@@ -325,21 +388,45 @@ public class GroupInterviewFlowService {
                 session.getStatus()
         );
 
+        String eventPrefix = switch (completionType) {
+            case COMPLETED -> "ANSWER_COMPLETED";
+            case TIMED_OUT -> "ANSWER_TIMED_OUT";
+            case SKIPPED -> "ANSWER_SKIPPED";
+            case RECORDING_FAILED -> "ANSWER_RECORDING_FAILED";
+        };
         String type = switch (result) {
-            case NEXT_PARTICIPANT -> timedOut
-                    ? "ANSWER_TIMED_OUT_SPEAKER_CHANGED"
-                    : "ANSWER_COMPLETED_SPEAKER_CHANGED";
-            case NEXT_QUESTION -> timedOut
-                    ? "ANSWER_TIMED_OUT_QUESTION_CHANGED"
-                    : "ANSWER_COMPLETED_QUESTION_CHANGED";
-            case INTERVIEW_FINISHED -> timedOut
-                    ? "ANSWER_TIMED_OUT_INTERVIEW_FINISHED"
-                    : "ANSWER_COMPLETED_INTERVIEW_FINISHED";
+            case NEXT_PARTICIPANT -> eventPrefix + "_SPEAKER_CHANGED";
+            case NEXT_QUESTION -> eventPrefix + "_QUESTION_CHANGED";
+            case INTERVIEW_FINISHED -> eventPrefix + "_INTERVIEW_FINISHED";
         };
         broadcastProgress(type, roomId, actorUserId, session);
         if (result == GroupInterviewSessionEntity.AnswerCompletionResult.INTERVIEW_FINISHED) {
             triggerComparison(roomId);
         }
+    }
+
+    private GroupInterviewAnswerEntity createAnswer(
+            GroupInterviewSessionEntity session,
+            Long actorUserId,
+            Instant startedAt
+    ) {
+        GroupQuestionEntity question = currentQuestion(session);
+        return answerRepository.saveAndFlush(
+                GroupInterviewAnswerEntity.builder()
+                        .groupInterview(session.getInterview())
+                        .participantUserId(actorUserId)
+                        .questionId(question == null ? null : question.getId())
+                        .round(session.getCurrentRound())
+                        .questionIndex(session.getCurrentQuestionIndex())
+                        .answerStartedAt(startedAt)
+                        .build()
+        );
+    }
+
+    private void scheduleAnswerStartDeadline(GroupInterviewSessionEntity session) {
+        session.scheduleAnswerStartDeadline(
+                Instant.now().plus(answerStartGraceSeconds, ChronoUnit.SECONDS)
+        );
     }
 
     private void triggerComparison(Long roomId) {

@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.group.service;
 
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewAnswerEntity;
+import com.example.interviewfitbe.domain.group.entity.GroupAnswerCompletionType;
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewRepository;
@@ -83,5 +84,26 @@ class GroupInterviewAnswerServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("이미 영상이 업로드");
         verifyNoInteractions(videoService);
+    }
+
+    @Test
+    void skippedAnswerIsExcludedFromVideoUploadAndAnalysis() {
+        GroupInterviewAnswerEntity answer = GroupInterviewAnswerEntity.builder()
+                .id(123L)
+                .groupInterview(interview)
+                .participantUserId(5L)
+                .build();
+        answer.complete(GroupAnswerCompletionType.RECORDING_FAILED, java.time.Instant.now());
+        when(answerRepository.findByRoomIdAndIdForUpdate(10L, 123L))
+                .thenReturn(Optional.of(answer));
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "answer.webm", "video/webm", new byte[]{1}
+        );
+
+        assertThatThrownBy(() -> service.uploadVideo(10L, 123L, 5L, file))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("건너뛴 답변");
+
+        verifyNoInteractions(videoService, analysisService);
     }
 }

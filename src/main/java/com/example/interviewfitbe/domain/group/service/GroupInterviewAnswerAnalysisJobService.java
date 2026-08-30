@@ -77,6 +77,9 @@ public class GroupInterviewAnswerAnalysisJobService {
             log.info("그룹 답변 분석 완료: answerId={}", answerId);
         } catch (AnalysisAlreadyClaimedException exception) {
             log.info("이미 실행 또는 완료된 그룹 답변 분석을 건너뜁니다. answerId={}", answerId);
+        } catch (AnalysisExcludedException exception) {
+            log.info("건너뛴 그룹 답변은 분석하지 않습니다. answerId={}", answerId);
+            markFailed(answerId, "SKIPPED_ANSWER_EXCLUDED_FROM_ANALYSIS");
         } catch (Exception exception) {
             log.error("그룹 답변 분석 실패: answerId={}", answerId, exception);
             markFailed(answerId, exception.getMessage());
@@ -95,6 +98,10 @@ public class GroupInterviewAnswerAnalysisJobService {
                 throw new AnalysisAlreadyClaimedException();
             }
             var answer = analysis.getAnswer();
+            if (answer.getCompletionType() != null
+                    && answer.getCompletionType().excludesAnalysis()) {
+                throw new AnalysisExcludedException();
+            }
             if (!answer.isVideoUploaded()) {
                 throw new IllegalStateException("분석할 답변 영상이 없습니다.");
             }
@@ -218,5 +225,8 @@ public class GroupInterviewAnswerAnalysisJobService {
     }
 
     private static class AnalysisAlreadyClaimedException extends RuntimeException {
+    }
+
+    private static class AnalysisExcludedException extends RuntimeException {
     }
 }
