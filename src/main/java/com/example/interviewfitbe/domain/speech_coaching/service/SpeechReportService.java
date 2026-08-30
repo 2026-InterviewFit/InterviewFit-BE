@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -34,8 +35,12 @@ public class SpeechReportService {
     private final ObjectMapper objectMapper;
     private final SpeechAnalysisService speechAnalysisService;
 
+
     /**
-     * Speech 분석 + STT + DB 저장
+     * Speech 분석 + STT + Gemini + DB 저장
+     *
+     * 같은 interview/answer에 이미 speech_report와 ai_evaluation이 모두 존재하면
+     * FastAPI를 다시 호출하지 않고 기존 결과를 재사용한다.
      */
     @Transactional
     public Long analyzeAndSave(
@@ -44,8 +49,42 @@ public class SpeechReportService {
 
         validateAnalyzeRequest(request);
 
+        Optional<SpeechReportEntity> existingReport =
+                speechReportRepository.findByInterview_Id(
+                        request.getInterviewId()
+                );
+
+        boolean aiEvaluationAlreadyExists =
+                request.getInterviewAnswerId() == null
+                        || aiEvaluationRepository
+                        .findByInterviewAnswer_Id(
+                                request.getInterviewAnswerId()
+                        )
+                        .isPresent();
+
+        /*
+         * speech_report와 ai_evaluation이 이미 모두 존재하면
+         * FastAPI를 다시 호출하지 않는다.
+         */
+        if (
+                existingReport.isPresent()
+                        && aiEvaluationAlreadyExists
+        ) {
+
+            log.info(
+                    "[Speech] 기존 Speech/Gemini 분석 결과 재사용 - "
+                            + "interviewId={}, answerId={}, speechReportId={}",
+                    request.getInterviewId(),
+                    request.getInterviewAnswerId(),
+                    existingReport.get().getId()
+            );
+
+            return existingReport.get().getId();
+        }
+
         /*
          * 1. FastAPI Speech 분석 호출
+         * STT + 음성 분석 + Gemini 평가를 한 번의 요청으로 수행한다.
          */
         Map<String, Object> fastApiResponse =
                 speechAnalysisService.analyzeSpeech(
@@ -241,8 +280,14 @@ public class SpeechReportService {
         );
     }
 
+
     /**
-     * SpeechReport DB 저장
+     * SpeechReport + AiEvaluation 저장
+     *
+     * speech_report는 현재 interview 단위로 저장되므로,
+     * 같은 interview의 리포트가 이미 있으면 중복 INSERT하지 않고 기존 행을 재사용한다.
+     *
+     * ai_evaluation은 interview_answer_id 기준으로 중복 저장을 방지한다.
      */
     @Transactional
     public Long saveReport(
@@ -260,10 +305,11 @@ public class SpeechReportService {
                             .findById(
                                     request.getInterviewId()
                             )
-                            .orElseThrow(() ->
-                                    new EntityNotFoundException(
-                                            "면접 정보를 찾을 수 없습니다."
-                                    )
+                            .orElseThrow(
+                                    () ->
+                                            new EntityNotFoundException(
+                                                    "면접 정보를 찾을 수 없습니다."
+                                            )
                             );
 
             InterviewAnswerEntity interviewAnswer =
@@ -278,88 +324,95 @@ public class SpeechReportService {
                 textScript = textScript.trim();
             }
 
-            SpeechReportEntity report =
-                    SpeechReportEntity
-                            .builder()
-
-                            .interview(
-                                    interview
-                            )
-
-                            .score(
-                                    calculateSpeechScore(
-                                            request
-                                    )
-                            )
-
-                            .textScript(
-                                    textScript
-                            )
-
-                            .totalFillerCount(
-                                    getTotalFillerCount(
-                                            request
-                                    )
-                            )
-
-                            .fillerDetailsJson(
-                                    toJson(
-                                            getFillerDetails(
-                                                    request
-                                            )
-                                    )
-                            )
-
-                            .repeatedExpressionsJson(
-                                    toJson(
-                                            getRepeatedExpressions(
-                                                    request
-                                            )
-                                    )
-                            )
-
-                            .paceEvaluation(
-                                    getPaceEvaluation(
-                                            request
-                                    )
-                            )
-
-                            .paceFeedback(
-                                    getPaceFeedback(
-                                            request
-                                    )
-                            )
-
-                            .charactersPerSecond(
-                                    getCharactersPerSecond(
-                                            request
-                                    )
-                            )
-
-                            .totalSilenceSeconds(
-                                    getTotalSilenceSeconds(
-                                            request
-                                    )
-                            )
-
-                            .pauseRatePercent(
-                                    getPauseRatePercent(
-                                            request
-                                    )
-                            )
-
-                            .criticalSilenceCount(
-                                    getCriticalSilenceCount(
-                                            request
-                                    )
-                            )
-
-                            .build();
-
-            SpeechReportEntity saved =
-                    speechReportRepository.save(
-                            report
+            Optional<SpeechReportEntity> existingReport =
+                    speechReportRepository.findByInterview_Id(
+                            request.getInterviewId()
                     );
+
+            SpeechReportEntity saved;
+
+            if (existingReport.isPresent()) {
+
+                saved = existingReport.get();
+
+                log.info(
+                        "[Speech] 기존 SpeechReport 재사용 - reportId={}, interviewId={}",
+                        saved.getId(),
+                        interview.getId()
+                );
+
+            } else {
+
+                SpeechReportEntity report =
+                        SpeechReportEntity
+                                .builder()
+                                .interview(
+                                        interview
+                                )
+                                .score(
+                                        calculateSpeechScore(
+                                                request
+                                        )
+                                )
+                                .textScript(
+                                        textScript
+                                )
+                                .totalFillerCount(
+                                        getTotalFillerCount(
+                                                request
+                                        )
+                                )
+                                .fillerDetailsJson(
+                                        toJson(
+                                                getFillerDetails(
+                                                        request
+                                                )
+                                        )
+                                )
+                                .repeatedExpressionsJson(
+                                        toJson(
+                                                getRepeatedExpressions(
+                                                        request
+                                                )
+                                        )
+                                )
+                                .paceEvaluation(
+                                        getPaceEvaluation(
+                                                request
+                                        )
+                                )
+                                .paceFeedback(
+                                        getPaceFeedback(
+                                                request
+                                        )
+                                )
+                                .charactersPerSecond(
+                                        getCharactersPerSecond(
+                                                request
+                                        )
+                                )
+                                .totalSilenceSeconds(
+                                        getTotalSilenceSeconds(
+                                                request
+                                        )
+                                )
+                                .pauseRatePercent(
+                                        getPauseRatePercent(
+                                                request
+                                        )
+                                )
+                                .criticalSilenceCount(
+                                        getCriticalSilenceCount(
+                                                request
+                                        )
+                                )
+                                .build();
+
+                saved =
+                        speechReportRepository.save(
+                                report
+                        );
+            }
 
             saveAiEvaluation(
                     request,
@@ -367,7 +420,7 @@ public class SpeechReportService {
             );
 
             log.info(
-                    "[Speech] SpeechReport 저장 완료 - "
+                    "[Speech] SpeechReport 저장/확인 완료 - "
                             + "reportId={}, interviewId={}, answerId={}, textLength={}",
                     saved.getId(),
                     interview.getId(),
@@ -388,6 +441,7 @@ public class SpeechReportService {
         }
     }
 
+
     /**
      * 질문별 AI 평가 저장
      */
@@ -399,12 +453,20 @@ public class SpeechReportService {
         if (
                 request.getAiEvaluation() == null
         ) {
+
+            log.warn(
+                    "[Speech] FastAPI 응답에 ai_evaluation이 없어 AI 평가 저장 생략 - "
+                            + "interviewId={}, answerId={}",
+                    request.getInterviewId(),
+                    request.getInterviewAnswerId()
+            );
+
             return;
         }
 
         /*
-         * PT 발표 전체 영상의 경우
-         * interviewAnswerId가 없으므로 AI 평가 저장 안 함
+         * PT 발표 전체 영상처럼 interviewAnswerId가 없는 경우에는
+         * 질문별 AI 평가를 저장하지 않는다.
          */
         if (
                 interviewAnswer == null
@@ -418,14 +480,28 @@ public class SpeechReportService {
             return;
         }
 
+        if (
+                aiEvaluationRepository
+                        .findByInterviewAnswer_Id(
+                                interviewAnswer.getId()
+                        )
+                        .isPresent()
+        ) {
+
+            log.info(
+                    "[Speech] 기존 AiEvaluation 재사용 - answerId={}",
+                    interviewAnswer.getId()
+            );
+
+            return;
+        }
+
         AiEvaluationEntity aiEvaluation =
                 AiEvaluationEntity
                         .builder()
-
                         .interviewAnswer(
                                 interviewAnswer
                         )
-
                         .starEvaluationJson(
                                 toJson(
                                         request
@@ -433,13 +509,11 @@ public class SpeechReportService {
                                                 .getStarScore()
                                 )
                         )
-
                         .geminiFeedback(
                                 request
                                         .getAiEvaluation()
                                         .getFeedback()
                         )
-
                         .keywordsJson(
                                 toJson(
                                         request
@@ -447,17 +521,20 @@ public class SpeechReportService {
                                                 .getKeywords()
                                 )
                         )
-
                         .modelAnswer(
                                 request
                                         .getAiEvaluation()
                                         .getModelAnswer()
                         )
-
                         .build();
 
         aiEvaluationRepository.save(
                 aiEvaluation
+        );
+
+        log.info(
+                "[Speech] AiEvaluation 저장 완료 - answerId={}",
+                interviewAnswer.getId()
         );
     }
 

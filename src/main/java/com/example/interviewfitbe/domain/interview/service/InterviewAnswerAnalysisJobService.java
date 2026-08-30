@@ -5,14 +5,15 @@ import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
 import com.example.interviewfitbe.domain.pose.service.PoseService;
-import com.example.interviewfitbe.domain.speech_coaching.service.SpeechAnalysisService;
+import com.example.interviewfitbe.domain.speech_coaching.dto.SpeechAnalyzeRequest;
+import com.example.interviewfitbe.domain.speech_coaching.entity.SpeechReportEntity;
+import com.example.interviewfitbe.domain.speech_coaching.repository.AiEvaluationRepository;
+import com.example.interviewfitbe.domain.speech_coaching.service.SpeechReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -22,7 +23,8 @@ public class InterviewAnswerAnalysisJobService {
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final EyeBlinkingService eyeBlinkingService;
     private final PoseService poseService;
-    private final SpeechAnalysisService speechAnalysisService;
+    private final SpeechReportService speechReportService;
+    private final AiEvaluationRepository aiEvaluationRepository;
     private final TransactionTemplate transactionTemplate;
 
     /*
@@ -30,7 +32,12 @@ public class InterviewAnswerAnalysisJobService {
      *
      * - eye blinking
      * - pose
-     * - speech / STT
+     * - speech / STT / Gemini
+     *
+     * 중요:
+     * SpeechAnalysisService를 직접 호출하지 않는다.
+     * 반드시 SpeechReportService.analyzeAndSave()를 통해
+     * speech_report + ai_evaluation까지 저장한 뒤 DONE 처리한다.
      */
     @Async("analysisExecutor")
     public void analyzeAnswerAsync(
@@ -53,10 +60,8 @@ public class InterviewAnswerAnalysisJobService {
                     answer.getInterviewSafely();
 
             if (interview == null) {
-
                 throw new IllegalStateException(
-                        "답변에 연결된 면접 정보를 찾을 수 없습니다. "
-                                + "answerId="
+                        "답변에 연결된 면접 정보를 찾을 수 없습니다. answerId="
                                 + answerId
                 );
             }
@@ -64,23 +69,31 @@ public class InterviewAnswerAnalysisJobService {
             /*
              * 1. 눈 깜빡임 분석
              */
+            log.info("눈 깜빡임 분석 시작: answerId={}", answerId);
+
             eyeBlinkingService.analyzeAndSave(
                     videoObjectKey,
                     interview
             );
 
+            log.info("눈 깜빡임 분석 완료: answerId={}", answerId);
+
             /*
              * 2. 자세 분석
              */
+            log.info("자세 분석 시작: answerId={}", answerId);
+
             poseService.processPostureAnalysis(
                     videoObjectKey,
                     interview
             );
 
+            log.info("자세 분석 완료: answerId={}", answerId);
+
             /*
-             * 3. Speech / STT 분석
+             * 3. Speech / STT / Gemini 분석 + DB 저장
              */
-            analyzeSpeechAndSaveAnswerText(
+            analyzeSpeechGeminiAndSave(
                     answerId,
                     videoObjectKey,
                     interview,
@@ -88,8 +101,22 @@ public class InterviewAnswerAnalysisJobService {
             );
 
             /*
-             * 모든 분석 완료
+             * Gemini 평가가 실제 DB에 저장됐는지 마지막 검증.
+             *
+             * 이전 코드에서는 FastAPI 호출만 성공하면
+             * ai_evaluation이 없어도 DONE으로 바뀔 수 있었기 때문에
+             * 저장 결과를 확인한 뒤 DONE 처리한다.
              */
+            if (!aiEvaluationRepository
+                    .findByInterviewAnswer_Id(answerId)
+                    .isPresent()) {
+
+                throw new IllegalStateException(
+                        "Gemini AI 평가 결과가 저장되지 않았습니다. answerId="
+                                + answerId
+                );
+            }
+
             markDone(answerId);
 
             log.info(
@@ -114,10 +141,19 @@ public class InterviewAnswerAnalysisJobService {
     }
 
     /*
-     * FastAPI Speech 분석 실행 후
-     * STT 결과를 InterviewAnswer.answerText에 저장
+     * Speech / STT / Gemini 분석 및 저장
+     *
+     * 호출 흐름:
+     * InterviewAnswerAnalysisJobService
+     *      -> SpeechReportService.analyzeAndSave()
+     *      -> SpeechAnalysisService.analyzeSpeech()
+     *      -> FastAPI /apis/speech/analyze
+     *      -> speech_report 저장
+     *      -> ai_evaluation 저장
+     *
+     * 이 메서드에서는 FastAPI를 별도로 다시 호출하지 않는다.
      */
-    private void analyzeSpeechAndSaveAnswerText(
+    private void analyzeSpeechGeminiAndSave(
             Long answerId,
             String videoObjectKey,
             InterviewEntity interview,
@@ -126,19 +162,12 @@ public class InterviewAnswerAnalysisJobService {
 
         String jobCategory = "";
 
-        if (interview.getJobRole() != null) {
-
-            if (
-                    interview
-                            .getJobRole()
-                            .getCategory() != null
-            ) {
-
-                jobCategory =
-                        interview
-                                .getJobRole()
-                                .getCategory();
-            }
+        if (
+                interview.getJobRole() != null
+                        && interview.getJobRole().getCategory() != null
+        ) {
+            jobCategory =
+                    interview.getJobRole().getCategory();
         }
 
         Long questionId = null;
@@ -147,11 +176,8 @@ public class InterviewAnswerAnalysisJobService {
          * 일반 면접 질문
          */
         if (answer.getQuestion() != null) {
-
             questionId =
-                    answer
-                            .getQuestion()
-                            .getId();
+                    answer.getQuestion().getId();
         }
 
         /*
@@ -161,148 +187,69 @@ public class InterviewAnswerAnalysisJobService {
                 questionId == null
                         && answer.getPtQuestion() != null
         ) {
-
             questionId =
-                    answer
-                            .getPtQuestion()
-                            .getId();
+                    answer.getPtQuestion().getId();
         }
 
         String originalQuestion =
                 answer.getQuestionText();
 
-        /*
-         * FastAPI:
-         * POST /apis/speech/analyze
-         */
-        Map<String, Object> speechResponse =
-                speechAnalysisService.analyzeSpeech(
-                        "minio",
-                        videoObjectKey,
-                        jobCategory,
-                        interview.getId(),
-                        answerId,
-                        questionId,
-                        originalQuestion
-                );
-
-        String textScript =
-                extractTextScript(
-                        speechResponse
-                );
-
-        if (
-                textScript == null
-                        || textScript.isBlank()
-        ) {
-
-            log.warn(
-                    "Speech 분석은 완료됐지만 STT 결과가 비어 있습니다. "
-                            + "answerId={}",
-                    answerId
-            );
-
-            return;
-        }
-
-        saveAnswerText(
-                answerId,
-                textScript
-        );
+        SpeechAnalyzeRequest request =
+                SpeechAnalyzeRequest.builder()
+                        .sourceType("minio")
+                        .sourceValue(videoObjectKey)
+                        .jobCategory(jobCategory)
+                        .interviewId(interview.getId())
+                        .interviewAnswerId(answerId)
+                        .questionId(questionId)
+                        .originalQuestion(originalQuestion)
+                        .build();
 
         log.info(
-                "답변 STT 저장 완료: answerId={}, textLength={}",
+                "Speech/Gemini 분석 시작: answerId={}, interviewId={}",
                 answerId,
-                textScript.length()
+                interview.getId()
         );
-    }
-
-    /*
-     * FastAPI 응답에서 text_script 추출
-     *
-     * 예상 구조:
-     *
-     * {
-     *   "result": {
-     *       "text_script": "..."
-     *   }
-     * }
-     *
-     * 혹시 최상위에 text_script가 오는 경우도
-     * 같이 처리한다.
-     */
-    @SuppressWarnings("unchecked")
-    private String extractTextScript(
-            Map<String, Object> response
-    ) {
-
-        if (response == null) {
-            return null;
-        }
 
         /*
-         * 1. result.text_script
+         * FastAPI 호출은 이 한 번뿐이다.
+         * SpeechReportService 내부에서 결과까지 DB에 저장한다.
          */
-        Object resultObject =
-                response.get("result");
+        Long speechReportId =
+                speechReportService.analyzeAndSave(request);
 
-        if (resultObject instanceof Map<?, ?>) {
+        SpeechReportEntity speechReport =
+                speechReportService.getReport(speechReportId);
 
-            Map<String, Object> result =
-                    (Map<String, Object>) resultObject;
+        String textScript =
+                speechReport.getTextScript();
 
-            Object textScript =
-                    result.get("text_script");
-
-            if (textScript != null) {
-
-                return String.valueOf(
-                        textScript
-                ).trim();
-            }
-
-            /*
-             * 혹시 transcript라는 이름으로
-             * 반환되는 경우도 대응
-             */
-            Object transcript =
-                    result.get("transcript");
-
-            if (transcript != null) {
-
-                return String.valueOf(
-                        transcript
-                ).trim();
-            }
-        }
-
-        /*
-         * 2. 최상위 text_script
-         */
-        Object textScript =
-                response.get("text_script");
-
-        if (textScript != null) {
-
-            return String.valueOf(
+        if (
+                textScript != null
+                        && !textScript.isBlank()
+        ) {
+            saveAnswerText(
+                    answerId,
                     textScript
-            ).trim();
+            );
+
+            log.info(
+                    "답변 STT 저장 완료: answerId={}, textLength={}",
+                    answerId,
+                    textScript.length()
+            );
+        } else {
+            log.warn(
+                    "Speech 분석은 완료됐지만 STT 결과가 비어 있습니다. answerId={}",
+                    answerId
+            );
         }
 
-        /*
-         * 3. 최상위 transcript
-         */
-        Object transcript =
-                response.get("transcript");
-
-        if (transcript != null) {
-
-            return String.valueOf(
-                    transcript
-            ).trim();
-        }
-
-        return null;
+        log.info(
+                "Speech/Gemini 분석 완료: answerId={}, speechReportId={}",
+                answerId,
+                speechReportId
+        );
     }
 
     /*
@@ -318,25 +265,18 @@ public class InterviewAnswerAnalysisJobService {
 
                     InterviewAnswerEntity answer =
                             interviewAnswerRepository
-                                    .findById(
-                                            answerId
-                                    )
+                                    .findById(answerId)
                                     .orElseThrow(
                                             () ->
                                                     new IllegalArgumentException(
-                                                            "해당 답변을 찾을 수 없습니다. "
-                                                                    + "answerId="
+                                                            "해당 답변을 찾을 수 없습니다. answerId="
                                                                     + answerId
                                                     )
                                     );
 
-                    answer.updateAnswerText(
-                            answerText
-                    );
+                    answer.updateAnswerText(answerText);
 
-                    interviewAnswerRepository.save(
-                            answer
-                    );
+                    interviewAnswerRepository.save(answer);
                 }
         );
     }
@@ -350,23 +290,18 @@ public class InterviewAnswerAnalysisJobService {
 
                     InterviewAnswerEntity answer =
                             interviewAnswerRepository
-                                    .findWithInterviewById(
-                                            answerId
-                                    )
+                                    .findWithInterviewById(answerId)
                                     .orElseThrow(
                                             () ->
                                                     new IllegalArgumentException(
-                                                            "해당 답변을 찾을 수 없습니다. "
-                                                                    + "answerId="
+                                                            "해당 답변을 찾을 수 없습니다. answerId="
                                                                     + answerId
                                                     )
                                     );
 
                     answer.markRunning();
 
-                    return interviewAnswerRepository.save(
-                            answer
-                    );
+                    return interviewAnswerRepository.save(answer);
                 }
         );
     }
@@ -380,23 +315,18 @@ public class InterviewAnswerAnalysisJobService {
 
                     InterviewAnswerEntity answer =
                             interviewAnswerRepository
-                                    .findById(
-                                            answerId
-                                    )
+                                    .findById(answerId)
                                     .orElseThrow(
                                             () ->
                                                     new IllegalArgumentException(
-                                                            "해당 답변을 찾을 수 없습니다. "
-                                                                    + "answerId="
+                                                            "해당 답변을 찾을 수 없습니다. answerId="
                                                                     + answerId
                                                     )
                                     );
 
                     answer.markDone();
 
-                    interviewAnswerRepository.save(
-                            answer
-                    );
+                    interviewAnswerRepository.save(answer);
                 }
         );
     }
@@ -411,25 +341,18 @@ public class InterviewAnswerAnalysisJobService {
 
                     InterviewAnswerEntity answer =
                             interviewAnswerRepository
-                                    .findById(
-                                            answerId
-                                    )
+                                    .findById(answerId)
                                     .orElseThrow(
                                             () ->
                                                     new IllegalArgumentException(
-                                                            "해당 답변을 찾을 수 없습니다. "
-                                                                    + "answerId="
+                                                            "해당 답변을 찾을 수 없습니다. answerId="
                                                                     + answerId
                                                     )
                                     );
 
-                    answer.markFailed(
-                            errorMessage
-                    );
+                    answer.markFailed(errorMessage);
 
-                    interviewAnswerRepository.save(
-                            answer
-                    );
+                    interviewAnswerRepository.save(answer);
                 }
         );
     }
