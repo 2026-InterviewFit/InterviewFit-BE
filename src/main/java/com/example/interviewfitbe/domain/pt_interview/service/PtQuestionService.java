@@ -34,20 +34,26 @@ public class PtQuestionService {
     /**
      * PT 발표자료를 기반으로 예상 질문 생성
      *
-     * 동일 PT 면접에 대해 이미 질문이 생성되어 있으면
+     * 동일 PT 면접에 대해 질문 생성 요청이 동시에 들어와도
+     * PT 면접 행에 DB Lock을 걸어 중복 질문 생성을 방지한다.
+     *
+     * 이미 질문이 생성되어 있으면
      * Gemini를 다시 호출하지 않고 기존 질문을 반환한다.
      */
     @Transactional
-    public synchronized List<PtQuestionResponse> generateQuestions(
+    public List<PtQuestionResponse> generateQuestions(
             Long ptInterviewId
     ) {
 
         /*
-         * 1. PT 면접 존재 여부 확인
+         * 1. PT 면접 조회 + 비관적 쓰기 잠금
+         *
+         * 같은 PT 면접에 대해 여러 요청이 동시에 들어오면
+         * 먼저 들어온 트랜잭션이 끝날 때까지 나머지 요청은 대기한다.
          */
         PtInterviewEntity ptInterview =
                 ptInterviewRepository
-                        .findById(ptInterviewId)
+                        .findByIdForUpdate(ptInterviewId)
                         .orElseThrow(
                                 () -> new IllegalArgumentException(
                                         "존재하지 않는 PT 면접입니다. ptInterviewId="
@@ -58,8 +64,9 @@ public class PtQuestionService {
         /*
          * 2. 이미 생성된 질문이 있으면 그대로 반환
          *
-         * waiting 페이지에서 API가 중복 호출되더라도
-         * 질문을 다시 생성/저장하지 않는다.
+         * 앞선 요청이 질문을 생성하고 COMMIT한 이후
+         * 대기 중이던 요청이 여기로 들어오면
+         * 기존 질문을 조회하여 중복 저장을 방지한다.
          */
         List<PtQuestionEntity> existingQuestions =
                 ptQuestionRepository

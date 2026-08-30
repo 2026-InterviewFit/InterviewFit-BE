@@ -168,15 +168,7 @@ public class SecurityConfig {
                                         "/api/job-role/**",
                                         "/webhook/**",
                                         "/api/group/**",
-                                        "/ws-interview/**",
-
-                                        // PT 면접 테스트용
-                                        "/api/interview/**",
-                                        "/api/pt-interview/**",
-                                        "/api/pt-interviews/**",
-                                        "/api/pt-document/**",
-                                        "/api/pt-question/**",
-                                        "/api/pt-report/**"
+                                        "/ws-interview/**"
                                 )
                                 .permitAll()
 

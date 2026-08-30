@@ -19,13 +19,18 @@ public interface InterviewAnswerRepository
     );
 
     /*
-     * 일반 면접 정보와 직무 정보를 포함하여
-     * 답변 단건 조회
+     * 답변 분석용 단건 조회
+     *
+     * 비동기 분석에서는 조회 트랜잭션이 끝난 뒤에도
+     * interview / jobRole / ptQuestion 정보가 필요하므로
+     * EntityGraph를 통해 미리 로딩한다.
      */
     @EntityGraph(
             attributePaths = {
                     "interview",
-                    "interview.jobRole"
+                    "interview.jobRole",
+                    "ptQuestion",
+                    "ptQuestion.ptInterview"
             }
     )
     Optional<InterviewAnswerEntity>
