@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.interview.service;
 
 import com.example.interviewfitbe.domain.eye_blinking.service.EyeBlinkingService;
+import com.example.interviewfitbe.domain.eye_gaze.service.EyeGazeService;
 import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewAnswerRepository;
@@ -22,6 +23,7 @@ public class InterviewAnswerAnalysisJobService {
 
     private final InterviewAnswerRepository interviewAnswerRepository;
     private final EyeBlinkingService eyeBlinkingService;
+    private final EyeGazeService eyeGazeService;
     private final PoseService poseService;
     private final SpeechReportService speechReportService;
     private final AiEvaluationRepository aiEvaluationRepository;
@@ -31,6 +33,7 @@ public class InterviewAnswerAnalysisJobService {
      * 답변 영상 분석
      *
      * - eye blinking
+     * - eye gaze
      * - pose
      * - speech / STT / Gemini
      *
@@ -69,29 +72,59 @@ public class InterviewAnswerAnalysisJobService {
             /*
              * 1. 눈 깜빡임 분석
              */
-            log.info("눈 깜빡임 분석 시작: answerId={}", answerId);
+            log.info(
+                    "눈 깜빡임 분석 시작: answerId={}",
+                    answerId
+            );
 
             eyeBlinkingService.analyzeAndSave(
                     videoObjectKey,
                     interview
             );
 
-            log.info("눈 깜빡임 분석 완료: answerId={}", answerId);
+            log.info(
+                    "눈 깜빡임 분석 완료: answerId={}",
+                    answerId
+            );
 
             /*
-             * 2. 자세 분석
+             * 2. 시선 분석
              */
-            log.info("자세 분석 시작: answerId={}", answerId);
+            log.info(
+                    "시선 분석 시작: answerId={}",
+                    answerId
+            );
+
+            eyeGazeService.analyzeAndSave(
+                    videoObjectKey,
+                    interview
+            );
+
+            log.info(
+                    "시선 분석 완료: answerId={}",
+                    answerId
+            );
+
+            /*
+             * 3. 자세 분석
+             */
+            log.info(
+                    "자세 분석 시작: answerId={}",
+                    answerId
+            );
 
             poseService.processPostureAnalysis(
                     videoObjectKey,
                     interview
             );
 
-            log.info("자세 분석 완료: answerId={}", answerId);
+            log.info(
+                    "자세 분석 완료: answerId={}",
+                    answerId
+            );
 
             /*
-             * 3. Speech / STT / Gemini 분석 + DB 저장
+             * 4. Speech / STT / Gemini 분석 + DB 저장
              */
             analyzeSpeechGeminiAndSave(
                     answerId,
@@ -216,10 +249,14 @@ public class InterviewAnswerAnalysisJobService {
          * SpeechReportService 내부에서 결과까지 DB에 저장한다.
          */
         Long speechReportId =
-                speechReportService.analyzeAndSave(request);
+                speechReportService.analyzeAndSave(
+                        request
+                );
 
         SpeechReportEntity speechReport =
-                speechReportService.getReport(speechReportId);
+                speechReportService.getReport(
+                        speechReportId
+                );
 
         String textScript =
                 speechReport.getTextScript();
@@ -228,6 +265,7 @@ public class InterviewAnswerAnalysisJobService {
                 textScript != null
                         && !textScript.isBlank()
         ) {
+
             saveAnswerText(
                     answerId,
                     textScript
@@ -238,7 +276,9 @@ public class InterviewAnswerAnalysisJobService {
                     answerId,
                     textScript.length()
             );
+
         } else {
+
             log.warn(
                     "Speech 분석은 완료됐지만 STT 결과가 비어 있습니다. answerId={}",
                     answerId
@@ -274,9 +314,13 @@ public class InterviewAnswerAnalysisJobService {
                                                     )
                                     );
 
-                    answer.updateAnswerText(answerText);
+                    answer.updateAnswerText(
+                            answerText
+                    );
 
-                    interviewAnswerRepository.save(answer);
+                    interviewAnswerRepository.save(
+                            answer
+                    );
                 }
         );
     }
@@ -301,7 +345,9 @@ public class InterviewAnswerAnalysisJobService {
 
                     answer.markRunning();
 
-                    return interviewAnswerRepository.save(answer);
+                    return interviewAnswerRepository.save(
+                            answer
+                    );
                 }
         );
     }
@@ -326,7 +372,9 @@ public class InterviewAnswerAnalysisJobService {
 
                     answer.markDone();
 
-                    interviewAnswerRepository.save(answer);
+                    interviewAnswerRepository.save(
+                            answer
+                    );
                 }
         );
     }
@@ -350,9 +398,13 @@ public class InterviewAnswerAnalysisJobService {
                                                     )
                                     );
 
-                    answer.markFailed(errorMessage);
+                    answer.markFailed(
+                            errorMessage
+                    );
 
-                    interviewAnswerRepository.save(answer);
+                    interviewAnswerRepository.save(
+                            answer
+                    );
                 }
         );
     }
