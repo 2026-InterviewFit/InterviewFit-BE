@@ -26,7 +26,7 @@ class GroupInterviewAnswerCompletionServiceTest {
                 .id(123L)
                 .build();
         Instant completedAt = Instant.parse("2026-08-20T00:00:00Z");
-        when(answerRepository.findById(123L)).thenReturn(Optional.of(answer));
+        when(answerRepository.findByIdForUpdate(123L)).thenReturn(Optional.of(answer));
 
         service.complete(123L, GroupAnswerCompletionType.COMPLETED, completedAt);
 
@@ -36,7 +36,7 @@ class GroupInterviewAnswerCompletionServiceTest {
 
     @Test
     void missingAnswerFailsInsteadOfSilentlyContinuing() {
-        when(answerRepository.findById(123L)).thenReturn(Optional.empty());
+        when(answerRepository.findByIdForUpdate(123L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.complete(
                 123L,

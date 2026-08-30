@@ -23,6 +23,10 @@ public interface GroupInterviewAnswerRepository
             @Param("answerId") Long answerId
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from GroupInterviewAnswerEntity a where a.id = :answerId")
+    Optional<GroupInterviewAnswerEntity> findByIdForUpdate(@Param("answerId") Long answerId);
+
     @Query(value = """
             SELECT ga.id AS "answerId",
                    ga.round_number AS "roundNumber",

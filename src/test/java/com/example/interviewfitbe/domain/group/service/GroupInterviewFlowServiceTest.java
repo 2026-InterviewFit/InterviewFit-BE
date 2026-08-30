@@ -48,6 +48,11 @@ class GroupInterviewFlowServiceTest {
                 messagingTemplate
         );
         ReflectionTestUtils.setField(service, "answerLimitSeconds", 60L);
+        ReflectionTestUtils.setField(service, "answerStartGraceSeconds", 60L);
+        lenient().when(sessionRepository.findByInterviewIdForUpdate(anyLong()))
+                .thenAnswer(invocation -> sessionRepository.findByInterviewId(invocation.getArgument(0)));
+        lenient().when(sessionRepository.findByIdForUpdate(anyLong()))
+                .thenAnswer(invocation -> sessionRepository.findById(invocation.getArgument(0)));
         when(questionRepository.findFirstByRoundNumberAndQuestionText(
                 1,
                 GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
@@ -174,6 +179,96 @@ class GroupInterviewFlowServiceTest {
                 any()
         );
         assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
+    }
+
+    @Test
+    void recordingFailureBeforeAnswerStartSkipsCurrentParticipant() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .id(99L)
+                .interview(interview)
+                .build();
+        session.start();
+
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findById(99L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+        when(participantRepository.countByRoomId(10L)).thenReturn(2L);
+        when(answerRepository.saveAndFlush(any())).thenReturn(
+                GroupInterviewAnswerEntity.builder().id(123L).build()
+        );
+
+        service.skipAnswer(10L, 5L, GroupAnswerCompletionType.RECORDING_FAILED);
+
+        verify(completionService).complete(
+                eq(123L),
+                eq(GroupAnswerCompletionType.RECORDING_FAILED),
+                any()
+        );
+        assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
+        assertThat(session.getCurrentAnswerId()).isNull();
+
+        // skip 직후 늦게 도착한 timeout은 상태를 다시 전환하지 않는다.
+        service.completeExpiredAnswer(99L);
+        assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
+        verify(completionService, times(1)).complete(anyLong(), any(), any());
+    }
+
+    @Test
+    void onlyCurrentParticipantCanSkipAnswer() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .interview(interview)
+                .build();
+        session.start();
+
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+
+        assertThatThrownBy(() -> service.skipAnswer(
+                10L,
+                6L,
+                GroupAnswerCompletionType.SKIPPED
+        )).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+
+        verifyNoInteractions(answerRepository, completionService);
+        assertThat(session.getCurrentParticipantIndex()).isZero();
+    }
+
+    @Test
+    void missingStartRequestIsAutomaticallySkippedAfterGracePeriod() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .id(99L)
+                .interview(interview)
+                .answerStartDeadlineAt(java.time.Instant.now().minusSeconds(1))
+                .build();
+        session.start();
+
+        when(sessionRepository.findById(99L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+        when(participantRepository.countByRoomId(10L)).thenReturn(2L);
+        when(answerRepository.saveAndFlush(any())).thenReturn(
+                GroupInterviewAnswerEntity.builder().id(123L).build()
+        );
+
+        service.skipExpiredAnswerStart(99L);
+
+        verify(completionService).complete(
+                eq(123L),
+                eq(GroupAnswerCompletionType.RECORDING_FAILED),
+                any()
+        );
+        assertThat(session.getCurrentParticipantIndex()).isEqualTo(1);
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.QUESTION_VIEW);
+        assertThat(session.getAnswerStartDeadlineAt()).isAfter(java.time.Instant.now());
     }
 
     @Test

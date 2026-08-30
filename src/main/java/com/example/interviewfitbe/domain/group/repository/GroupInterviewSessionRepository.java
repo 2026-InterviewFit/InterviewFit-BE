@@ -23,9 +23,19 @@ public interface GroupInterviewSessionRepository
     Optional<GroupInterviewSessionEntity> findByInterviewIdForUpdate(
             @Param("interviewId") Long interviewId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from GroupInterviewSessionEntity s where s.id = :sessionId")
+    Optional<GroupInterviewSessionEntity> findByIdForUpdate(
+            @Param("sessionId") Long sessionId);
+
     @Query("select s.id from GroupInterviewSessionEntity s " +
             "where s.status = com.example.interviewfitbe.domain.group.entity.InterviewStatus.ANSWERING " +
             "and s.answerDeadlineAt <= :now")
     List<Long> findExpiredAnswerSessionIds(@Param("now") Instant now);
+
+    @Query("select s.id from GroupInterviewSessionEntity s " +
+            "where s.status = com.example.interviewfitbe.domain.group.entity.InterviewStatus.QUESTION_VIEW " +
+            "and s.answerStartDeadlineAt <= :now")
+    List<Long> findExpiredAnswerStartSessionIds(@Param("now") Instant now);
 
 }

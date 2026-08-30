@@ -16,7 +16,15 @@ public class GroupInterviewAnswerTimeoutScheduler {
 
     @Scheduled(fixedDelayString = "${app.group-interview.timeout-check-ms:1000}")
     public void completeExpiredAnswers() {
-        for (Long sessionId : flowService.findExpiredAnswerSessionIds(Instant.now())) {
+        Instant now = Instant.now();
+        for (Long sessionId : flowService.findExpiredAnswerStartSessionIds(now)) {
+            try {
+                flowService.skipExpiredAnswerStart(sessionId);
+            } catch (RuntimeException exception) {
+                log.warn("답변 시작 대기 만료 처리 실패. sessionId={}", sessionId, exception);
+            }
+        }
+        for (Long sessionId : flowService.findExpiredAnswerSessionIds(now)) {
             try {
                 flowService.completeExpiredAnswer(sessionId);
             } catch (RuntimeException exception) {

@@ -52,6 +52,8 @@ public class GroupInterviewSessionEntity {
 
     private Instant answerStartedAt;
 
+    private Instant answerStartDeadlineAt;
+
     private Instant answerDeadlineAt;
 
     private Long currentAnswerId;
@@ -76,6 +78,7 @@ public class GroupInterviewSessionEntity {
             throw new IllegalStateException("답변을 시작할 수 있는 상태가 아닙니다.");
         }
         this.status = InterviewStatus.ANSWERING;
+        this.answerStartDeadlineAt = null;
         this.answerStartedAt = startedAt;
         this.answerDeadlineAt = deadlineAt;
     }
@@ -93,6 +96,7 @@ public class GroupInterviewSessionEntity {
         this.status = InterviewStatus.FINISHED;
 
         clearAnswerTimer();
+        this.answerStartDeadlineAt = null;
 
     }
 
@@ -131,6 +135,13 @@ public class GroupInterviewSessionEntity {
         this.answerStartedAt = null;
         this.answerDeadlineAt = null;
         this.currentAnswerId = null;
+    }
+
+    public void scheduleAnswerStartDeadline(Instant deadlineAt) {
+        if (this.status != InterviewStatus.QUESTION_VIEW) {
+            throw new IllegalStateException("질문 확인 상태에서만 답변 시작 기한을 설정할 수 있습니다.");
+        }
+        this.answerStartDeadlineAt = deadlineAt;
     }
 
     public enum AnswerCompletionResult {
