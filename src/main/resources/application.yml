@@ -17,6 +17,7 @@ spring:
   sql:
     init:
       mode: always
+      encoding: UTF-8
       separator: "@@"
 
   defer-datasource-initialization: true
@@ -52,7 +53,8 @@ app:
 
 jwt:
   secret: ${JWT_SECRET:local-dev-only-not-a-real-secret-just-for-testing-12345}
-  expiration-ms: 3600000
+  access-expiration-ms: 3600000
+  refresh-expiration-ms: 1209600000
 
 livekit:
   api-key: ${LIVEKIT_API_KEY}

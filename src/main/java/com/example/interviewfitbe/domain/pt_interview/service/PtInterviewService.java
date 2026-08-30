@@ -6,6 +6,7 @@ import com.example.interviewfitbe.domain.pt_interview.dto.PtInterviewCreateReque
 import com.example.interviewfitbe.domain.pt_interview.dto.PtInterviewResponse;
 import com.example.interviewfitbe.domain.pt_interview.entity.PtInterviewEntity;
 import com.example.interviewfitbe.domain.pt_interview.repository.PtInterviewRepository;
+import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,13 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class PtInterviewService {
 
     private final PtInterviewRepository ptInterviewRepository;
-
     private final InterviewRepository interviewRepository;
 
     @Transactional
     public PtInterviewResponse create(
             PtInterviewCreateRequest request
     ) {
+
+        Long userId = AuthUtils.getCurrentUserId();
 
         InterviewEntity interview = interviewRepository
                 .findById(request.getInterviewId())
@@ -30,6 +32,12 @@ public class PtInterviewService {
                                 "존재하지 않는 면접입니다."
                         )
                 );
+
+        if (!interview.getUser().getId().equals(userId)) {
+            throw new IllegalStateException(
+                    "본인의 면접만 PT 면접으로 생성할 수 있습니다."
+            );
+        }
 
         if (
                 ptInterviewRepository

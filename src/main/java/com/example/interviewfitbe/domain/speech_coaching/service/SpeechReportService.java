@@ -22,37 +22,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SpeechReportService {
 
-
     private final SpeechReportRepository speechReportRepository;
-
     private final AiEvaluationRepository aiEvaluationRepository;
-
     private final InterviewRepository interviewRepository;
-
     private final InterviewAnswerRepository interviewAnswerRepository;
-
     private final ObjectMapper objectMapper;
-
     private final SpeechAnalysisService speechAnalysisService;
 
-
-
     /**
-     * Controller 요청 진입점
-     *
-     * Client
-     *  ↓
-     * Spring
-     *  ↓
-     * FastAPI(STT + 분석 + Gemini)
-     *  ↓
-     * SpeechReport + AiEvaluation 저장
+     * Speech 분석 + STT + DB 저장
      */
     @Transactional
     public Long analyzeAndSave(
@@ -61,8 +44,10 @@ public class SpeechReportService {
 
         validateAnalyzeRequest(request);
 
-
-        Map<String,Object> fastApiResponse =
+        /*
+         * 1. FastAPI Speech 분석 호출
+         */
+        Map<String, Object> fastApiResponse =
                 speechAnalysisService.analyzeSpeech(
                         request.getSourceType(),
                         request.getSourceValue(),
@@ -73,39 +58,129 @@ public class SpeechReportService {
                         request.getOriginalQuestion()
                 );
 
+        log.info(
+                "[Speech] FastAPI 전체 응답 = {}",
+                fastApiResponse
+        );
 
-        Map<String,Object> payload =
+        /*
+         * 2. 실제 Speech payload 추출
+         */
+        Map<String, Object> payload =
                 extractSpeechPayload(
                         fastApiResponse
                 );
 
+        log.info(
+                "[Speech] 추출된 payload = {}",
+                payload
+        );
 
+        /*
+         * 3. FastAPI 응답 -> DTO
+         */
         SpeechReportRequest reportRequest =
                 objectMapper.convertValue(
                         payload,
                         SpeechReportRequest.class
                 );
 
-
+        /*
+         * 4. 메타데이터 보완
+         */
         reportRequest =
                 fillMissingMetadata(
                         reportRequest,
                         request
                 );
 
+        /*
+         * 5. STT 보완
+         *
+         * DTO 변환 과정에서 textScript가 비어 있다면
+         * FastAPI 전체 응답에서 직접 다시 검색한다.
+         */
+        if (
+                reportRequest.getTextScript() == null
+                        || reportRequest.getTextScript().isBlank()
+        ) {
 
-        return saveReport(reportRequest);
+            String extractedText =
+                    extractTextScript(
+                            fastApiResponse
+                    );
+
+            if (
+                    extractedText != null
+                            && !extractedText.isBlank()
+            ) {
+
+                reportRequest =
+                        reportRequest
+                                .toBuilder()
+                                .textScript(
+                                        extractedText.trim()
+                                )
+                                .build();
+
+                log.info(
+                        "[Speech] STT fallback 추출 성공 - length={}",
+                        extractedText.length()
+                );
+            }
+        }
+
+        /*
+         * 6. 최종 STT 확인
+         */
+        if (
+                reportRequest.getTextScript() == null
+                        || reportRequest.getTextScript().isBlank()
+        ) {
+
+            log.warn(
+                    "[Speech] STT 결과가 비어 있습니다. "
+                            + "interviewId={}, answerId={}, sourceValue={}",
+                    request.getInterviewId(),
+                    request.getInterviewAnswerId(),
+                    request.getSourceValue()
+            );
+
+        } else {
+
+            log.info(
+                    "[Speech] STT 정상 추출 - interviewId={}, answerId={}, length={}, text={}",
+                    request.getInterviewId(),
+                    request.getInterviewAnswerId(),
+                    reportRequest.getTextScript().length(),
+                    reportRequest.getTextScript()
+            );
+        }
+
+        /*
+         * 7. DB 저장
+         */
+        return saveReport(
+                reportRequest
+        );
     }
 
+    /**
+     * Speech 점수 계산
+     */
     private Double calculateSpeechScore(
             SpeechReportRequest request
     ) {
+
         double score = 100.0;
 
         int fillerCount =
-                getTotalFillerCount(request);
+                getTotalFillerCount(
+                        request
+                );
 
         if (fillerCount > 20) {
+
             score -= Math.min(
                     20.0,
                     fillerCount - 20.0
@@ -113,9 +188,15 @@ public class SpeechReportService {
         }
 
         Double pauseRate =
-                getPauseRatePercent(request);
+                getPauseRatePercent(
+                        request
+                );
 
-        if (pauseRate != null && pauseRate > 15.0) {
+        if (
+                pauseRate != null
+                        && pauseRate > 15.0
+        ) {
+
             score -= Math.min(
                     20.0,
                     pauseRate - 15.0
@@ -123,9 +204,12 @@ public class SpeechReportService {
         }
 
         int criticalSilenceCount =
-                getCriticalSilenceCount(request);
+                getCriticalSilenceCount(
+                        request
+                );
 
         if (criticalSilenceCount > 3) {
+
             score -= Math.min(
                     20.0,
                     criticalSilenceCount * 2.0
@@ -133,40 +217,47 @@ public class SpeechReportService {
         }
 
         Double charactersPerSecond =
-                getCharactersPerSecond(request);
+                getCharactersPerSecond(
+                        request
+                );
 
-        if (charactersPerSecond != null
-                && (charactersPerSecond < 3.0
-                || charactersPerSecond > 8.0)) {
+        if (
+                charactersPerSecond != null
+                        && (
+                        charactersPerSecond < 3.0
+                                || charactersPerSecond > 8.0
+                )
+        ) {
 
             score -= 10.0;
         }
 
         return Math.max(
                 0.0,
-                Math.min(100.0, score)
+                Math.min(
+                        100.0,
+                        score
+                )
         );
     }
 
     /**
-     * SpeechReport 저장
-     *
-     * 전체 영상 기반 분석 결과 저장
-     * + 질문별 AI 평가 저장
+     * SpeechReport DB 저장
      */
-
     @Transactional
     public Long saveReport(
             SpeechReportRequest request
     ) {
 
-        validateReportRequest(request);
-
+        validateReportRequest(
+                request
+        );
 
         try {
 
             InterviewEntity interview =
-                    interviewRepository.findById(
+                    interviewRepository
+                            .findById(
                                     request.getInterviewId()
                             )
                             .orElseThrow(() ->
@@ -175,94 +266,118 @@ public class SpeechReportService {
                                     )
                             );
 
-
-
             InterviewAnswerEntity interviewAnswer =
                     findInterviewAnswerOrNull(
                             request.getInterviewAnswerId()
                     );
 
+            String textScript =
+                    request.getTextScript();
 
+            if (textScript != null) {
+                textScript = textScript.trim();
+            }
 
             SpeechReportEntity report =
-                    SpeechReportEntity.builder()
+                    SpeechReportEntity
+                            .builder()
 
-                            .interview(interview)
+                            .interview(
+                                    interview
+                            )
 
                             .score(
-                                    calculateSpeechScore(request)
+                                    calculateSpeechScore(
+                                            request
+                                    )
                             )
 
                             .textScript(
-                                    request.getTextScript()
+                                    textScript
                             )
 
                             .totalFillerCount(
-                                    getTotalFillerCount(request)
+                                    getTotalFillerCount(
+                                            request
+                                    )
                             )
 
                             .fillerDetailsJson(
                                     toJson(
-                                            getFillerDetails(request)
+                                            getFillerDetails(
+                                                    request
+                                            )
                                     )
                             )
 
                             .repeatedExpressionsJson(
                                     toJson(
-                                            getRepeatedExpressions(request)
+                                            getRepeatedExpressions(
+                                                    request
+                                            )
                                     )
                             )
 
                             .paceEvaluation(
-                                    getPaceEvaluation(request)
+                                    getPaceEvaluation(
+                                            request
+                                    )
                             )
 
                             .paceFeedback(
-                                    getPaceFeedback(request)
+                                    getPaceFeedback(
+                                            request
+                                    )
                             )
 
                             .charactersPerSecond(
-                                    getCharactersPerSecond(request)
+                                    getCharactersPerSecond(
+                                            request
+                                    )
                             )
 
                             .totalSilenceSeconds(
-                                    getTotalSilenceSeconds(request)
+                                    getTotalSilenceSeconds(
+                                            request
+                                    )
                             )
 
                             .pauseRatePercent(
-                                    getPauseRatePercent(request)
+                                    getPauseRatePercent(
+                                            request
+                                    )
                             )
 
                             .criticalSilenceCount(
-                                    getCriticalSilenceCount(request)
+                                    getCriticalSilenceCount(
+                                            request
+                                    )
                             )
 
                             .build();
 
-
-
             SpeechReportEntity saved =
-                    speechReportRepository.save(report);
-
-
+                    speechReportRepository.save(
+                            report
+                    );
 
             saveAiEvaluation(
                     request,
                     interviewAnswer
             );
 
-
-
             log.info(
-                    "SpeechReport 저장 완료 id={}, interviewId={}",
+                    "[Speech] SpeechReport 저장 완료 - "
+                            + "reportId={}, interviewId={}, answerId={}, textLength={}",
                     saved.getId(),
-                    interview.getId()
+                    interview.getId(),
+                    request.getInterviewAnswerId(),
+                    textScript == null
+                            ? 0
+                            : textScript.length()
             );
 
-
             return saved.getId();
-
-
 
         } catch (JsonProcessingException e) {
 
@@ -272,39 +387,40 @@ public class SpeechReportService {
             );
         }
     }
+
     /**
      * 질문별 AI 평가 저장
-     *
-     * AiEvaluationEntity
-     *      |
-     *      1:1
-     *      |
-     * InterviewAnswerEntity
      */
     private void saveAiEvaluation(
             SpeechReportRequest request,
             InterviewAnswerEntity interviewAnswer
     ) throws JsonProcessingException {
 
-
-        if (request.getAiEvaluation() == null) {
+        if (
+                request.getAiEvaluation() == null
+        ) {
             return;
         }
 
+        /*
+         * PT 발표 전체 영상의 경우
+         * interviewAnswerId가 없으므로 AI 평가 저장 안 함
+         */
+        if (
+                interviewAnswer == null
+        ) {
 
-        if (interviewAnswer == null) {
-
-            log.warn(
-                    "interviewAnswer가 없어 AI 평가 저장 생략"
+            log.info(
+                    "[Speech] interviewAnswer 없음 - "
+                            + "전체 발표 Speech 분석으로 판단, AI 평가 저장 생략"
             );
 
             return;
         }
 
-
-
         AiEvaluationEntity aiEvaluation =
-                AiEvaluationEntity.builder()
+                AiEvaluationEntity
+                        .builder()
 
                         .interviewAnswer(
                                 interviewAnswer
@@ -312,45 +428,51 @@ public class SpeechReportService {
 
                         .starEvaluationJson(
                                 toJson(
-                                        request.getAiEvaluation()
+                                        request
+                                                .getAiEvaluation()
                                                 .getStarScore()
                                 )
                         )
 
                         .geminiFeedback(
-                                request.getAiEvaluation()
+                                request
+                                        .getAiEvaluation()
                                         .getFeedback()
                         )
 
                         .keywordsJson(
                                 toJson(
-                                        request.getAiEvaluation()
+                                        request
+                                                .getAiEvaluation()
                                                 .getKeywords()
                                 )
                         )
 
                         .modelAnswer(
-                                request.getAiEvaluation()
+                                request
+                                        .getAiEvaluation()
                                         .getModelAnswer()
                         )
 
                         .build();
 
-
-
-        aiEvaluationRepository.save(aiEvaluation);
+        aiEvaluationRepository.save(
+                aiEvaluation
+        );
     }
 
-
-
-
+    /**
+     * SpeechReport 조회
+     */
     @Transactional(readOnly = true)
     public SpeechReportEntity getReport(
             Long id
     ) {
 
-        return speechReportRepository.findById(id)
-
+        return speechReportRepository
+                .findById(
+                        id
+                )
                 .orElseThrow(() ->
                         new EntityNotFoundException(
                                 "스피치 리포트를 찾을 수 없습니다."
@@ -358,55 +480,200 @@ public class SpeechReportService {
                 );
     }
 
-
-
-
-
     /**
-     * FastAPI 응답 구조 처리
+     * FastAPI 응답 payload 추출
+     *
+     * 대응:
      *
      * {
-     *    result:{
-     *       text_script:"",
-     *       ai_evaluation:{}
-     *    }
+     *   "result": {...}
      * }
+     *
+     * {
+     *   "data": {...}
+     * }
+     *
+     * {
+     *   "payload": {...}
+     * }
+     *
+     * 또는 최상위 직접 응답
      */
     @SuppressWarnings("unchecked")
-    private Map<String,Object> extractSpeechPayload(
-            Map<String,Object> response
+    private Map<String, Object> extractSpeechPayload(
+            Map<String, Object> response
     ) {
 
+        if (
+                response == null
+                        || response.isEmpty()
+        ) {
 
-        Object result =
-                response.get("result");
-
-
-        if (result instanceof Map<?,?>) {
-
-            return (Map<String,Object>) result;
+            return Collections.emptyMap();
         }
 
+        Object result =
+                response.get(
+                        "result"
+                );
+
+        if (
+                result instanceof Map<?, ?>
+        ) {
+
+            return (Map<String, Object>) result;
+        }
+
+        Object data =
+                response.get(
+                        "data"
+                );
+
+        if (
+                data instanceof Map<?, ?>
+        ) {
+
+            return (Map<String, Object>) data;
+        }
+
+        Object payload =
+                response.get(
+                        "payload"
+                );
+
+        if (
+                payload instanceof Map<?, ?>
+        ) {
+
+            return (Map<String, Object>) payload;
+        }
 
         return response;
     }
 
+    /**
+     * FastAPI 전체 응답에서 STT 텍스트를 찾는다.
+     */
+    private String extractTextScript(
+            Map<String, Object> response
+    ) {
 
+        if (
+                response == null
+                        || response.isEmpty()
+        ) {
+            return null;
+        }
 
+        /*
+         * 현재 Map에서 바로 검색
+         */
+        String value =
+                getStringValue(
+                        response,
+                        "text_script"
+                );
 
+        if (
+                value != null
+                        && !value.isBlank()
+        ) {
+            return value;
+        }
+
+        value =
+                getStringValue(
+                        response,
+                        "textScript"
+                );
+
+        if (
+                value != null
+                        && !value.isBlank()
+        ) {
+            return value;
+        }
+
+        value =
+                getStringValue(
+                        response,
+                        "transcript"
+                );
+
+        if (
+                value != null
+                        && !value.isBlank()
+        ) {
+            return value;
+        }
+
+        /*
+         * 내부 Map 재귀 검색
+         */
+        for (
+                Object child :
+                response.values()
+        ) {
+
+            if (
+                    child instanceof Map<?, ?>
+            ) {
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> childMap =
+                        (Map<String, Object>) child;
+
+                String nested =
+                        extractTextScript(
+                                childMap
+                        );
+
+                if (
+                        nested != null
+                                && !nested.isBlank()
+                ) {
+
+                    return nested;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private String getStringValue(
+            Map<String, Object> map,
+            String key
+    ) {
+
+        Object value =
+                map.get(
+                        key
+                );
+
+        if (
+                value == null
+        ) {
+            return null;
+        }
+
+        return String
+                .valueOf(
+                        value
+                )
+                .trim();
+    }
 
     /**
-     * FastAPI 결과에 없는 값 보완
-     *
-     * Spring 요청값 우선
+     * FastAPI 결과에서 빠진 메타데이터 보완
      */
     private SpeechReportRequest fillMissingMetadata(
             SpeechReportRequest reportRequest,
             SpeechAnalyzeRequest analyzeRequest
     ) {
 
-
-        return reportRequest.toBuilder()
+        return reportRequest
+                .toBuilder()
 
                 .interviewId(
                         reportRequest.getInterviewId() != null
@@ -414,13 +681,11 @@ public class SpeechReportService {
                                 : analyzeRequest.getInterviewId()
                 )
 
-
                 .interviewAnswerId(
                         reportRequest.getInterviewAnswerId() != null
                                 ? reportRequest.getInterviewAnswerId()
                                 : analyzeRequest.getInterviewAnswerId()
                 )
-
 
                 .questionId(
                         reportRequest.getQuestionId() != null
@@ -428,87 +693,84 @@ public class SpeechReportService {
                                 : analyzeRequest.getQuestionId()
                 )
 
-
                 .originalQuestion(
-                        isBlank(reportRequest.getOriginalQuestion())
+                        isBlank(
+                                reportRequest.getOriginalQuestion()
+                        )
                                 ? analyzeRequest.getOriginalQuestion()
                                 : reportRequest.getOriginalQuestion()
                 )
 
-
                 .jobCategory(
-                        isBlank(reportRequest.getJobCategory())
+                        isBlank(
+                                reportRequest.getJobCategory()
+                        )
                                 ? analyzeRequest.getJobCategory()
                                 : reportRequest.getJobCategory()
                 )
 
-
                 .build();
     }
-
-
-
-
 
     private InterviewAnswerEntity findInterviewAnswerOrNull(
             Long id
     ) {
 
-        if (id == null) {
+        if (
+                id == null
+        ) {
             return null;
         }
 
-
-        return interviewAnswerRepository.findById(id)
-
+        return interviewAnswerRepository
+                .findById(
+                        id
+                )
                 .orElseThrow(() ->
                         new EntityNotFoundException(
-                                "답변 정보를 찾을 수 없습니다. id=" + id
+                                "답변 정보를 찾을 수 없습니다. id="
+                                        + id
                         )
                 );
     }
-
-
-
-
 
     private Integer getTotalFillerCount(
             SpeechReportRequest request
     ) {
 
-        if (request.getFillerWordAnalysis() == null ||
-                request.getFillerWordAnalysis().getTotalCount() == null) {
+        if (
+                request.getFillerWordAnalysis() == null
+                        || request
+                        .getFillerWordAnalysis()
+                        .getTotalCount() == null
+        ) {
 
             return 0;
         }
 
-
-        return request.getFillerWordAnalysis()
+        return request
+                .getFillerWordAnalysis()
                 .getTotalCount();
     }
 
-
-
-
-
-    private Map<String,Integer> getFillerDetails(
+    private Map<String, Integer> getFillerDetails(
             SpeechReportRequest request
     ) {
 
-        if (request.getFillerWordAnalysis() == null ||
-                request.getFillerWordAnalysis().getDetails() == null) {
+        if (
+                request.getFillerWordAnalysis() == null
+                        || request
+                        .getFillerWordAnalysis()
+                        .getDetails() == null
+        ) {
 
             return Collections.emptyMap();
         }
 
-
-        return request.getFillerWordAnalysis()
+        return request
+                .getFillerWordAnalysis()
                 .getDetails();
     }
-
-
-
-
 
     private List<SpeechReportRequest.RepeatedExpression>
     getRepeatedExpressions(
@@ -520,167 +782,163 @@ public class SpeechReportService {
                 : request.getRepeatedExpressions();
     }
 
-
-
-
-
     private String getPaceEvaluation(
             SpeechReportRequest request
     ) {
 
-        if (request.getSpeechPaceAnalysis() == null) {
+        if (
+                request.getSpeechPaceAnalysis() == null
+        ) {
             return null;
         }
 
-
-        return request.getSpeechPaceAnalysis()
+        return request
+                .getSpeechPaceAnalysis()
                 .getEvaluation();
     }
-
-
-
-
 
     private String getPaceFeedback(
             SpeechReportRequest request
     ) {
 
-        if (request.getSpeechPaceAnalysis() == null) {
+        if (
+                request.getSpeechPaceAnalysis() == null
+        ) {
             return null;
         }
 
-
-        return request.getSpeechPaceAnalysis()
+        return request
+                .getSpeechPaceAnalysis()
                 .getFeedback();
     }
-
-
-
-
 
     private Double getCharactersPerSecond(
             SpeechReportRequest request
     ) {
 
-        if (request.getSpeechPaceAnalysis() == null) {
+        if (
+                request.getSpeechPaceAnalysis() == null
+        ) {
             return null;
         }
 
-
-        return request.getSpeechPaceAnalysis()
+        return request
+                .getSpeechPaceAnalysis()
                 .getCharactersPerSecond();
     }
-
-
 
     private Double getTotalSilenceSeconds(
             SpeechReportRequest request
     ) {
 
-        if (request.getSilenceAnalysis() == null) {
+        if (
+                request.getSilenceAnalysis() == null
+        ) {
             return null;
         }
 
-
-        return request.getSilenceAnalysis()
+        return request
+                .getSilenceAnalysis()
                 .getTotalSilenceSeconds();
     }
-
-
-
-
 
     private Double getPauseRatePercent(
             SpeechReportRequest request
     ) {
 
-        if (request.getSilenceAnalysis() == null) {
+        if (
+                request.getSilenceAnalysis() == null
+        ) {
             return null;
         }
 
-
-        return request.getSilenceAnalysis()
+        return request
+                .getSilenceAnalysis()
                 .getPauseRatePercent();
     }
-
-
-
-
 
     private Integer getCriticalSilenceCount(
             SpeechReportRequest request
     ) {
 
-        if (request.getSilenceAnalysis() == null ||
-                request.getSilenceAnalysis().getCriticalSilenceCount() == null) {
+        if (
+                request.getSilenceAnalysis() == null
+                        || request
+                        .getSilenceAnalysis()
+                        .getCriticalSilenceCount() == null
+        ) {
 
             return 0;
         }
 
-
-        return request.getSilenceAnalysis()
+        return request
+                .getSilenceAnalysis()
                 .getCriticalSilenceCount();
     }
-
-
-
-
 
     private String toJson(
             Object value
     ) throws JsonProcessingException {
 
-        return objectMapper.writeValueAsString(value);
+        return objectMapper
+                .writeValueAsString(
+                        value
+                );
     }
-
-
-
-
 
     private void validateAnalyzeRequest(
             SpeechAnalyzeRequest request
     ) {
 
+        if (
+                request == null
+        ) {
 
-        if (request == null) {
             throw new IllegalArgumentException(
                     "분석 요청 값이 없습니다."
             );
         }
 
+        if (
+                isBlank(
+                        request.getSourceType()
+                )
+        ) {
 
-        if (isBlank(request.getSourceType())) {
             throw new IllegalArgumentException(
                     "sourceType 필요"
             );
         }
 
+        if (
+                isBlank(
+                        request.getSourceValue()
+                )
+        ) {
 
-        if (isBlank(request.getSourceValue())) {
             throw new IllegalArgumentException(
                     "sourceValue 필요"
             );
         }
 
+        if (
+                request.getInterviewId() == null
+        ) {
 
-        if (request.getInterviewId() == null) {
             throw new IllegalArgumentException(
                     "interviewId 필요"
             );
         }
     }
 
-
-
-
-
     private void validateReportRequest(
             SpeechReportRequest request
     ) {
 
-
-        if (request == null ||
-                request.getInterviewId() == null) {
+        if (
+                request == null
+                        || request.getInterviewId() == null
+        ) {
 
             throw new IllegalArgumentException(
                     "리포트 요청 정보 부족"
@@ -688,15 +946,11 @@ public class SpeechReportService {
         }
     }
 
-
-
-
-
     private boolean isBlank(
             String value
     ) {
 
-        return value == null || value.isBlank();
+        return value == null
+                || value.isBlank();
     }
-
 }
