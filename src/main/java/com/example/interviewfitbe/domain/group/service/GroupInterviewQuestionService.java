@@ -59,13 +59,15 @@ public class GroupInterviewQuestionService {
         selectedQuestions.add(selfIntroductionQuestion());
 
         // 2라운드: 공통 역량 질문
-        List<GroupQuestionEntity> round2 = groupQuestionRepository.findAllByRoundNumberOrderByIdAsc(2);
+        List<GroupQuestionEntity> round2 = groupQuestionRepository
+                .findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(2);
         if (!round2.isEmpty()) {
             selectedQuestions.add(GroupQuestionSelector.select(round2, roomId, 2));
         }
 
         // 3라운드: 압박 면접 질문
-        List<GroupQuestionEntity> round3 = groupQuestionRepository.findAllByRoundNumberOrderByIdAsc(3);
+        List<GroupQuestionEntity> round3 = groupQuestionRepository
+                .findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(3);
         if (!round3.isEmpty()) {
             selectedQuestions.add(GroupQuestionSelector.select(round3, roomId, 3));
         }

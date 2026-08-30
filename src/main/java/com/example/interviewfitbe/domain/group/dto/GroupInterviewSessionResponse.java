@@ -2,6 +2,7 @@ package com.example.interviewfitbe.domain.group.dto;
 
 import com.example.interviewfitbe.domain.group.entity.GroupInterviewSessionEntity;
 import com.example.interviewfitbe.domain.group.entity.InterviewStatus;
+import com.example.interviewfitbe.domain.group.entity.GroupQuestionType;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -17,6 +18,7 @@ public class GroupInterviewSessionResponse {
     private Integer currentQuestionIndex;
     private Long currentQuestionId;
     private String currentQuestionText;
+    private GroupQuestionType questionType;
     private Integer currentParticipantIndex;
     private Long currentParticipantUserId;
     private InterviewStatus status;
@@ -37,6 +39,9 @@ public class GroupInterviewSessionResponse {
                 .currentQuestionIndex(session.getCurrentQuestionIndex())
                 .currentQuestionId(currentQuestionId)
                 .currentQuestionText(currentQuestionText)
+                .questionType(session.getCurrentRound() == null
+                        ? null
+                        : GroupQuestionType.fromRound(session.getCurrentRound()))
                 .currentParticipantIndex(session.getCurrentParticipantIndex())
                 .currentParticipantUserId(currentParticipantUserId)
                 .status(session.getStatus())

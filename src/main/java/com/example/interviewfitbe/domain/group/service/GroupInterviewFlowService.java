@@ -194,13 +194,17 @@ public class GroupInterviewFlowService {
     ) {
         InterviewProgressResponse progress = toProgress(roomId, session);
         log.info(
-                "Group interview WebSocket progress: destination={}, type={}, roomId={}, currentRound={}, currentQuestionIndex={}, currentParticipantIndex={}, status={}",
+                "Group interview progress: destination={}, eventType={}, roomId={}, currentRound={}, currentQuestionIndex={}, currentQuestionId={}, currentQuestionText={}, questionType={}, jobRoleId={}, currentParticipantUserId={}, status={}",
                 "/topic/room/" + roomId,
                 type,
                 roomId,
                 progress.getCurrentRound(),
                 progress.getCurrentQuestionIndex(),
-                progress.getCurrentParticipantIndex(),
+                progress.getCurrentQuestionId(),
+                progress.getCurrentQuestionText(),
+                progress.getQuestionType(),
+                session.getInterview().getJobRoleId(),
+                progress.getCurrentParticipantUserId(),
                 progress.getStatus()
         );
         messagingTemplate.convertAndSend(
@@ -253,21 +257,27 @@ public class GroupInterviewFlowService {
                     )
                     .orElseThrow(() -> new IllegalStateException("자기소개 질문 데이터가 없습니다."));
         }
-        List<GroupQuestionEntity> candidates;
-        if (session.getCurrentRound() == 4) {
-            candidates = groupQuestionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(
-                    4,
-                    session.getInterview().getJobRoleId()
-            );
-        } else {
-            candidates = groupQuestionRepository.findAllByRoundNumberOrderByIdAsc(session.getCurrentRound());
-        }
+        int round = session.getCurrentRound();
+        List<GroupQuestionEntity> candidates = switch (round) {
+            case 2, 3 -> groupQuestionRepository.findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(round);
+            case 4 -> {
+                Long jobRoleId = session.getInterview().getJobRoleId();
+                if (jobRoleId == null) {
+                    throw new IllegalStateException("4라운드 질문 선택에 jobRoleId가 필요합니다.");
+                }
+                yield groupQuestionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(4, jobRoleId);
+            }
+            default -> throw new IllegalStateException("지원하지 않는 면접 라운드입니다: " + round);
+        };
         if (candidates.isEmpty()) {
-            return null;
+            throw new IllegalStateException(
+                    "라운드에 사용할 질문이 없습니다. round=" + round
+                            + ", jobRoleId=" + session.getInterview().getJobRoleId()
+            );
         }
 
         long roomId = session.getInterview().getId();
-        return GroupQuestionSelector.select(candidates, roomId, session.getCurrentRound());
+        return GroupQuestionSelector.select(candidates, roomId, round);
     }
 
     private Long currentParticipantUserId(Long roomId, Integer index) {
