@@ -48,6 +48,42 @@ class GroupInterviewFlowServiceTest {
                 messagingTemplate
         );
         ReflectionTestUtils.setField(service, "answerLimitSeconds", 60L);
+        when(questionRepository.findFirstByRoundNumberAndQuestionText(
+                1,
+                GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
+        )).thenReturn(Optional.of(question(1L, GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION)));
+    }
+
+    @Test
+    void firstRoundAlwaysReturnsSelfIntroductionQuestion() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        GroupInterviewSessionEntity session = GroupInterviewSessionEntity.builder()
+                .interview(interview)
+                .build();
+        session.start();
+        GroupQuestionEntity selfIntroduction = question(
+                100L,
+                GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
+        );
+
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L)));
+        when(questionRepository.findAllByRoundNumberOrderByIdAsc(1))
+                .thenReturn(List.of(question(200L, "본인의 가장 큰 강점은 무엇입니까?")));
+        when(questionRepository.findFirstByRoundNumberAndQuestionText(
+                1,
+                GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
+        )).thenReturn(Optional.of(selfIntroduction));
+
+        var response = service.getSession(10L);
+
+        assertThat(response.getCurrentRound()).isEqualTo(1);
+        assertThat(response.getCurrentQuestionId()).isEqualTo(100L);
+        assertThat(response.getCurrentQuestionText())
+                .isEqualTo(GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION);
+        verify(questionRepository, never()).findAllByRoundNumberOrderByIdAsc(1);
     }
 
     @Test
@@ -64,7 +100,10 @@ class GroupInterviewFlowServiceTest {
         when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.of(session));
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
                 .thenReturn(List.of(participant(5L)));
-        when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of(question));
+        when(questionRepository.findFirstByRoundNumberAndQuestionText(
+                1,
+                GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
+        )).thenReturn(Optional.of(question));
         when(answerRepository.saveAndFlush(any())).thenReturn(
                 GroupInterviewAnswerEntity.builder().id(123L).build()
         );

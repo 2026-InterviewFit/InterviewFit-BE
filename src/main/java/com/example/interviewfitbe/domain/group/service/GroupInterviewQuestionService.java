@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class GroupInterviewQuestionService {
 
+    public static final String SELF_INTRODUCTION_QUESTION = "간단하게 자기소개를 해주세요.";
+
     private final GroupQuestionRepository groupQuestionRepository;
     private final JobRoleRepository jobRoleRepository;
 
@@ -29,10 +31,7 @@ public class GroupInterviewQuestionService {
         List<GroupQuestionEntity> selectedQuestions = new ArrayList<>();
 
         // 1라운드: 자기소개
-        List<GroupQuestionEntity> round1 = groupQuestionRepository.findByRoundNumber(1);
-        if (!round1.isEmpty()) {
-            selectedQuestions.add(randomQuestion(round1));
-        }
+        selectedQuestions.add(selfIntroductionQuestion());
 
         // 2라운드: 공통 역량 질문
         List<GroupQuestionEntity> round2 = groupQuestionRepository.findByRoundNumber(2);
@@ -64,5 +63,11 @@ public class GroupInterviewQuestionService {
         List<GroupQuestionEntity> shuffled = new ArrayList<>(questions);
         Collections.shuffle(shuffled);
         return shuffled.get(0);
+    }
+
+    private GroupQuestionEntity selfIntroductionQuestion() {
+        return groupQuestionRepository
+                .findFirstByRoundNumberAndQuestionText(1, SELF_INTRODUCTION_QUESTION)
+                .orElseThrow(() -> new IllegalStateException("자기소개 질문 데이터가 없습니다."));
     }
 }
