@@ -10,12 +10,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class QuestionRequest {
+
     /**
-     * 생성된 질문을 연결할 1:1 면접 ID.
+     * 선택된 질문을 사용할 1:1 면접 ID.
      *
-     * 면접을 먼저 생성한 뒤 질문 생성 API를 호출하는 현재 FE 흐름에서
-     * interviewId를 함께 보내면 questions.interview_id가 즉시 연결된다.
-     * 기존 호출과의 호환을 위해 optional이다.
+     * QuestionEntity 자체를 면접에 귀속시키지 않고,
+     * interviewId가 전달되면 interview_questions 연결 테이블에
+     * interview_id + question_id + question_order를 저장한다.
+     *
+     * 기존 질문 생성 호출과의 호환을 위해 optional이다.
      */
     private Long interviewId;
 

@@ -22,13 +22,17 @@ public interface InterviewAnswerRepository
      * 답변 분석용 단건 조회
      *
      * 비동기 분석에서는 조회 트랜잭션이 끝난 뒤에도
-     * interview / jobRole / ptQuestion 정보가 필요하므로
-     * EntityGraph를 통해 미리 로딩한다.
+     * interview / jobRole / 일반 질문 / PT 질문 정보가 필요하다.
+     * 질문별 답변 분석에서는 InterviewQuestion -> Question 경로를 사용하므로
+     * 해당 연관관계까지 EntityGraph로 미리 로딩한다.
      */
     @EntityGraph(
             attributePaths = {
                     "interview",
                     "interview.jobRole",
+                    "interviewQuestion",
+                    "interviewQuestion.question",
+                    "question",
                     "ptQuestion",
                     "ptQuestion.ptInterview"
             }

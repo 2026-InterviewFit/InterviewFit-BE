@@ -7,12 +7,14 @@ import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionA
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionEntity;
 import com.example.interviewfitbe.domain.coverletter.enums.ProcessingStatus;
 import com.example.interviewfitbe.domain.coverletter.exception.CoverLetterProcessingErrorCode;
+import com.example.interviewfitbe.domain.coverletter.service.CoverLetterService;
+import com.example.interviewfitbe.domain.coverletter.service.embedding.CoverLetterQuestionEmbeddingService;
 import com.example.interviewfitbe.domain.coverletter.service.processing.CoverLetterProcessingService;
 import com.example.interviewfitbe.domain.coverletter.service.question.CoverLetterQuestionAnalysisService;
 import com.example.interviewfitbe.domain.coverletter.service.question.CoverLetterQuestionService;
-import com.example.interviewfitbe.domain.coverletter.service.CoverLetterService;
-import com.example.interviewfitbe.domain.coverletter.service.embedding.CoverLetterQuestionEmbeddingService;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewQuestionEntity;
+import com.example.interviewfitbe.domain.interview.repository.InterviewQuestionRepository;
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.job.service.JobRoleService;
@@ -41,6 +43,8 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 @Service
 public class QuestionService {
+    private static final String SELF_INTRODUCTION_QUESTION = "간단하게 자기소개 부탁드립니다.";
+
     private final QuestionClientService questionClientService;
     private final JsonQuestionService jsonQuestionService;
     private final CoverLetterService coverLetterService;
@@ -52,6 +56,7 @@ public class QuestionService {
     private final QuestionRepository questionRepository;
     private final QuestionMapper questionMapper;
     private final InterviewRepository interviewRepository;
+    private final InterviewQuestionRepository interviewQuestionRepository;
 
     private final CoverLetterQuestionSelector coverLetterQuestionSelector;
 
@@ -64,14 +69,45 @@ public class QuestionService {
 
     @Transactional
     public List<QuestionResponse> createQuestions(Long userId, QuestionRequest request) {
+        validateCreateRequest(request);
+
+        /*
+         * FE는 면접을 먼저 생성한 뒤 질문 생성 API를 호출한다.
+         * request.interviewId가 있으면 현재 로그인 사용자의 면접인지 확인하고
+         * 최종 선택된 질문 원본은 건드리지 않은 채 interview_questions에 연결한다.
+         */
+        InterviewEntity interview = resolveInterview(userId, request);
+
+        /*
+         * 같은 interviewId로 질문 생성 API가 재호출된 경우
+         * 이미 확정된 질문 세트를 그대로 반환한다.
+         * 네트워크 재시도 때문에 질문 생성/Gemini 호출이 중복되는 것도 막는다.
+         */
+        List<QuestionResponse> existingInterviewQuestions =
+                getExistingInterviewQuestions(interview, request.getCount());
+
+        if (!existingInterviewQuestions.isEmpty()) {
+            return existingInterviewQuestions;
+        }
+
         QuestionCreateData data = new QuestionCreateData();
         List<QuestionEntity> entities;
 
         try {
             data = loadQuestionData(userId, request);
 
+            /*
+             * develop 기존 동작을 유지한다.
+             * 재사용 가능한 질문만으로 요청 개수를 충족하는 경우
+             * 별도 생성 없이 해당 질문들을 이번 interview에 연결한다.
+             */
             if (hasEnoughReusableQuestions(data, request)) {
-                return getReusableQuestions(data, request);
+                List<QuestionEntity> selected = data.getReusableQuestions()
+                        .stream()
+                        .limit(request.getCount())
+                        .toList();
+
+                return attachToInterviewAndMap(selected, interview);
             }
 
             entities = generateQuestions(request, data);
@@ -91,17 +127,170 @@ public class QuestionService {
             }
         }
 
+        /*
+         * develop에서 추가된 자기소개 질문을 유지한다.
+         * loadQuestionData 도중 예외가 발생한 경우 data.jobRole이 비어 있을 수 있으므로
+         * request.jobRoleId로 안전하게 다시 조회한다.
+         */
+        JobRoleEntity selfIntroductionJobRole = data.getJobRole() != null
+                ? data.getJobRole()
+                : jobRoleService.getJobRoleEntity(request.getJobRoleId());
+
         entities = new ArrayList<>(entities);
-        entities.add(createSelfIntroductionQuestion(data.getJobRole()));
+        entities.add(createSelfIntroductionQuestion(selfIntroductionJobRole));
 
         List<QuestionEntity> saved = saveQuestions(entities);
 
-        return mergeQuestions(
-                data.getReusableQuestions().isEmpty()
-                        ? List.of()
-                        : data.getReusableQuestions(),
+        /*
+         * develop의 정렬 기준을 유지하면서 Response로 변환하기 전에
+         * QuestionEntity 목록을 만든다. 그래야 interview_questions 연결에
+         * 실제 Question PK를 사용할 수 있다.
+         */
+        List<QuestionEntity> finalQuestions = mergeQuestionEntities(
+                data.getReusableQuestions(),
                 saved
         );
+
+        return attachToInterviewAndMap(finalQuestions, interview);
+    }
+
+    private void validateCreateRequest(QuestionRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("질문 생성 요청이 필요합니다.");
+        }
+
+        if (request.getCount() == null || request.getCount() <= 0) {
+            throw new IllegalArgumentException("count는 1 이상이어야 합니다.");
+        }
+
+        if (request.getJobRoleId() == null) {
+            throw new IllegalArgumentException("jobRoleId는 필수입니다.");
+        }
+    }
+
+    private InterviewEntity resolveInterview(Long userId, QuestionRequest request) {
+        if (request.getInterviewId() == null) {
+            return null;
+        }
+
+        InterviewEntity interview = interviewRepository
+                .findById(request.getInterviewId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "해당 면접을 찾을 수 없습니다. interviewId=" + request.getInterviewId()
+                ));
+
+        if (userId == null || !interview.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException(
+                    "본인의 면접에만 질문을 연결할 수 있습니다."
+            );
+        }
+
+        if (!interview.getJobRole().getId().equals(request.getJobRoleId())) {
+            throw new IllegalArgumentException(
+                    "면접의 직무와 질문 생성 요청의 jobRoleId가 일치하지 않습니다."
+            );
+        }
+
+        return interview;
+    }
+
+    /**
+     * 질문 원본을 수정하지 않고 이번 면접과의 사용 관계만 저장한다.
+     *
+     * QuestionEntity는 여러 면접에서 재사용 가능한 원본이므로
+     * interview_id / question_order를 QuestionEntity에 기록하지 않는다.
+     * 대신 interview_questions 연결 테이블에
+     * interview_id + question_id + question_order를 저장한다.
+     */
+    private List<QuestionResponse> attachToInterviewAndMap(
+            List<QuestionEntity> questions,
+            InterviewEntity interview
+    ) {
+        if (questions == null || questions.isEmpty()) {
+            return List.of();
+        }
+
+        if (interview != null) {
+            for (int index = 0; index < questions.size(); index++) {
+                QuestionEntity question = questions.get(index);
+                int questionOrder = index + 1;
+
+                InterviewQuestionEntity interviewQuestion =
+                        interviewQuestionRepository
+                                .findByInterview_IdAndQuestion_Id(
+                                        interview.getId(),
+                                        question.getId()
+                                )
+                                .orElseGet(
+                                        () -> InterviewQuestionEntity.builder()
+                                                .interview(interview)
+                                                .question(question)
+                                                .questionOrder(questionOrder)
+                                                .build()
+                                );
+
+                if (interviewQuestion.getQuestionOrder() == null
+                        || !interviewQuestion.getQuestionOrder().equals(questionOrder)) {
+                    interviewQuestion.changeOrder(questionOrder);
+                }
+
+                interviewQuestionRepository.save(interviewQuestion);
+            }
+        }
+
+        return questions
+                .stream()
+                .map(questionMapper::toResponse)
+                .toList();
+    }
+
+    private List<QuestionResponse> getExistingInterviewQuestions(
+            InterviewEntity interview,
+            Integer expectedCount
+    ) {
+        if (interview == null) {
+            return List.of();
+        }
+
+        List<InterviewQuestionEntity> existing =
+                interviewQuestionRepository
+                        .findAllByInterview_IdOrderByQuestionOrderAsc(
+                                interview.getId()
+                        );
+
+        if (existing.isEmpty()) {
+            return List.of();
+        }
+
+        /*
+         * develop에서는 일반 질문 생성 후 자기소개 질문을 1개 추가한다.
+         * 반면 재사용 질문만으로 count를 충족하면 기존 로직상 자기소개 질문을
+         * 추가하지 않고 바로 반환한다. 두 경우 모두 재호출 시 정상으로 인정한다.
+         */
+        boolean hasSelfIntroduction = existing.stream()
+                .map(InterviewQuestionEntity::getQuestion)
+                .anyMatch(question -> SELF_INTRODUCTION_QUESTION.equals(question.getQuestion()));
+
+        int expectedLinkedCount = expectedCount == null
+                ? existing.size()
+                : expectedCount + (hasSelfIntroduction ? 1 : 0);
+
+        if (expectedCount != null && existing.size() != expectedLinkedCount) {
+            throw new IllegalStateException(
+                    "면접 질문 연결 개수가 요청 count와 다릅니다. interviewId="
+                            + interview.getId()
+                            + ", linkedCount="
+                            + existing.size()
+                            + ", requestedCount="
+                            + expectedCount
+            );
+        }
+
+        return existing
+                .stream()
+                .map(InterviewQuestionEntity::getQuestion)
+                .map(questionMapper::toResponse)
+                .toList();
     }
 
     private boolean hasEnoughReusableQuestions(QuestionCreateData data, QuestionRequest request) {
@@ -205,7 +394,7 @@ public class QuestionService {
         QuestionResult result = getQuestions(
                 request,
                 data.getJobRole(),
-                data.getPreviousQuestions() ,
+                data.getPreviousQuestions(),
                 data.getSelectedCoverLetterQuestionAnalyses().isEmpty()
                         ? data.getCoverLetterQuestionAnalyses()
                         : data.getSelectedCoverLetterQuestionAnalyses(),
@@ -227,10 +416,13 @@ public class QuestionService {
                 .toList();
     }
 
-    private List<QuestionResponse> mergeQuestions(List<QuestionEntity> reusable, List<QuestionEntity> saved) {
+    private List<QuestionEntity> mergeQuestionEntities(
+            List<QuestionEntity> reusable,
+            List<QuestionEntity> saved
+    ) {
         return Stream.concat(
                         reusable == null ? Stream.empty() : reusable.stream(),
-                        saved.stream()
+                        saved == null ? Stream.empty() : saved.stream()
                 )
                 .sorted(
                         Comparator
@@ -240,6 +432,12 @@ public class QuestionService {
                                 )
                                 .thenComparing(QuestionEntity::getId)
                 )
+                .toList();
+    }
+
+    private List<QuestionResponse> mergeQuestions(List<QuestionEntity> reusable, List<QuestionEntity> saved) {
+        return mergeQuestionEntities(reusable, saved)
+                .stream()
                 .map(questionMapper::toResponse)
                 .toList();
     }
@@ -349,7 +547,7 @@ public class QuestionService {
 
     private QuestionEntity createSelfIntroductionQuestion(JobRoleEntity jobRole) {
         return QuestionEntity.builder()
-                .question("간단하게 자기소개 부탁드립니다.")
+                .question(SELF_INTRODUCTION_QUESTION)
                 .jobRole(jobRole)
                 .type(QuestionType.DEFAULT)
                 .questionOrder(1)

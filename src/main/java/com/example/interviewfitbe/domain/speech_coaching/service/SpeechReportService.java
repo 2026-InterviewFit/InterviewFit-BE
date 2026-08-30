@@ -207,6 +207,149 @@ public class SpeechReportService {
     }
 
     /**
+     * 일반 면접의 질문별 답변 분석.
+     *
+     * 질문별 audio/webm은 면접 전체 SpeechReport를 만들기 위한 원본이 아니다.
+     * 따라서 speech_report(interview 단위)는 저장/갱신하지 않고,
+     * 아래 두 결과만 답변 기준으로 저장한다.
+     *
+     * 1) interview_answers.answer_text : Whisper STT
+     * 2) ai_evaluation                 : Gemini 질문별 내용 평가
+     *
+     * 전체 면접 영상의 스피치 지표/전체 STT는 기존 analyzeAndSave()가 담당한다.
+     */
+    @Transactional
+    public void analyzeQuestionAnswerAndSave(
+            SpeechAnalyzeRequest request
+    ) {
+
+        validateAnalyzeRequest(request);
+
+        if (request.getInterviewAnswerId() == null) {
+            throw new IllegalArgumentException(
+                    "질문별 답변 분석에는 interviewAnswerId가 필요합니다."
+            );
+        }
+
+        InterviewAnswerEntity interviewAnswer =
+                findInterviewAnswerOrNull(
+                        request.getInterviewAnswerId()
+                );
+
+        boolean hasAnswerText =
+                interviewAnswer != null
+                        && interviewAnswer.getAnswerText() != null
+                        && !interviewAnswer.getAnswerText().isBlank();
+
+        boolean hasAiEvaluation =
+                aiEvaluationRepository
+                        .findByInterviewAnswer_Id(
+                                request.getInterviewAnswerId()
+                        )
+                        .isPresent();
+
+        if (hasAnswerText && hasAiEvaluation) {
+            log.info(
+                    "[Speech] 기존 질문별 STT/Gemini 결과 재사용 - answerId={}",
+                    request.getInterviewAnswerId()
+            );
+            return;
+        }
+
+        Map<String, Object> fastApiResponse =
+                speechAnalysisService.analyzeSpeech(
+                        request.getSourceType(),
+                        request.getSourceValue(),
+                        request.getJobCategory(),
+                        request.getInterviewId(),
+                        request.getInterviewAnswerId(),
+                        request.getQuestionId(),
+                        request.getOriginalQuestion()
+                );
+
+        log.info(
+                "[Speech][Question] FastAPI 전체 응답 = {}",
+                fastApiResponse
+        );
+
+        Map<String, Object> payload =
+                extractSpeechPayload(
+                        fastApiResponse
+                );
+
+        SpeechReportRequest reportRequest =
+                objectMapper.convertValue(
+                        payload,
+                        SpeechReportRequest.class
+                );
+
+        reportRequest =
+                fillMissingMetadata(
+                        reportRequest,
+                        request
+                );
+
+        if (
+                reportRequest.getTextScript() == null
+                        || reportRequest.getTextScript().isBlank()
+        ) {
+            String extractedText =
+                    extractTextScript(
+                            fastApiResponse
+                    );
+
+            if (extractedText != null && !extractedText.isBlank()) {
+                reportRequest =
+                        reportRequest
+                                .toBuilder()
+                                .textScript(extractedText.trim())
+                                .build();
+            }
+        }
+
+        String textScript = reportRequest.getTextScript();
+
+        if (textScript != null && !textScript.isBlank()) {
+            interviewAnswer.updateAnswerText(
+                    textScript.trim()
+            );
+            interviewAnswerRepository.save(
+                    interviewAnswer
+            );
+
+            log.info(
+                    "[Speech][Question] STT 저장 완료 - answerId={}, textLength={}",
+                    interviewAnswer.getId(),
+                    textScript.trim().length()
+            );
+        } else {
+            log.warn(
+                    "[Speech][Question] STT 결과가 비어 있습니다. answerId={}",
+                    interviewAnswer.getId()
+            );
+        }
+
+        try {
+            saveAiEvaluation(
+                    reportRequest,
+                    interviewAnswer
+            );
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                    "질문별 AI 평가 JSON 변환 실패",
+                    e
+            );
+        }
+
+        log.info(
+                "[Speech][Question] 질문별 STT/Gemini 저장 완료 - answerId={}, questionId={}",
+                interviewAnswer.getId(),
+                request.getQuestionId()
+        );
+    }
+
+
+    /**
      * Speech 점수 계산
      */
     private Double calculateSpeechScore(
