@@ -68,6 +68,7 @@ public class GroupInterviewAnswerAnalysisJobService {
                     stringValue(speechPayload, "text_script", "textScript"),
                     toJson(speech),
                     toJson(speechPayload.get("ai_evaluation")),
+                    toJson(speechPayload.get("external_ai_analysis")),
                     toJson(blinking),
                     toJson(gaze),
                     toJson(pose)
@@ -126,6 +127,7 @@ public class GroupInterviewAnswerAnalysisJobService {
             String speechText,
             String speechJson,
             String aiEvaluationJson,
+            String externalAiAnalysisJson,
             String blinkingJson,
             String gazeJson,
             String poseJson
@@ -136,6 +138,7 @@ public class GroupInterviewAnswerAnalysisJobService {
                     speechText,
                     speechJson,
                     aiEvaluationJson,
+                    externalAiAnalysisJson,
                     blinkingJson,
                     gazeJson,
                     poseJson,

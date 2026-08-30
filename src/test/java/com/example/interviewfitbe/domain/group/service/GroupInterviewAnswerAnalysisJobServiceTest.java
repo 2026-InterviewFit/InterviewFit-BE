@@ -109,7 +109,17 @@ class GroupInterviewAnswerAnalysisJobServiceTest {
                 "repeated_expressions", List.of(),
                 "speech_pace_analysis", Map.of("characters_per_second", 4.2),
                 "silence_analysis", Map.of("total_silence_seconds", 1.0),
-                "ai_evaluation", Map.of("feedback", "좋습니다")
+                "ai_evaluation", Map.of("feedback", "좋습니다"),
+                "external_ai_analysis", Map.of(
+                        "star", Map.of(
+                                "situation", "서비스 장애 상황",
+                                "task", "서비스 복구",
+                                "action", "로그 분석",
+                                "result", "정상화"
+                        ),
+                        "strengths", List.of("행동 과정이 구체적입니다."),
+                        "improvements", List.of("성과를 수치로 제시하세요.")
+                )
         )));
         when(blinkingService.analyzeBlinking("videos/answer.webm"))
                 .thenReturn(Map.of("result", Map.of("blink_count", 10)));
@@ -124,9 +134,31 @@ class GroupInterviewAnswerAnalysisJobServiceTest {
         assertThat(analysis.getSpeechText()).isEqualTo("안녕하세요");
         assertThat(analysis.getSpeechResultJson()).contains("filler_word_analysis");
         assertThat(analysis.getAiEvaluationJson()).contains("좋습니다");
+        assertThat(analysis.getExternalAiAnalysisJson())
+                .contains("서비스 장애 상황")
+                .contains("행동 과정이 구체적입니다.");
         assertThat(analysis.getEyeBlinkingResultJson()).contains("blink_count");
         assertThat(analysis.getEyeGazeResultJson()).contains("center_ratio");
         assertThat(analysis.getPoseResultJson()).contains("timestamp");
+    }
+
+    @Test
+    void missingExternalAiAnalysisDoesNotFailExistingAnalysis() {
+        when(speechService.analyzeSpeech(anyString(), anyString(), any(), anyLong(),
+                anyLong(), anyLong(), anyString()))
+                .thenReturn(Map.of("result", Map.of(
+                        "text_script", "안녕하세요",
+                        "ai_evaluation", Map.of("feedback", "기존 평가")
+                )));
+        when(blinkingService.analyzeBlinking(anyString())).thenReturn(Map.of());
+        when(gazeService.analyzeGaze(anyString())).thenReturn(Map.of());
+        when(poseService.analyzePosture(anyString())).thenReturn(List.of());
+
+        service.analyzeAsync(123L);
+
+        assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.DONE);
+        assertThat(analysis.getAiEvaluationJson()).contains("기존 평가");
+        assertThat(analysis.getExternalAiAnalysisJson()).isNull();
     }
 
     @Test

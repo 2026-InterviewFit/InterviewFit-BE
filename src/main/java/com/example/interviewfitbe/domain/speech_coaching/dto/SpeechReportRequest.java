@@ -104,6 +104,12 @@ public class SpeechReportRequest {
     @JsonProperty("ai_evaluation")
     private AiEvaluation aiEvaluation;
 
+    /**
+     * 외부 학습 AI의 구조화된 답변 분석. 분석 실패 시 null이다.
+     */
+    @JsonProperty("external_ai_analysis")
+    private ExternalAiAnalysis externalAiAnalysis;
+
 
 
     // ============================
