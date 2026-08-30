@@ -40,9 +40,9 @@ class GroupInterviewQuestionServiceTest {
                 1,
                 GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
         )).thenReturn(Optional.of(question(1L, GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION)));
-        when(questionRepository.findAllByRoundNumberOrderByIdAsc(2))
+        when(questionRepository.findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(2))
                 .thenReturn(List.of(question(20L, "2-1"), question(21L, "2-2")));
-        when(questionRepository.findAllByRoundNumberOrderByIdAsc(3))
+        when(questionRepository.findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(3))
                 .thenReturn(List.of(question(30L, "3-1"), question(31L, "3-2"), question(32L, "3-3")));
         when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(4, 2L))
                 .thenReturn(List.of(question(40L, "4-1"), question(41L, "4-2")));
@@ -64,11 +64,11 @@ class GroupInterviewQuestionServiceTest {
 
         assertThat(questions.get(1).getId())
                 .isEqualTo(GroupQuestionSelector.select(
-                        questionRepository.findAllByRoundNumberOrderByIdAsc(2), roomId, 2
+                        questionRepository.findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(2), roomId, 2
                 ).getId());
         assertThat(questions.get(2).getId())
                 .isEqualTo(GroupQuestionSelector.select(
-                        questionRepository.findAllByRoundNumberOrderByIdAsc(3), roomId, 3
+                        questionRepository.findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(3), roomId, 3
                 ).getId());
         assertThat(questions.get(3).getId())
                 .isEqualTo(GroupQuestionSelector.select(

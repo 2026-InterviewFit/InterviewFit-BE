@@ -227,23 +227,36 @@ class GroupInterviewFlowServiceTest {
         when(participantRepository.findAllByRoomIdOrderByIdAsc(10L)).thenReturn(participants);
         when(participantRepository.countByRoomId(10L)).thenReturn(2L);
         when(questionRepository.findAllByRoundNumberOrderByIdAsc(1)).thenReturn(List.of(firstQuestion));
-        when(questionRepository.findAllByRoundNumberOrderByIdAsc(2)).thenReturn(List.of(secondQuestion));
-        when(questionRepository.findAllByRoundNumberOrderByIdAsc(3)).thenReturn(List.of(thirdQuestion));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(2))
+                .thenReturn(List.of(secondQuestion));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(3))
+                .thenReturn(List.of(thirdQuestion));
         when(questionRepository.findAllByRoundNumberAndJobRoleIdOrderByIdAsc(4, 2L))
                 .thenReturn(List.of(fourthQuestion));
         when(answerRepository.saveAndFlush(any())).thenAnswer(invocation ->
                 GroupInterviewAnswerEntity.builder().id(answerId.getAndIncrement()).build()
         );
 
+        assertSessionQuestion(1, 1L, GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION,
+                GroupQuestionType.INTRODUCTION, 5L, InterviewStatus.QUESTION_VIEW);
+
         answer(service, 5L);
         assertProgress(session, 1, 0, 1, InterviewStatus.QUESTION_VIEW);
+        assertSessionQuestion(1, 1L, GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION,
+                GroupQuestionType.INTRODUCTION, 6L, InterviewStatus.QUESTION_VIEW);
         answer(service, 6L);
         assertProgress(session, 2, 1, 0, InterviewStatus.QUESTION_VIEW);
+        assertSessionQuestion(2, 32L, "질문 2", GroupQuestionType.COMMON_COMPETENCY,
+                5L, InterviewStatus.QUESTION_VIEW);
 
         answer(service, 5L);
         assertProgress(session, 2, 1, 1, InterviewStatus.QUESTION_VIEW);
+        assertSessionQuestion(2, 32L, "질문 2", GroupQuestionType.COMMON_COMPETENCY,
+                6L, InterviewStatus.QUESTION_VIEW);
         answer(service, 6L);
         assertProgress(session, 3, 2, 0, InterviewStatus.QUESTION_VIEW);
+        assertSessionQuestion(3, 33L, "질문 3", GroupQuestionType.PRESSURE,
+                5L, InterviewStatus.QUESTION_VIEW);
 
         ArgumentCaptor<GroupRoomEvent> eventCaptor = ArgumentCaptor.forClass(GroupRoomEvent.class);
         verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/room/10"), eventCaptor.capture());
@@ -260,13 +273,21 @@ class GroupInterviewFlowServiceTest {
 
         answer(service, 5L);
         assertProgress(session, 3, 2, 1, InterviewStatus.QUESTION_VIEW);
+        assertSessionQuestion(3, 33L, "질문 3", GroupQuestionType.PRESSURE,
+                6L, InterviewStatus.QUESTION_VIEW);
         answer(service, 6L);
         assertProgress(session, 4, 3, 0, InterviewStatus.QUESTION_VIEW);
+        assertSessionQuestion(4, 34L, "질문 4", GroupQuestionType.JOB_SPECIFIC,
+                5L, InterviewStatus.QUESTION_VIEW);
 
         answer(service, 5L);
         assertProgress(session, 4, 3, 1, InterviewStatus.QUESTION_VIEW);
+        assertSessionQuestion(4, 34L, "질문 4", GroupQuestionType.JOB_SPECIFIC,
+                6L, InterviewStatus.QUESTION_VIEW);
         answer(service, 6L);
         assertProgress(session, 4, 3, 1, InterviewStatus.FINISHED);
+        assertSessionQuestion(4, 34L, "질문 4", GroupQuestionType.JOB_SPECIFIC,
+                6L, InterviewStatus.FINISHED);
         verify(interview).finishInterview();
     }
 
@@ -324,6 +345,24 @@ class GroupInterviewFlowServiceTest {
         assertThat(session.getCurrentQuestionIndex()).isEqualTo(questionIndex);
         assertThat(session.getCurrentParticipantIndex()).isEqualTo(participantIndex);
         assertThat(session.getStatus()).isEqualTo(status);
+    }
+
+    private void assertSessionQuestion(
+            int round,
+            Long questionId,
+            String questionText,
+            GroupQuestionType questionType,
+            Long participantUserId,
+            InterviewStatus status
+    ) {
+        var response = service.getSession(10L);
+        assertThat(response.getCurrentRound()).isEqualTo(round);
+        assertThat(response.getCurrentQuestionIndex()).isEqualTo(round - 1);
+        assertThat(response.getCurrentQuestionId()).isEqualTo(questionId);
+        assertThat(response.getCurrentQuestionText()).isEqualTo(questionText);
+        assertThat(response.getQuestionType()).isEqualTo(questionType);
+        assertThat(response.getCurrentParticipantUserId()).isEqualTo(participantUserId);
+        assertThat(response.getStatus()).isEqualTo(status);
     }
 
     private GroupQuestionEntity question(Long id, String text) {
