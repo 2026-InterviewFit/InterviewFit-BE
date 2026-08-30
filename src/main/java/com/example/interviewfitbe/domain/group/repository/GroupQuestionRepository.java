@@ -11,10 +11,10 @@ import java.util.Optional;
 @Repository
 public interface GroupQuestionRepository extends JpaRepository<GroupQuestionEntity, Long> {
 
-    // 1, 2라운드용: 직무 상관없이 공통 라운드 질문 조회
+    // 1~3라운드용: 직무 상관없이 공통 라운드 질문 조회
     List<GroupQuestionEntity> findByRoundNumber(Integer roundNumber);
 
-    // 3라운드용: 특정 직무에 매핑된 직무 토의 질문 조회
+    // 4라운드용: 특정 직무에 매핑된 직무 토의 질문 조회
     List<GroupQuestionEntity> findByRoundNumberAndJobRole(Integer roundNumber, JobRoleEntity jobRole);
 
     List<GroupQuestionEntity> findAllByRoundNumberOrderByIdAsc(Integer roundNumber);

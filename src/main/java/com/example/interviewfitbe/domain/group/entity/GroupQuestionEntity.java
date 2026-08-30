@@ -19,13 +19,13 @@ public class GroupQuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 직무 토의(3라운드)의 경우 특정 직무와 연동, 1~2라운드 공통 질문은 null 허용
+    // 직무 토의(4라운드)의 경우 특정 직무와 연동, 1~3라운드 공통 질문은 null 허용
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_role_id")
     private JobRoleEntity jobRole;
 
     @Column(nullable = false)
-    private Integer roundNumber; // 1: 공통 역량, 2: 압박, 3: 직무 토의
+    private Integer roundNumber; // 1: 자기소개, 2: 공통 역량, 3: 압박, 4: 직무 토의
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String questionText; // 면접 질문 내용
