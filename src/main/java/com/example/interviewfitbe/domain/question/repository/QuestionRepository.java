@@ -14,13 +14,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface QuestionRepository extends JpaRepository<QuestionEntity, Long> {
-
-    /**
-     * 실제 면접에서 한 번도 사용되지 않은 오래된 DEFAULT 질문만 정리한다.
-     *
-     * QuestionEntity.interview가 아니라 interview_questions 연결 테이블을 기준으로
-     * 사용 여부를 판단한다.
-     */
     @Query("""
         SELECT q.id
         FROM QuestionEntity q
@@ -34,11 +27,7 @@ public interface QuestionRepository extends JpaRepository<QuestionEntity, Long> 
           )
         ORDER BY q.id
     """)
-    List<Long> findExpiredQuestionIds(
-            @Param("type") QuestionType type,
-            @Param("expiredAt") LocalDateTime expiredAt,
-            Pageable pageable
-    );
+    List<Long> findExpiredQuestionIds(@Param("type") QuestionType type, @Param("expiredAt") LocalDateTime expiredAt, Pageable pageable);
 
     @Modifying
     @Transactional
@@ -48,34 +37,22 @@ public interface QuestionRepository extends JpaRepository<QuestionEntity, Long> 
     """)
     int deleteByIds(@Param("ids") List<Long> ids);
 
-    /**
-     * AI 생성 질문 원본은 특정 Interview에 귀속되지 않는다.
-     * 따라서 interview_id 여부와 관계없이 자기소개서 문항 + 타입 기준으로 재사용한다.
-     */
     @Query(value = """
-        SELECT *
-        FROM questions
-        WHERE cover_letter_question_id IN (:coverLetterQuestionIds)
-          AND type = :type
-        ORDER BY created_at
+        SELECT q.*
+        FROM questions q
+        WHERE q.cover_letter_question_id IN (:coverLetterQuestionIds)
+          AND q.type = :type
+          AND NOT EXISTS (
+              SELECT iq.id
+              FROM interview_questions iq
+              WHERE iq.question_id = q.id
+          )
+        ORDER BY q.created_at
         LIMIT :count
     """, nativeQuery = true)
-    List<QuestionEntity> findReusableQuestions(
-            @Param("coverLetterQuestionIds") List<Long> coverLetterQuestionIds,
-            @Param("type") String type,
-            @Param("count") int count
-    );
+    List<QuestionEntity> findReusableQuestions(@Param("coverLetterQuestionIds") List<Long> coverLetterQuestionIds, @Param("type") String type, @Param("count") int count);
 
     List<QuestionEntity> findAllByOrderByCreatedAtDesc();
-
-    List<QuestionEntity> findTop6ByCoverLetterQuestionInAndTypeOrderByCreatedAtDesc(
-            List<CoverLetterQuestionEntity> coverLetterQuestions,
-            QuestionType type
-    );
-
-    List<QuestionEntity> findTop6ByCoverLetterQuestionInAndTypeAndIdNotInOrderByCreatedAtDesc(
-            List<CoverLetterQuestionEntity> coverLetterQuestions,
-            QuestionType type,
-            List<Long> excludeIds
-    );
+    List<QuestionEntity> findTop6ByCoverLetterQuestionInAndTypeOrderByCreatedAtDesc(List<CoverLetterQuestionEntity> coverLetterQuestions, QuestionType type);
+    List<QuestionEntity> findTop6ByCoverLetterQuestionInAndTypeAndIdNotInOrderByCreatedAtDesc(List<CoverLetterQuestionEntity> coverLetterQuestions, QuestionType type, List<Long> excludeIds);
 }
