@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class GroupInterviewComparisonService {
-    private static final int QUESTION_COUNT = 3;
+    private static final int QUESTION_COUNT = GroupInterviewSessionEntity.TOTAL_ROUNDS;
 
     private final GroupInterviewRepository interviewRepository;
     private final GroupInterviewSessionRepository sessionRepository;
@@ -215,7 +215,9 @@ public class GroupInterviewComparisonService {
     }
     private void validateQuestionIndex(int questionIndex) {
         if (questionIndex < 0 || questionIndex >= QUESTION_COUNT)
-            throw new IllegalArgumentException("질문 인덱스는 0부터 2까지입니다.");
+            throw new IllegalArgumentException(
+                    "질문 인덱스는 0부터 " + (QUESTION_COUNT - 1) + "까지입니다."
+            );
     }
     private GroupInterviewComparisonScoreCalculator.Scores emptyScores() {
         return new GroupInterviewComparisonScoreCalculator.Scores(null, null, null, null, null, null);

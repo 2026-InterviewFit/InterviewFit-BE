@@ -13,7 +13,7 @@ import java.time.Instant;
 @Builder
 public class GroupInterviewSessionEntity {
 
-    private static final int LAST_ROUND = 4;
+    public static final int TOTAL_ROUNDS = 4;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -119,7 +119,7 @@ public class GroupInterviewSessionEntity {
             return AnswerCompletionResult.NEXT_PARTICIPANT;
         }
 
-        if (this.currentRound < LAST_ROUND) {
+        if (this.currentRound < TOTAL_ROUNDS) {
             this.currentRound++;
             this.currentQuestionIndex++;
             this.currentParticipantIndex = 0;
