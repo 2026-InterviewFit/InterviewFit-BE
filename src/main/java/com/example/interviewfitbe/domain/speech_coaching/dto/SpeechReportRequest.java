@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.speech_coaching.dto;
 
+import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
@@ -9,7 +10,6 @@ import lombok.extern.jackson.Jacksonized;
 
 import java.util.List;
 import java.util.Map;
-import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 
 @Getter
 @Builder(toBuilder = true)
@@ -17,14 +17,23 @@ import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus
 @ToString
 public class SpeechReportRequest {
 
+    /**
+     * 음성 종합 점수
+     */
     @JsonProperty("speech_score")
     @JsonAlias("speechScore")
     private Integer speechScore;
 
+    /**
+     * 음성 점수 상태
+     */
     @JsonProperty("speech_score_status")
     @JsonAlias("speechScoreStatus")
     private SpeechScoreStatus speechScoreStatus;
 
+    /**
+     * 음성 점수 산출 사유
+     */
     @JsonProperty("speech_score_reason")
     @JsonAlias("speechScoreReason")
     private String speechScoreReason;
@@ -36,7 +45,6 @@ public class SpeechReportRequest {
     @JsonAlias("interviewId")
     private Long interviewId;
 
-
     /**
      * 질문 답변 ID
      * AiEvaluation 저장용
@@ -45,14 +53,12 @@ public class SpeechReportRequest {
     @JsonAlias("interviewAnswerId")
     private Long interviewAnswerId;
 
-
     /**
      * 질문 ID
      */
     @JsonProperty("question_id")
     @JsonAlias("questionId")
     private Long questionId;
-
 
     /**
      * 원본 질문
@@ -61,14 +67,12 @@ public class SpeechReportRequest {
     @JsonAlias({"originalQuestion", "question"})
     private String originalQuestion;
 
-
     /**
      * 직무
      */
     @JsonProperty("job_category")
     @JsonAlias({"jobCategory", "job"})
     private String jobCategory;
-
 
     /**
      * 전체 STT 결과
@@ -77,37 +81,11 @@ public class SpeechReportRequest {
     @JsonAlias("textScript")
     private String textScript;
 
-
-    /**
-     * 음성 종합 점수
-     */
-    @JsonProperty("speech_score")
-    @JsonAlias("speechScore")
-    private Integer speechScore;
-
-
-    /**
-     * 음성 점수 상태
-     */
-    @JsonProperty("speech_score_status")
-    @JsonAlias("speechScoreStatus")
-    private String speechScoreStatus;
-
-
-    /**
-     * 음성 점수 산출 사유
-     */
-    @JsonProperty("speech_score_reason")
-    @JsonAlias("speechScoreReason")
-    private String speechScoreReason;
-
-
     /**
      * 필러 분석
      */
     @JsonProperty("filler_word_analysis")
     private FillerWordAnalysis fillerWordAnalysis;
-
 
     /**
      * 반복 표현 분석
@@ -115,13 +93,11 @@ public class SpeechReportRequest {
     @JsonProperty("repeated_expressions")
     private List<RepeatedExpression> repeatedExpressions;
 
-
     /**
      * 말하기 속도 분석
      */
     @JsonProperty("speech_pace_analysis")
     private SpeechPaceAnalysis speechPaceAnalysis;
-
 
     /**
      * 침묵 분석
@@ -129,25 +105,22 @@ public class SpeechReportRequest {
     @JsonProperty("silence_analysis")
     private SilenceAnalysis silenceAnalysis;
 
-
     /**
      * 질문별 AI 평가
      */
     @JsonProperty("ai_evaluation")
     private AiEvaluation aiEvaluation;
 
-
     /**
-     * 외부 학습 AI의 구조화된 답변 분석. 분석 실패 시 null이다.
+     * 외부 학습 AI의 구조화된 답변 분석.
+     * 분석 실패 시 null.
      */
     @JsonProperty("external_ai_analysis")
     private ExternalAiAnalysis externalAiAnalysis;
 
-
     // ============================
     // 내부 DTO
     // ============================
-
 
     /**
      * 필러 단어 분석
@@ -164,7 +137,6 @@ public class SpeechReportRequest {
         private Integer totalCount;
     }
 
-
     /**
      * 반복 표현 분석
      */
@@ -178,7 +150,6 @@ public class SpeechReportRequest {
 
         private Integer count;
     }
-
 
     /**
      * 말하기 속도 분석
@@ -196,7 +167,6 @@ public class SpeechReportRequest {
         @JsonProperty("characters_per_second")
         private Double charactersPerSecond;
     }
-
 
     /**
      * 침묵 분석
@@ -216,7 +186,6 @@ public class SpeechReportRequest {
         @JsonProperty("critical_silence_count")
         private Integer criticalSilenceCount;
     }
-
 
     /**
      * AI 평가
