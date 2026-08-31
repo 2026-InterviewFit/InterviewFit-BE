@@ -74,6 +74,7 @@ class GroupInterviewComparisonServiceTest {
         when(analysisRepository.findAllForComparison(10L, 0)).thenReturn(List.of(first, second));
         when(analysisRepository.findAllForComparison(10L, 1)).thenReturn(List.of());
         when(analysisRepository.findAllForComparison(10L, 2)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 3)).thenReturn(List.of());
         when(calculator.calculate(first)).thenReturn(scores("90"));
         when(calculator.calculate(second)).thenReturn(scores("80"));
 
@@ -93,7 +94,7 @@ class GroupInterviewComparisonServiceTest {
     @Test
     void createsOverallAveragesAndStoresFeedbackForBothParticipants() {
         List<GroupInterviewComparisonReportEntity> questions = new ArrayList<>();
-        for (int questionIndex = 0; questionIndex < 3; questionIndex++) {
+        for (int questionIndex = 0; questionIndex < GroupInterviewSessionEntity.TOTAL_ROUNDS; questionIndex++) {
             questions.add(questionReport(1L, questionIndex, "90"));
             questions.add(questionReport(2L, questionIndex, "80"));
         }
@@ -124,6 +125,7 @@ class GroupInterviewComparisonServiceTest {
         when(analysisRepository.findAllForComparison(10L, 0)).thenReturn(List.of(done, failed));
         when(analysisRepository.findAllForComparison(10L, 1)).thenReturn(List.of());
         when(analysisRepository.findAllForComparison(10L, 2)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 3)).thenReturn(List.of());
         when(calculator.calculate(done)).thenReturn(scores("90"));
 
         service.generateAvailableComparisons(10L);
@@ -142,6 +144,7 @@ class GroupInterviewComparisonServiceTest {
         when(analysisRepository.findAllForComparison(10L, 0)).thenReturn(List.of(first, second));
         when(analysisRepository.findAllForComparison(10L, 1)).thenReturn(List.of());
         when(analysisRepository.findAllForComparison(10L, 2)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 3)).thenReturn(List.of());
         when(calculator.calculate(first)).thenReturn(scores("90"));
         when(calculator.calculate(second)).thenReturn(scores("80"));
         when(feedbackClient.createFeedback(any())).thenReturn(List.of());
@@ -174,11 +177,90 @@ class GroupInterviewComparisonServiceTest {
         verifyNoInteractions(feedbackClient);
     }
 
+    @Test
+    void fourthQuestionComparisonIsAvailable() {
+        GroupInterviewComparisonReportEntity report = questionReport(1L, 3, "90");
+        when(reportRepository.findAllByRoomIdAndScopeAndQuestionIndexOrderByRankAscParticipantUserIdAsc(
+                10L, GroupComparisonScope.QUESTION, 3)).thenReturn(List.of(report));
+        when(userRepository.findAllById(List.of(1L))).thenReturn(List.of(
+                UserEntity.builder().id(1L).kakaoId(101L).name("홍길동").build()));
+
+        var response = service.getQuestion(10L, 3, 1L);
+
+        assertThat(response).singleElement().satisfies(item -> {
+            assertThat(item.getQuestionIndex()).isEqualTo(3);
+            assertThat(item.getTotalScore()).isEqualByComparingTo("90");
+        });
+    }
+
+    @Test
+    void createsAllFourQuestionComparisonsAndOverallAverage() {
+        for (int questionIndex = 0;
+             questionIndex < GroupInterviewSessionEntity.TOTAL_ROUNDS;
+             questionIndex++) {
+            var first = analysis(1L, AnalysisStatus.DONE, questionIndex);
+            var second = analysis(2L, AnalysisStatus.DONE, questionIndex);
+            when(analysisRepository.findAllForComparison(10L, questionIndex))
+                    .thenReturn(List.of(first, second));
+            when(calculator.calculate(first)).thenReturn(scores(Integer.toString(80 + questionIndex)));
+            when(calculator.calculate(second)).thenReturn(scores(Integer.toString(70 + questionIndex)));
+        }
+
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).filteredOn(r -> r.getScope() == GroupComparisonScope.QUESTION)
+                .hasSize(8)
+                .anyMatch(r -> Integer.valueOf(3).equals(r.getQuestionIndex()))
+                .allMatch(r -> r.getStatus() == GroupComparisonStatus.DONE)
+                .allMatch(r -> r.getRank() != null);
+        assertThat(saved).filteredOn(r -> r.getScope() == GroupComparisonScope.OVERALL)
+                .hasSize(2)
+                .allMatch(r -> r.getStatus() == GroupComparisonStatus.DONE)
+                .filteredOn(r -> r.getParticipantUserId().equals(1L))
+                .singleElement()
+                .extracting(GroupInterviewComparisonReportEntity::getTotalScore)
+                .isEqualTo(new BigDecimal("81.50"));
+    }
+
+    @Test
+    void missingFourthQuestionScoreKeepsExistingPartialPolicy() {
+        var complete = analysis(1L, AnalysisStatus.DONE, 3);
+        var incomplete = analysis(2L, AnalysisStatus.DONE, 3);
+        when(analysisRepository.findAllForComparison(10L, 3))
+                .thenReturn(List.of(complete, incomplete));
+        when(calculator.calculate(complete)).thenReturn(scores("90"));
+        when(calculator.calculate(incomplete)).thenReturn(
+                new GroupInterviewComparisonScoreCalculator.Scores(
+                        new BigDecimal("80"), null, new BigDecimal("80"),
+                        new BigDecimal("80"), new BigDecimal("80"), null
+                )
+        );
+
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).hasSize(2).allMatch(
+                report -> report.getStatus() == GroupComparisonStatus.PARTIAL
+                        && report.getRank() == null
+        );
+        assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(2L))
+                .singleElement()
+                .extracting(GroupInterviewComparisonReportEntity::getTotalScore)
+                .isNull();
+    }
+
     private GroupInterviewAnswerAnalysisEntity analysis(Long participantId, AnalysisStatus status) {
+        return analysis(participantId, status, 0);
+    }
+
+    private GroupInterviewAnswerAnalysisEntity analysis(
+            Long participantId,
+            AnalysisStatus status,
+            int questionIndex
+    ) {
         GroupInterviewEntity room = mock(GroupInterviewEntity.class);
         when(room.getId()).thenReturn(10L);
         GroupInterviewAnswerEntity answer = GroupInterviewAnswerEntity.builder()
-                .groupInterview(room).participantUserId(participantId).questionIndex(0).build();
+                .groupInterview(room).participantUserId(participantId).questionIndex(questionIndex).build();
         return GroupInterviewAnswerAnalysisEntity.builder().answer(answer).status(status).build();
     }
 
