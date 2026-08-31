@@ -76,13 +76,8 @@ public class QuestionService {
         try {
             data = loadQuestionData(userId, request);
 
-            System.out.println("requested count = " + request.getCount());
-            System.out.println("reusable questions = " + data.getReusableQuestions().size());
-
             if (hasEnoughReusableQuestions(data, request)) {
                 List<QuestionEntity> questions  = getReusableQuestions(data, request);
-
-                System.out.println("모두 재사용: " + questions.size());
 
                 attachQuestionsToInterview(questions, interview);
 
@@ -91,7 +86,6 @@ public class QuestionService {
                         .toList();
             }
 
-            System.out.println("데이터 생성");
             entities = generateQuestions(request, data);
         } catch (BaseException e) {
             if (e.getErrorCode() == CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_COMPLETED) {
@@ -279,8 +273,6 @@ public class QuestionService {
                 data.getReusableQuestions()
         );
 
-        System.out.println("생성 후 반환된 질문 개수: " + result.getQuestions().size());
-
         return questionMapper.toEntities(result, data.getJobRole(), data.getCoverLetterQuestionAnalyses());
     }
 
@@ -325,9 +317,6 @@ public class QuestionService {
     ) {
         int reusableQuestionsSize = reusableQuestions != null ? reusableQuestions.size() : 0;
         int remainCount = request.getCount() - reusableQuestionsSize;
-
-        System.out.println("질문 샏성 개수: " + remainCount);
-        System.out.println("질문 재사용 개수: " + reusableQuestionsSize);
 
         if (request.getCoverLetterId() == null) {
             return getDefaultQuestions(request.getJobName(), remainCount);
