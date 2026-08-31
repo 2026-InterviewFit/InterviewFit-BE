@@ -50,6 +50,8 @@ public class QuestionService {
     private final CoverLetterQuestionEmbeddingService coverLetterQuestionEmbeddingService;
     private final CoverLetterProcessingService coverLetterProcessingService;
     private final JobRoleService jobRoleService;
+    private final UserService userService;
+
     private final QuestionRepository questionRepository;
     private final QuestionMapper questionMapper;
 
@@ -58,22 +60,16 @@ public class QuestionService {
 
     private final CoverLetterQuestionSelector coverLetterQuestionSelector;
 
-    private final UserService userService;
-
-    public QuestionEntity getQuestion(Long id) {
-        return questionRepository.findById(id).orElseThrow(() ->
-                new BaseException(QuestionErrorCode.QUESTION_NOT_FOUND));
-    }
-
     @Transactional
     public List<QuestionResponse> createQuestions(Long userId, QuestionRequest request) {
-        validateCreateRequest(request);
-        InterviewEntity interview = findInterview(request);
-
         QuestionCreateData data = new QuestionCreateData();
         List<QuestionEntity> entities;
+        InterviewEntity interview;
 
         try {
+            validateCreateRequest(request);
+            interview = findInterview(request);
+
             data = loadQuestionData(userId, request);
 
             if (hasEnoughReusableQuestions(data, request)) {
@@ -103,6 +99,8 @@ public class QuestionService {
             }
         }
 
+        interview = findInterview(request);
+
         entities = new ArrayList<>(entities);
         entities.add(createSelfIntroductionQuestion(data.getJobRole()));
 
@@ -126,16 +124,15 @@ public class QuestionService {
         int nextOrder = 2;
 
         for (QuestionEntity question : questions) {
-            InterviewQuestionEntity interviewQuestion =
-                    InterviewQuestionEntity.builder()
-                            .interview(interview)
-                            .question(question)
-                            .questionOrder(
-                                    question.getQuestionOrder() != null
-                                            ? question.getQuestionOrder()
-                                            : nextOrder++
-                            )
-                            .build();
+            InterviewQuestionEntity interviewQuestion = InterviewQuestionEntity.builder()
+                    .interview(interview)
+                    .question(question)
+                    .questionOrder(
+                            question.getQuestionOrder() != null
+                                    ? question.getQuestionOrder()
+                                    : nextOrder++
+                    )
+                    .build();
 
             interviewQuestionRepository.save(interviewQuestion);
         }
@@ -147,11 +144,15 @@ public class QuestionService {
         }
 
         if (request.getCount() == null || request.getCount() <= 0) {
-            throw new IllegalArgumentException("count는 1 이상이어야 합니다.");
+            request.setCount(3);
+            throw new BaseException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
         }
 
         if (request.getJobRoleId() == null) {
-            throw new IllegalArgumentException("jobRoleId는 필수입니다.");
+            request.setJobRoleId(11L);
+            request.setJobName("기타");
+            request.setCoverLetterId(null);
+            throw new BaseException(QuestionErrorCode.JOB_ROLE_REQUIRED);
         }
     }
 
@@ -160,10 +161,9 @@ public class QuestionService {
             return null;
         }
 
-        return interviewRepository.findById(request.getInterviewId())
-                .orElseThrow(() -> new IllegalArgumentException("해당 면접을 찾을 수 없습니다. interviewId=" + request.getInterviewId()));
+        return interviewRepository.findById(request.getInterviewId()).orElseThrow(() ->
+                new IllegalArgumentException("해당 면접을 찾을 수 없습니다. interviewId=" + request.getInterviewId()));
     }
-
 
     private boolean hasEnoughReusableQuestions(QuestionCreateData data, QuestionRequest request) {
         return data.getReusableQuestions() != null
@@ -185,13 +185,9 @@ public class QuestionService {
         CoverLetterProcessingEntity processing = coverLetterProcessingService.getProcessingByCoverLetter(coverLetter);
 
         if (processing.getStatus() == ProcessingStatus.FAILED) {
-            throw new BaseException(
-                    CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_FAILED
-            );
+            throw new BaseException(CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_FAILED);
         } else if (processing.getStatus() != ProcessingStatus.COMPLETED) {
-            throw new BaseException(
-                    CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_COMPLETED
-            );
+            throw new BaseException(CoverLetterProcessingErrorCode.COVER_LETTER_PROCESSING_NOT_COMPLETED);
         }
     }
 
@@ -200,6 +196,7 @@ public class QuestionService {
                 .jobRole(jobRole)
                 .reusableQuestions(List.of())
                 .coverLetterQuestionAnalyses(List.of())
+                .selectedCoverLetterQuestionAnalyses(List.of())
                 .previousQuestions(List.of())
                 .build();
     }
@@ -355,11 +352,7 @@ public class QuestionService {
 
     private List<QuestionEntity> generateQuestionsAfterProcessingFailure(QuestionRequest request, QuestionCreateData data) {
         JobRoleEntity jobRole = jobRoleService.getJobRoleEntity(request.getJobRoleId());
-
-        if (request.getCoverLetterId() == null) {
-            QuestionResult result = getDefaultQuestions(jobRole.getName(), request.getCount());
-            return questionMapper.toEntities(result, jobRole, List.of());
-        }
+        data.setJobRole(jobRole);
 
         List<CoverLetterQuestionAnalysisEntity> analyses = resolveAnalyses(request.getCoverLetterId(), data).stream()
                 .sorted(Comparator.comparingDouble(a -> Math.random()))
@@ -407,8 +400,11 @@ public class QuestionService {
                 ? "기타"
                 : request.getJobName();
 
+        JobRoleEntity jobRole = jobRoleService.getJobRoleEntity(request.getJobRoleId());
+        data.setJobRole(jobRole);
+
         QuestionResult result = getDefaultQuestions(jobName, generateCount);
-        return questionMapper.toEntities(result, jobRoleService.getJobRoleEntity(request.getJobRoleId()), List.of());
+        return questionMapper.toEntities(result, jobRole, List.of());
     }
 
     private QuestionEntity createSelfIntroductionQuestion(JobRoleEntity jobRole) {
