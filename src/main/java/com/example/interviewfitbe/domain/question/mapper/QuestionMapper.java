@@ -19,7 +19,6 @@ public class QuestionMapper {
     public QuestionDto toDto(QuestionEntity entity) {
         return QuestionDto.builder()
                 .id(entity.getId())
-                .interviewId(entity.getInterview() == null ? null : entity.getInterview().getId())
                 .question(entity.getQuestion())
                 .jobName(entity.getJobRole().getName())
                 .createdAt(entity.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
