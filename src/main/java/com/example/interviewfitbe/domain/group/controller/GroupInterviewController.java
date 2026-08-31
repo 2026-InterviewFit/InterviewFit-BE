@@ -24,6 +24,7 @@ import com.example.interviewfitbe.domain.livekit.service.LiveKitService;
 import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
@@ -287,6 +288,16 @@ public class GroupInterviewController {
                 AuthUtils.getCurrentUserId(),
                 file
         ));
+    }
+
+    @GetMapping("/{roomId}/answers/{answerId}/video")
+    public ResponseEntity<StreamingResponseBody> streamMyAnswerVideo(
+            @PathVariable Long roomId,
+            @PathVariable Long answerId,
+            @RequestHeader(value = "Range", required = false) String rangeHeader
+    ) {
+        return groupInterviewAnswerService.streamMyVideo(
+                roomId, answerId, AuthUtils.getCurrentUserId(), rangeHeader);
     }
 
     @GetMapping("/{roomId}/answers")
