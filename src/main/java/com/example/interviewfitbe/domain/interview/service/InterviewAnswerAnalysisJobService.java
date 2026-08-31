@@ -29,7 +29,7 @@ public class InterviewAnswerAnalysisJobService {
     private final AiEvaluationRepository aiEvaluationRepository;
     private final TransactionTemplate transactionTemplate;
 
-    /*
+    /**
      * 답변 영상 분석
      *
      * - eye blinking
@@ -37,10 +37,14 @@ public class InterviewAnswerAnalysisJobService {
      * - pose
      * - speech / STT / Gemini
      *
-     * 중요:
-     * SpeechAnalysisService를 직접 호출하지 않는다.
-     * 반드시 SpeechReportService.analyzeAndSave()를 통해
-     * speech_report + ai_evaluation까지 저장한 뒤 DONE 처리한다.
+     * 일반 면접:
+     * SpeechReportService.analyzeAndSave()
+     *
+     * PT 질의응답:
+     * SpeechReportService.analyzeQuestionAnswerAndSave()
+     *
+     * PT 질의응답의 경우 발표 전체 SpeechReport를 사용하지 않고
+     * 각 InterviewAnswer.answerText에 질문별 Whisper STT를 저장한다.
      */
     @Async("analysisExecutor")
     public void analyzeAnswerAsync(
@@ -134,15 +138,13 @@ public class InterviewAnswerAnalysisJobService {
             );
 
             /*
-             * Gemini 평가가 실제 DB에 저장됐는지 마지막 검증.
-             *
-             * 이전 코드에서는 FastAPI 호출만 성공하면
-             * ai_evaluation이 없어도 DONE으로 바뀔 수 있었기 때문에
-             * 저장 결과를 확인한 뒤 DONE 처리한다.
+             * Gemini 평가 결과가 실제 DB에 저장됐는지 검증
              */
-            if (!aiEvaluationRepository
-                    .findByInterviewAnswer_Id(answerId)
-                    .isPresent()) {
+            if (
+                    aiEvaluationRepository
+                            .findByInterviewAnswer_Id(answerId)
+                            .isEmpty()
+            ) {
 
                 throw new IllegalStateException(
                         "Gemini AI 평가 결과가 저장되지 않았습니다. answerId="
@@ -150,6 +152,9 @@ public class InterviewAnswerAnalysisJobService {
                 );
             }
 
+            /*
+             * 5. 분석 완료 처리
+             */
             markDone(answerId);
 
             log.info(
@@ -173,18 +178,30 @@ public class InterviewAnswerAnalysisJobService {
         }
     }
 
-    /*
+    /**
      * Speech / STT / Gemini 분석 및 저장
      *
-     * 호출 흐름:
+     * 일반 면접:
+     *
      * InterviewAnswerAnalysisJobService
      *      -> SpeechReportService.analyzeAndSave()
      *      -> SpeechAnalysisService.analyzeSpeech()
      *      -> FastAPI /apis/speech/analyze
      *      -> speech_report 저장
      *      -> ai_evaluation 저장
+     *      -> SpeechReport STT를 answerText에 저장
      *
-     * 이 메서드에서는 FastAPI를 별도로 다시 호출하지 않는다.
+     *
+     * PT 질의응답:
+     *
+     * InterviewAnswerAnalysisJobService
+     *      -> SpeechReportService.analyzeQuestionAnswerAndSave()
+     *      -> SpeechAnalysisService.analyzeSpeech()
+     *      -> FastAPI /apis/speech/analyze
+     *      -> InterviewAnswer.answerText에 질문별 STT 저장
+     *      -> ai_evaluation 저장
+     *
+     * PT 질문 답변은 전체 발표 SpeechReport를 갱신하지 않는다.
      */
     private void analyzeSpeechGeminiAndSave(
             Long answerId,
@@ -193,24 +210,36 @@ public class InterviewAnswerAnalysisJobService {
             InterviewAnswerEntity answer
     ) {
 
+        /*
+         * 직무 카테고리
+         */
         String jobCategory = "";
 
         if (
                 interview.getJobRole() != null
                         && interview.getJobRole().getCategory() != null
         ) {
+
             jobCategory =
-                    interview.getJobRole().getCategory();
+                    interview
+                            .getJobRole()
+                            .getCategory();
         }
 
+        /*
+         * 질문 ID
+         */
         Long questionId = null;
 
         /*
          * 일반 면접 질문
          */
         if (answer.getQuestion() != null) {
+
             questionId =
-                    answer.getQuestion().getId();
+                    answer
+                            .getQuestion()
+                            .getId();
         }
 
         /*
@@ -220,15 +249,25 @@ public class InterviewAnswerAnalysisJobService {
                 questionId == null
                         && answer.getPtQuestion() != null
         ) {
+
             questionId =
-                    answer.getPtQuestion().getId();
+                    answer
+                            .getPtQuestion()
+                            .getId();
         }
 
+        /*
+         * 질문 내용
+         */
         String originalQuestion =
                 answer.getQuestionText();
 
+        /*
+         * FastAPI Speech 분석 요청
+         */
         SpeechAnalyzeRequest request =
-                SpeechAnalyzeRequest.builder()
+                SpeechAnalyzeRequest
+                        .builder()
                         .sourceType("minio")
                         .sourceValue(videoObjectKey)
                         .jobCategory(jobCategory)
@@ -238,6 +277,44 @@ public class InterviewAnswerAnalysisJobService {
                         .originalQuestion(originalQuestion)
                         .build();
 
+        /*
+         * =========================================================
+         * PT 질의응답
+         * =========================================================
+         *
+         * PT 질문별 답변은 발표 전체 SpeechReport를 사용하면 안 된다.
+         *
+         * 질문마다 녹화된 pt-answer-XXX.webm을 Whisper로 분석한 뒤
+         * 해당 InterviewAnswer.answerText에 직접 저장한다.
+         */
+        if (answer.getPtQuestion() != null) {
+
+            log.info(
+                    "[PT][Question] Speech/Gemini 분석 시작: answerId={}, interviewId={}, questionId={}",
+                    answerId,
+                    interview.getId(),
+                    questionId
+            );
+
+            speechReportService
+                    .analyzeQuestionAnswerAndSave(
+                            request
+                    );
+
+            log.info(
+                    "[PT][Question] Speech/Gemini 분석 완료: answerId={}, questionId={}",
+                    answerId,
+                    questionId
+            );
+
+            return;
+        }
+
+        /*
+         * =========================================================
+         * 일반 면접 답변
+         * =========================================================
+         */
         log.info(
                 "Speech/Gemini 분석 시작: answerId={}, interviewId={}",
                 answerId,
@@ -245,22 +322,26 @@ public class InterviewAnswerAnalysisJobService {
         );
 
         /*
-         * FastAPI 호출은 이 한 번뿐이다.
-         * SpeechReportService 내부에서 결과까지 DB에 저장한다.
+         * 일반 면접은 기존 SpeechReport 방식 유지
          */
         Long speechReportId =
-                speechReportService.analyzeAndSave(
-                        request
-                );
+                speechReportService
+                        .analyzeAndSave(
+                                request
+                        );
 
         SpeechReportEntity speechReport =
-                speechReportService.getReport(
-                        speechReportId
-                );
+                speechReportService
+                        .getReport(
+                                speechReportId
+                        );
 
         String textScript =
                 speechReport.getTextScript();
 
+        /*
+         * 일반 면접 STT를 InterviewAnswer에도 저장
+         */
         if (
                 textScript != null
                         && !textScript.isBlank()
@@ -292,8 +373,12 @@ public class InterviewAnswerAnalysisJobService {
         );
     }
 
-    /*
-     * STT 결과 저장
+    /**
+     * 일반 면접 STT 결과 저장
+     *
+     * PT 질의응답에서는 이 메서드를 사용하지 않는다.
+     * PT는 SpeechReportService.analyzeQuestionAnswerAndSave()
+     * 내부에서 직접 answerText를 저장한다.
      */
     private void saveAnswerText(
             Long answerId,
@@ -325,6 +410,9 @@ public class InterviewAnswerAnalysisJobService {
         );
     }
 
+    /**
+     * 분석 시작 상태
+     */
     private InterviewAnswerEntity markRunning(
             Long answerId
     ) {
@@ -352,6 +440,9 @@ public class InterviewAnswerAnalysisJobService {
         );
     }
 
+    /**
+     * 분석 완료 상태
+     */
     private void markDone(
             Long answerId
     ) {
@@ -379,6 +470,9 @@ public class InterviewAnswerAnalysisJobService {
         );
     }
 
+    /**
+     * 분석 실패 상태
+     */
     private void markFailed(
             Long answerId,
             String errorMessage

@@ -635,6 +635,9 @@ public class PtReportService {
             return List.of();
         }
 
+        /*
+         * PT 질문별 실제 사용자 답변 조회
+         */
         List<InterviewAnswerEntity> answers =
                 interviewAnswerRepository
                         .findAllByPtQuestion_PtInterview_IdOrderByAnswerOrderAsc(
@@ -646,6 +649,10 @@ public class PtReportService {
 
         for (PtQuestionAnalysisResponse analysis : analyses) {
 
+            /*
+             * 현재 분석 결과의 questionNumber와
+             * 실제 InterviewAnswer의 PT 질문 번호를 매칭한다.
+             */
             InterviewAnswerEntity matchedAnswer =
                     answers.stream()
                             .filter(answer -> {
@@ -667,6 +674,27 @@ public class PtReportService {
                             .findFirst()
                             .orElse(null);
 
+            /*
+             * 실제 질문별 답변 STT
+             *
+             * FastAPI 분석 결과의 analysis.answer()가 아니라
+             * interview_answers.answer_text를 사용한다.
+             */
+            String actualAnswer = "";
+
+            if (
+                    matchedAnswer != null
+                            && matchedAnswer.getAnswerText() != null
+            ) {
+                actualAnswer =
+                        matchedAnswer
+                                .getAnswerText()
+                                .trim();
+            }
+
+            /*
+             * 질문별 Gemini 평가 조회
+             */
             AiEvaluationEntity aiEvaluation = null;
 
             if (
@@ -682,6 +710,9 @@ public class PtReportService {
                                 .orElse(null);
             }
 
+            /*
+             * STAR 분석
+             */
             PtStarAnalysisResponse starAnalysis =
                     aiEvaluation == null
                             ? null
@@ -689,21 +720,33 @@ public class PtReportService {
                             aiEvaluation.getStarEvaluationJson()
                     );
 
+            /*
+             * Gemini 피드백
+             */
             String aiFeedback =
                     aiEvaluation == null
                             ? null
                             : aiEvaluation.getGeminiFeedback();
 
+            /*
+             * AI 모범 답안
+             */
             String modelAnswer =
                     aiEvaluation == null
                             ? null
                             : aiEvaluation.getModelAnswer();
 
+            /*
+             * 최종 질문별 분석 응답 생성
+             */
             result.add(
                     new PtQuestionAnalysisResponse(
                             analysis.questionNumber(),
                             analysis.question(),
-                            analysis.answer(),
+
+                            // 핵심 수정
+                            actualAnswer,
+
                             analysis.understandingScore(),
                             analysis.logicScore(),
                             analysis.specificityScore(),
