@@ -23,6 +23,13 @@ public interface GroupInterviewAnswerRepository
             @Param("answerId") Long answerId
     );
 
+    @Query("select a from GroupInterviewAnswerEntity a " +
+            "where a.id = :answerId and a.groupInterview.id = :roomId")
+    Optional<GroupInterviewAnswerEntity> findByRoomIdAndId(
+            @Param("roomId") Long roomId,
+            @Param("answerId") Long answerId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from GroupInterviewAnswerEntity a where a.id = :answerId")
     Optional<GroupInterviewAnswerEntity> findByIdForUpdate(@Param("answerId") Long answerId);

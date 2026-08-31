@@ -6,11 +6,16 @@ import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerRe
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupParticipantRepository;
 import com.example.interviewfitbe.domain.video_storage.service.VideoService;
+import com.example.interviewfitbe.domain.video_storage.service.MinioVideoStreamingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.IOException;
 import java.util.List;
@@ -24,6 +29,7 @@ public class GroupInterviewAnswerService {
     private final GroupParticipantRepository participantRepository;
     private final VideoService videoService;
     private final GroupInterviewAnswerAnalysisService analysisService;
+    private final MinioVideoStreamingService streamingService;
 
     @Transactional
     public GroupInterviewAnswerResponse uploadVideo(
@@ -71,6 +77,28 @@ public class GroupInterviewAnswerService {
                 .stream()
                 .map(GroupInterviewAnswerResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseEntity<StreamingResponseBody> streamMyVideo(
+            Long roomId,
+            Long answerId,
+            Long actorUserId,
+            String rangeHeader
+    ) {
+        GroupInterviewAnswerEntity answer = answerRepository.findByRoomIdAndId(roomId, answerId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "해당 방의 답변을 찾을 수 없습니다."));
+        if (!answer.getParticipantUserId().equals(actorUserId)) {
+            throw new AccessDeniedException("답변자 본인만 답변 영상을 조회할 수 있습니다.");
+        }
+        if (answer.getCompletionType() != null && answer.getCompletionType().excludesAnalysis()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "재생 가능한 답변 영상이 없습니다.");
+        }
+        if (!answer.isVideoUploaded()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "재생 가능한 답변 영상이 없습니다.");
+        }
+        return streamingService.stream(answer.getVideoObjectKey(), rangeHeader);
     }
 
     private String originalFileName(MultipartFile file) {
