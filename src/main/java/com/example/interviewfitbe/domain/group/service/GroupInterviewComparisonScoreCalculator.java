@@ -21,11 +21,11 @@ import java.util.*;
 @Component
 @RequiredArgsConstructor
 public class GroupInterviewComparisonScoreCalculator {
-    private static final BigDecimal CONTENT_WEIGHT = new BigDecimal("0.45");
-    private static final BigDecimal SPEECH_WEIGHT = new BigDecimal("0.25");
-    private static final BigDecimal GAZE_WEIGHT = new BigDecimal("0.15");
-    private static final BigDecimal POSE_WEIGHT = new BigDecimal("0.10");
-    private static final BigDecimal BLINK_WEIGHT = new BigDecimal("0.05");
+    private static final BigDecimal CONTENT_WEIGHT = new BigDecimal("0.25");
+    private static final BigDecimal SPEECH_WEIGHT = new BigDecimal("0.20");
+    private static final BigDecimal GAZE_WEIGHT = new BigDecimal("0.20");
+    private static final BigDecimal POSE_WEIGHT = new BigDecimal("0.20");
+    private static final BigDecimal BLINK_WEIGHT = new BigDecimal("0.15");
     private static final BigDecimal STAR_MAX_SCORE = new BigDecimal("10");
     private static final BigDecimal STAR_NORMALIZATION_FACTOR = new BigDecimal("10");
 

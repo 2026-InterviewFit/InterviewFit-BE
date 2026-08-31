@@ -47,7 +47,7 @@ class GroupInterviewComparisonScoreCalculatorTest {
         assertThat(scores.gaze()).isEqualByComparingTo(new BigDecimal("90.00"));
         assertThat(scores.pose()).isEqualByComparingTo(new BigDecimal("100.00"));
         assertThat(scores.blink()).isEqualByComparingTo(new BigDecimal("80.00"));
-        assertThat(scores.total()).isEqualByComparingTo(new BigDecimal("81.75"));
+        assertThat(scores.total()).isEqualByComparingTo(new BigDecimal("85.15"));
     }
 
     @Test
