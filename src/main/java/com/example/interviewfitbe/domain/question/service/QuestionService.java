@@ -68,13 +68,11 @@ public class QuestionService {
 
         try {
             validateCreateRequest(request);
-            interview = findInterview(request);
-
             data = loadQuestionData(userId, request);
 
             if (hasEnoughReusableQuestions(data, request)) {
                 List<QuestionEntity> questions  = getReusableQuestions(data, request);
-
+                interview = getInterview(request.getInterviewId());
                 attachQuestionsToInterview(questions, interview);
 
                 return questions.stream()
@@ -99,25 +97,45 @@ public class QuestionService {
             }
         }
 
-        interview = findInterview(request);
-
+        interview = getInterview(request.getInterviewId());
         entities = new ArrayList<>(entities);
         entities.add(createSelfIntroductionQuestion(data.getJobRole()));
-
         List<QuestionEntity> saved = saveQuestions(entities);
-
         List<QuestionEntity> mergedQuestions = mergeQuestions(
                 data.getReusableQuestions().isEmpty()
                         ? List.of()
                         : data.getReusableQuestions(),
                 saved
         );
-
         attachQuestionsToInterview(mergedQuestions, interview);
 
         return mergedQuestions.stream()
                 .map(questionMapper::toResponse)
                 .toList();
+    }
+
+    private InterviewEntity getInterview(Long interviewId) {
+        return interviewRepository.findById(interviewId).orElseThrow(() ->
+                        new IllegalArgumentException("해당 면접을 찾을 수 없습니다. interviewId=" + interviewId));
+    }
+
+    private void validateCreateRequest(QuestionRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("질문 생성 요청이 필요합니다.");
+        }
+        if (request.getCount() == null || request.getCount() <= 0) {
+            request.setCount(3);
+            throw new BaseException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
+        }
+        if (request.getJobRoleId() == null) {
+            request.setJobRoleId(11L);
+            request.setJobName("기타");
+            request.setCoverLetterId(null);
+            throw new BaseException(QuestionErrorCode.JOB_ROLE_REQUIRED);
+        }
+        if (request.getInterviewId() == null) {
+            throw new IllegalArgumentException("interviewId는 필수입니다.");
+        }
     }
 
     private void attachQuestionsToInterview(List<QuestionEntity> questions, InterviewEntity interview) {
@@ -133,36 +151,8 @@ public class QuestionService {
                                     : nextOrder++
                     )
                     .build();
-
             interviewQuestionRepository.save(interviewQuestion);
         }
-    }
-
-    private void validateCreateRequest(QuestionRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("질문 생성 요청이 필요합니다.");
-        }
-
-        if (request.getCount() == null || request.getCount() <= 0) {
-            request.setCount(3);
-            throw new BaseException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
-        }
-
-        if (request.getJobRoleId() == null) {
-            request.setJobRoleId(11L);
-            request.setJobName("기타");
-            request.setCoverLetterId(null);
-            throw new BaseException(QuestionErrorCode.JOB_ROLE_REQUIRED);
-        }
-    }
-
-    private InterviewEntity findInterview(QuestionRequest request) {
-        if (request.getInterviewId() == null) {
-            return null;
-        }
-
-        return interviewRepository.findById(request.getInterviewId()).orElseThrow(() ->
-                new IllegalArgumentException("해당 면접을 찾을 수 없습니다. interviewId=" + request.getInterviewId()));
     }
 
     private boolean hasEnoughReusableQuestions(QuestionCreateData data, QuestionRequest request) {
