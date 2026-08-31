@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.util.retry.Retry;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -59,12 +61,9 @@ public class FollowUpTranscriptionService {
         try {
 
             /*
-             * MultipartFile을 FastAPI에 전달하기 위한
-             * ByteArrayResource 생성.
-             *
-             * getFilename()을 override하지 않으면
-             * multipart의 filename이 사라질 수 있으므로
-             * 반드시 원래 파일명을 반환한다.
+             * ByteArrayResource는 요청 재시도 시에도 같은 byte[]를 다시
+             * 전송할 수 있다. FastAPI가 개발 중 재시작되거나 연결이 순간적으로
+             * reset된 경우에 한해서 네트워크 요청을 1회 재시도한다.
              */
             ByteArrayResource resource =
                     new ByteArrayResource(
@@ -93,23 +92,12 @@ public class FollowUpTranscriptionService {
             FollowUpTranscriptionResponse response =
                     fastApiWebClient
                             .post()
-
                             .uri(
                                     "/apis/speech/transcribe-file"
                             )
-
                             .contentType(
                                     MediaType.MULTIPART_FORM_DATA
                             )
-
-                            /*
-                             * FastAPI:
-                             *
-                             * file: UploadFile = File(...)
-                             *
-                             * 이므로 multipart key 이름은
-                             * 반드시 "file"이어야 한다.
-                             */
                             .body(
                                     BodyInserters
                                             .fromMultipartData(
@@ -117,21 +105,36 @@ public class FollowUpTranscriptionService {
                                                     resource
                                             )
                             )
-
                             .retrieve()
-
                             .bodyToMono(
                                     FollowUpTranscriptionResponse.class
                             )
 
                             /*
-                             * Whisper 첫 호출은 모델 초기화 등으로
-                             * 시간이 걸릴 수 있으므로 여유 있게 설정.
+                             * Connection reset / connection refused 같은
+                             * 전송 계층 오류만 500ms 뒤 1회 재시도한다.
+                             *
+                             * 422(무음/너무 짧음) 같은 정상적인 API 오류는
+                             * 재시도하지 않는다.
                              */
+                            .retryWhen(
+                                    Retry.backoff(
+                                                    1,
+                                                    Duration.ofMillis(500)
+                                            )
+                                            .filter(
+                                                    throwable ->
+                                                            throwable
+                                                                    instanceof WebClientRequestException
+                                            )
+                                            .onRetryExhaustedThrow(
+                                                    (retrySpec, signal) ->
+                                                            signal.failure()
+                                            )
+                            )
                             .timeout(
                                     Duration.ofMinutes(3)
                             )
-
                             .block();
 
 
@@ -179,6 +182,21 @@ public class FollowUpTranscriptionService {
                         FastApiErrorCode.STT_NO_SPEECH
                 );
             }
+
+            throw new BaseException(
+                    FastApiErrorCode.FASTAPI_SERVER_ERROR
+            );
+
+
+        } catch (
+                WebClientRequestException e
+        ) {
+
+            log.error(
+                    "FastAPI STT 연결 실패 - message={}",
+                    e.getMessage(),
+                    e
+            );
 
             throw new BaseException(
                     FastApiErrorCode.FASTAPI_SERVER_ERROR
