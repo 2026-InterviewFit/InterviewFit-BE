@@ -617,6 +617,18 @@ public class InterviewService {
                         report.getId()
                 )
 
+                .speechScore(
+                        report.getScore()
+                )
+
+                .speechScoreStatus(
+                        report.getSpeechScoreStatus()
+                )
+
+                .speechScoreReason(
+                        report.getSpeechScoreReason()
+                )
+
                 .textScript(
                         report.getTextScript()
                 )
