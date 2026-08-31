@@ -1,5 +1,6 @@
 package com.example.interviewfitbe.domain.pt_interview.service;
 
+import com.example.interviewfitbe.domain.eye_gaze.service.EyeGazeService;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pt_interview.entity.PtInterviewEntity;
 import com.example.interviewfitbe.domain.pt_interview.repository.PtInterviewRepository;
@@ -23,9 +24,11 @@ public class PtPresentationService {
     private final PtInterviewRepository ptInterviewRepository;
     private final VideoService videoService;
     private final SpeechReportService speechReportService;
+    private final EyeGazeService eyeGazeService;
 
     /**
-     * PT 발표 전체 영상 업로드 및 Speech/STT 분석
+     * PT 발표 전체 영상 업로드 및
+     * 시선 분석 + Speech/STT 분석
      */
     public Long uploadAndAnalyze(
             Long ptInterviewId,
@@ -74,7 +77,27 @@ public class PtPresentationService {
         );
 
         /*
-         * 2. 직무 카테고리
+         * 2. 시선 분석
+         */
+        log.info(
+                "PT 시선 분석 시작: ptInterviewId={}, interviewId={}",
+                ptInterviewId,
+                interview.getId()
+        );
+
+        eyeGazeService.analyzeAndSave(
+                videoObjectKey,
+                interview
+        );
+
+        log.info(
+                "PT 시선 분석 완료: ptInterviewId={}, interviewId={}",
+                ptInterviewId,
+                interview.getId()
+        );
+
+        /*
+         * 3. 직무 카테고리
          */
         String jobCategory = "";
 
@@ -89,7 +112,7 @@ public class PtPresentationService {
         }
 
         /*
-         * 3. FastAPI Speech 분석
+         * 4. FastAPI Speech 분석
          *
          * 발표 전체 영상이므로
          * interviewAnswerId / questionId / originalQuestion은 null.
@@ -104,6 +127,12 @@ public class PtPresentationService {
                         .questionId(null)
                         .originalQuestion(null)
                         .build();
+
+        log.info(
+                "PT Speech 분석 시작: ptInterviewId={}, interviewId={}",
+                ptInterviewId,
+                interview.getId()
+        );
 
         Long speechReportId =
                 speechReportService

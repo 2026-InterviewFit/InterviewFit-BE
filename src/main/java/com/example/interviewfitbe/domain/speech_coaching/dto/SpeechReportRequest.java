@@ -78,13 +78,35 @@ public class SpeechReportRequest {
     private String textScript;
 
 
+    /**
+     * 음성 종합 점수
+     */
+    @JsonProperty("speech_score")
+    @JsonAlias("speechScore")
+    private Integer speechScore;
+
+
+    /**
+     * 음성 점수 상태
+     */
+    @JsonProperty("speech_score_status")
+    @JsonAlias("speechScoreStatus")
+    private String speechScoreStatus;
+
+
+    /**
+     * 음성 점수 산출 사유
+     */
+    @JsonProperty("speech_score_reason")
+    @JsonAlias("speechScoreReason")
+    private String speechScoreReason;
+
 
     /**
      * 필러 분석
      */
     @JsonProperty("filler_word_analysis")
     private FillerWordAnalysis fillerWordAnalysis;
-
 
 
     /**
@@ -94,13 +116,11 @@ public class SpeechReportRequest {
     private List<RepeatedExpression> repeatedExpressions;
 
 
-
     /**
      * 말하기 속도 분석
      */
     @JsonProperty("speech_pace_analysis")
     private SpeechPaceAnalysis speechPaceAnalysis;
-
 
 
     /**
@@ -110,19 +130,18 @@ public class SpeechReportRequest {
     private SilenceAnalysis silenceAnalysis;
 
 
-
     /**
      * 질문별 AI 평가
      */
     @JsonProperty("ai_evaluation")
     private AiEvaluation aiEvaluation;
 
+
     /**
      * 외부 학습 AI의 구조화된 답변 분석. 분석 실패 시 null이다.
      */
     @JsonProperty("external_ai_analysis")
     private ExternalAiAnalysis externalAiAnalysis;
-
 
 
     // ============================
@@ -141,11 +160,9 @@ public class SpeechReportRequest {
 
         private Map<String, Integer> details;
 
-
         @JsonProperty("total_count")
         private Integer totalCount;
     }
-
 
 
     /**
@@ -163,7 +180,6 @@ public class SpeechReportRequest {
     }
 
 
-
     /**
      * 말하기 속도 분석
      */
@@ -173,17 +189,13 @@ public class SpeechReportRequest {
     @ToString
     public static class SpeechPaceAnalysis {
 
-
         private String evaluation;
 
-
         private String feedback;
-
 
         @JsonProperty("characters_per_second")
         private Double charactersPerSecond;
     }
-
 
 
     /**
@@ -195,19 +207,15 @@ public class SpeechReportRequest {
     @ToString
     public static class SilenceAnalysis {
 
-
         @JsonProperty("total_silence_seconds")
         private Double totalSilenceSeconds;
-
 
         @JsonProperty("pause_rate_percent")
         private Double pauseRatePercent;
 
-
         @JsonProperty("critical_silence_count")
         private Integer criticalSilenceCount;
     }
-
 
 
     /**
@@ -220,28 +228,21 @@ public class SpeechReportRequest {
     @ToString
     public static class AiEvaluation {
 
-
         /**
          * STAR 점수
          */
         @JsonProperty("star_score")
         private Map<String, Integer> starScore;
 
-
-
         /**
          * Gemini 피드백
          */
         private String feedback;
 
-
-
         /**
          * 핵심 키워드
          */
         private List<String> keywords;
-
-
 
         /**
          * AI 모범 답안
