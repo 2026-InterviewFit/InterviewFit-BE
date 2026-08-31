@@ -23,11 +23,13 @@ class GroupInterviewComparisonScoreCalculatorTest {
                         """)
                 .speechResultJson("""
                         {"result":{
+                          "speech_score":82,
                           "filler_word_analysis":{"total_count":25},
                           "silence_analysis":{"pause_rate_percent":20,"critical_silence_count":4},
                           "speech_pace_analysis":{"characters_per_second":2.0}
                         }}
                         """)
+                .speechScore(82)
                 .eyeGazeResultJson("{" + "\"result\":{\"score\":90}}")
                 .eyeBlinkingResultJson("{" + "\"result\":{\"score\":80}}")
                 .poseResultJson("""
@@ -41,11 +43,11 @@ class GroupInterviewComparisonScoreCalculatorTest {
         var scores = calculator.calculate(analysis);
 
         assertThat(scores.content()).isEqualByComparingTo(new BigDecimal("75.00"));
-        assertThat(scores.speech()).isEqualByComparingTo(new BigDecimal("72.00"));
+        assertThat(scores.speech()).isEqualByComparingTo(new BigDecimal("82.00"));
         assertThat(scores.gaze()).isEqualByComparingTo(new BigDecimal("90.00"));
         assertThat(scores.pose()).isEqualByComparingTo(new BigDecimal("100.00"));
         assertThat(scores.blink()).isEqualByComparingTo(new BigDecimal("80.00"));
-        assertThat(scores.total()).isEqualByComparingTo(new BigDecimal("79.25"));
+        assertThat(scores.total()).isEqualByComparingTo(new BigDecimal("81.75"));
     }
 
     @Test

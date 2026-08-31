@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 
 @Entity
 @Table(name = "speech_report")
@@ -26,6 +27,12 @@ public class SpeechReportEntity {
     @JoinColumn(name = "interview_id", nullable = false, unique = true)
     private InterviewEntity interview;
     private Double score;
+
+    @Enumerated(EnumType.STRING)
+    private SpeechScoreStatus speechScoreStatus;
+
+    @Column(columnDefinition = "TEXT")
+    private String speechScoreReason;
 
     /**
      * 전체 STT 결과

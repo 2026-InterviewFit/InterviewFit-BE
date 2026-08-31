@@ -148,11 +148,7 @@ public class PtReportService {
         List<Double> speechScores =
                 speechReport
                         .map(report ->
-                                List.of(
-                                        report.getScore() == null
-                                                ? 0.0
-                                                : report.getScore()
-                                )
+                                java.util.Collections.singletonList(report.getScore())
                         )
                         .orElseGet(List::of);
 
@@ -556,6 +552,9 @@ public class PtReportService {
                         .map(report ->
                                 new PtSpeechDetailResponse(
                                         report.getScore(),
+                                        report.getScore(),
+                                        report.getSpeechScoreStatus(),
+                                        report.getSpeechScoreReason(),
                                         report.getTextScript(),
                                         report.getTotalFillerCount(),
                                         report.getFillerDetailsJson(),

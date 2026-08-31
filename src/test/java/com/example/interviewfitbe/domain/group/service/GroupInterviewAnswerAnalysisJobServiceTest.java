@@ -105,6 +105,8 @@ class GroupInterviewAnswerAnalysisJobServiceTest {
                 eq(10L), eq(123L), eq(30L), anyString()
         )).thenReturn(Map.of("result", Map.of(
                 "text_script", "안녕하세요",
+                "speech_score", 82,
+                "speech_score_status", "SCORED",
                 "filler_word_analysis", Map.of("total_count", 1),
                 "repeated_expressions", List.of(),
                 "speech_pace_analysis", Map.of("characters_per_second", 4.2),
@@ -132,6 +134,10 @@ class GroupInterviewAnswerAnalysisJobServiceTest {
 
         assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.DONE);
         assertThat(analysis.getSpeechText()).isEqualTo("안녕하세요");
+        assertThat(analysis.getSpeechScore()).isEqualTo(82);
+        assertThat(analysis.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.SCORED);
+        assertThat(analysis.getSpeechScoreReason()).isNull();
         assertThat(analysis.getSpeechResultJson()).contains("filler_word_analysis");
         assertThat(analysis.getAiEvaluationJson()).contains("좋습니다");
         assertThat(analysis.getExternalAiAnalysisJson())
@@ -140,6 +146,14 @@ class GroupInterviewAnswerAnalysisJobServiceTest {
         assertThat(analysis.getEyeBlinkingResultJson()).contains("blink_count");
         assertThat(analysis.getEyeGazeResultJson()).contains("center_ratio");
         assertThat(analysis.getPoseResultJson()).contains("timestamp");
+
+        var response = com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse
+                .from(analysis, null);
+        assertThat(response.getSpeechScore()).isEqualTo(82);
+        assertThat(response.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.SCORED);
+        assertThat(response.getSpeechScoreReason()).isNull();
+
     }
 
     @Test
@@ -159,6 +173,43 @@ class GroupInterviewAnswerAnalysisJobServiceTest {
         assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.DONE);
         assertThat(analysis.getAiEvaluationJson()).contains("기존 평가");
         assertThat(analysis.getExternalAiAnalysisJson()).isNull();
+    }
+
+    @Test
+    void insufficientSpeechDataStillCompletesAllAnalyses() {
+        when(speechService.analyzeSpeech(anyString(), anyString(), any(), anyLong(),
+                anyLong(), anyLong(), anyString()))
+                .thenReturn(Map.of("result", new java.util.HashMap<>(Map.of(
+                        "text_script", "짧은 답변",
+                        "speech_score_status", "INSUFFICIENT_DATA",
+                        "speech_score_reason", "발화 데이터가 부족하여 점수를 산출할 수 없습니다.",
+                        "ai_evaluation", Map.of("feedback", "내용 피드백")
+                ))));
+        when(blinkingService.analyzeBlinking(anyString()))
+                .thenReturn(Map.of("result", Map.of("score", 70)));
+        when(gazeService.analyzeGaze(anyString()))
+                .thenReturn(Map.of("result", Map.of("score", 80)));
+        when(poseService.analyzePosture(anyString()))
+                .thenReturn(List.of(PoseAnalysisResponse.builder().timestamp(1.0).build()));
+
+        service.analyzeAsync(123L);
+
+        assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.DONE);
+        assertThat(analysis.getSpeechScore()).isNull();
+        assertThat(analysis.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.INSUFFICIENT_DATA);
+        assertThat(analysis.getSpeechScoreReason()).contains("발화 데이터가 부족");
+        assertThat(analysis.getAiEvaluationJson()).contains("내용 피드백");
+        assertThat(analysis.getEyeBlinkingResultJson()).contains("70");
+        assertThat(analysis.getEyeGazeResultJson()).contains("80");
+        assertThat(analysis.getPoseResultJson()).contains("timestamp");
+
+        var response = com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse
+                .from(analysis, null);
+        assertThat(response.getSpeechScore()).isNull();
+        assertThat(response.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.INSUFFICIENT_DATA);
+        assertThat(response.getSpeechScoreReason()).contains("발화 데이터가 부족");
     }
 
     @Test
