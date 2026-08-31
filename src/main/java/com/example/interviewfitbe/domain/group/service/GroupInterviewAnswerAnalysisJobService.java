@@ -10,6 +10,7 @@ import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResponse;
 import com.example.interviewfitbe.domain.pose.service.PoseAnalysisService;
 import com.example.interviewfitbe.domain.speech_coaching.service.SpeechAnalysisService;
+import com.example.interviewfitbe.domain.speech_coaching.dto.SpeechReportRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,10 +64,17 @@ public class GroupInterviewAnswerAnalysisJobService {
                     poseAnalysisService.analyzePosture(context.videoObjectKey());
 
             Map<String, Object> speechPayload = extractResult(speech);
+            SpeechReportRequest speechReport = objectMapper.convertValue(
+                    speechPayload,
+                    SpeechReportRequest.class
+            );
             saveDone(
                     answerId,
                     stringValue(speechPayload, "text_script", "textScript"),
                     toJson(speech),
+                    speechReport.getSpeechScore(),
+                    speechReport.getSpeechScoreStatus(),
+                    speechReport.getSpeechScoreReason(),
                     toJson(speechPayload.get("ai_evaluation")),
                     toJson(speechPayload.get("external_ai_analysis")),
                     toJson(blinking),
@@ -133,6 +141,9 @@ public class GroupInterviewAnswerAnalysisJobService {
             Long answerId,
             String speechText,
             String speechJson,
+            Integer speechScore,
+            com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus speechScoreStatus,
+            String speechScoreReason,
             String aiEvaluationJson,
             String externalAiAnalysisJson,
             String blinkingJson,
@@ -144,6 +155,9 @@ public class GroupInterviewAnswerAnalysisJobService {
             analysis.markDone(
                     speechText,
                     speechJson,
+                    speechScore,
+                    speechScoreStatus,
+                    speechScoreReason,
                     aiEvaluationJson,
                     externalAiAnalysisJson,
                     blinkingJson,

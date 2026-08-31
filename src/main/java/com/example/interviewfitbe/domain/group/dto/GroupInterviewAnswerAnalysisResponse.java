@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
+import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 
 @Getter
 @Builder
@@ -20,6 +21,9 @@ public class GroupInterviewAnswerAnalysisResponse {
     private AnalysisStatus status;
     private String speechText;
     private String speechResultJson;
+    private Integer speechScore;
+    private SpeechScoreStatus speechScoreStatus;
+    private String speechScoreReason;
     private String aiEvaluationJson;
     private ExternalAiAnalysis externalAiAnalysis;
     private String eyeBlinkingResultJson;
@@ -44,6 +48,9 @@ public class GroupInterviewAnswerAnalysisResponse {
                 .status(analysis.getStatus())
                 .speechText(analysis.getSpeechText())
                 .speechResultJson(analysis.getSpeechResultJson())
+                .speechScore(analysis.getSpeechScore())
+                .speechScoreStatus(analysis.getSpeechScoreStatus())
+                .speechScoreReason(analysis.getSpeechScoreReason())
                 .aiEvaluationJson(analysis.getAiEvaluationJson())
                 .externalAiAnalysis(externalAiAnalysis)
                 .eyeBlinkingResultJson(analysis.getEyeBlinkingResultJson())

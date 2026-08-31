@@ -495,10 +495,10 @@ public class SpeechReportService {
                                         interview
                                 )
                                 .score(
-                                        calculateSpeechScore(
-                                                request
-                                        )
+                                        resolveSpeechScore(request)
                                 )
+                                .speechScoreStatus(request.getSpeechScoreStatus())
+                                .speechScoreReason(request.getSpeechScoreReason())
                                 .textScript(
                                         textScript
                                 )
@@ -584,6 +584,16 @@ public class SpeechReportService {
                     e
             );
         }
+    }
+
+    private Double resolveSpeechScore(SpeechReportRequest request) {
+        if (request.getSpeechScoreStatus() != null) {
+            return request.getSpeechScore() == null
+                    ? null
+                    : request.getSpeechScore().doubleValue();
+        }
+        // 구버전 Python 응답과의 하위 호환용 기존 계산식.
+        return calculateSpeechScore(request);
     }
 
 

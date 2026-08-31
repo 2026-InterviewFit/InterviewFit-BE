@@ -11,6 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 
 @Entity
 @Table(name = "group_interview_answer_analyses")
@@ -38,6 +39,14 @@ public class GroupInterviewAnswerAnalysisEntity {
 
     @Column(name = "speech_result_json", columnDefinition = "TEXT")
     private String speechResultJson;
+
+    private Integer speechScore;
+
+    @Enumerated(EnumType.STRING)
+    private SpeechScoreStatus speechScoreStatus;
+
+    @Column(columnDefinition = "TEXT")
+    private String speechScoreReason;
 
     @Column(name = "ai_evaluation_json", columnDefinition = "TEXT")
     private String aiEvaluationJson;
@@ -90,6 +99,9 @@ public class GroupInterviewAnswerAnalysisEntity {
     public void markDone(
             String speechText,
             String speechResultJson,
+            Integer speechScore,
+            SpeechScoreStatus speechScoreStatus,
+            String speechScoreReason,
             String aiEvaluationJson,
             String externalAiAnalysisJson,
             String eyeBlinkingResultJson,
@@ -99,6 +111,9 @@ public class GroupInterviewAnswerAnalysisEntity {
     ) {
         this.speechText = speechText;
         this.speechResultJson = speechResultJson;
+        this.speechScore = speechScore;
+        this.speechScoreStatus = speechScoreStatus;
+        this.speechScoreReason = speechScoreReason;
         this.aiEvaluationJson = aiEvaluationJson;
         this.externalAiAnalysisJson = externalAiAnalysisJson;
         this.eyeBlinkingResultJson = eyeBlinkingResultJson;

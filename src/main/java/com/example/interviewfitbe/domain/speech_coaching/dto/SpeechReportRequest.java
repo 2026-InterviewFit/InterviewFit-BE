@@ -9,12 +9,25 @@ import lombok.extern.jackson.Jacksonized;
 
 import java.util.List;
 import java.util.Map;
+import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 
 @Getter
 @Builder(toBuilder = true)
 @Jacksonized
 @ToString
 public class SpeechReportRequest {
+
+    @JsonProperty("speech_score")
+    @JsonAlias("speechScore")
+    private Integer speechScore;
+
+    @JsonProperty("speech_score_status")
+    @JsonAlias("speechScoreStatus")
+    private SpeechScoreStatus speechScoreStatus;
+
+    @JsonProperty("speech_score_reason")
+    @JsonAlias("speechScoreReason")
+    private String speechScoreReason;
 
     /**
      * 면접 ID

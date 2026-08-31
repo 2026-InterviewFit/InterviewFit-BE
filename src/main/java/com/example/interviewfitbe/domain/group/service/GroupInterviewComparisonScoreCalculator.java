@@ -35,7 +35,9 @@ public class GroupInterviewComparisonScoreCalculator {
 
     public Scores calculate(GroupInterviewAnswerAnalysisEntity analysis) {
         BigDecimal content = contentScore(analysis.getAiEvaluationJson());
-        BigDecimal speech = speechScore(analysis.getSpeechResultJson());
+        BigDecimal speech = analysis.getSpeechScore() == null
+                ? null
+                : round(BigDecimal.valueOf(analysis.getSpeechScore()));
         BigDecimal gaze = resultScore(analysis.getEyeGazeResultJson());
         BigDecimal pose = poseScore(analysis.getPoseResultJson());
         BigDecimal blink = resultScore(analysis.getEyeBlinkingResultJson());
@@ -66,24 +68,6 @@ public class GroupInterviewComparisonScoreCalculator {
         }
         return clamp(average(values).multiply(STAR_NORMALIZATION_FACTOR))
                 .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /** Mirrors SpeechReportService's existing penalty thresholds. */
-    private BigDecimal speechScore(String json) {
-        JsonNode root = result(tree(json));
-        if (root == null) return null;
-        double score = 100.0;
-        Integer filler = Optional.ofNullable(
-                integerAt(root, "filler_word_analysis", "total_count")).orElse(0);
-        Double pause = doubleAt(root, "silence_analysis", "pause_rate_percent");
-        Integer critical = Optional.ofNullable(
-                integerAt(root, "silence_analysis", "critical_silence_count")).orElse(0);
-        Double cps = doubleAt(root, "speech_pace_analysis", "characters_per_second");
-        if (filler > 20) score -= Math.min(20.0, filler - 20.0);
-        if (pause != null && pause > 15.0) score -= Math.min(20.0, pause - 15.0);
-        if (critical > 3) score -= Math.min(20.0, critical * 2.0);
-        if (cps != null && (cps < 3.0 || cps > 8.0)) score -= 10.0;
-        return round(BigDecimal.valueOf(Math.max(0.0, Math.min(100.0, score))));
     }
 
     private BigDecimal resultScore(String json) {
