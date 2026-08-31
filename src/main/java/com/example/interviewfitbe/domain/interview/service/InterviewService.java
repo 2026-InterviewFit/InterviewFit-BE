@@ -375,6 +375,7 @@ public class InterviewService {
                 .interviewQuestionId(answer.getInterviewQuestionId())
                 .questionId(answer.getQuestionId())
                 .questionText(answer.getQuestionText())
+                .videoObjectKey(answer.getVideoObjectKey())
                 .answerText(answer.getAnswerText())
                 .answerOrder(answer.getAnswerOrder())
                 .startTime(answer.getStartTime())

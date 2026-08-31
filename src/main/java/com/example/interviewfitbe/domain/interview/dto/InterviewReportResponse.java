@@ -47,6 +47,7 @@ public class InterviewReportResponse {
         private Long interviewQuestionId;
         private Long questionId;
         private String questionText;
+        private String videoObjectKey;
         private String answerText;
         private Integer answerOrder;
         private Double startTime;
