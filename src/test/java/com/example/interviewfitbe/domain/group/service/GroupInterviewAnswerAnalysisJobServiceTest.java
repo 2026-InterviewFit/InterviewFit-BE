@@ -1,0 +1,227 @@
+package com.example.interviewfitbe.domain.group.service;
+
+import com.example.interviewfitbe.domain.eye_blinking.service.EyeBlinkingAnalysisService;
+import com.example.interviewfitbe.domain.eye_gaze.service.EyeGazeAnalysisService;
+import com.example.interviewfitbe.domain.group.entity.GroupInterviewAnswerAnalysisEntity;
+import com.example.interviewfitbe.domain.group.entity.GroupInterviewAnswerEntity;
+import com.example.interviewfitbe.domain.group.entity.GroupInterviewEntity;
+import com.example.interviewfitbe.domain.group.entity.GroupQuestionEntity;
+import com.example.interviewfitbe.domain.group.repository.GroupInterviewAnswerAnalysisRepository;
+import com.example.interviewfitbe.domain.group.repository.GroupQuestionRepository;
+import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
+import com.example.interviewfitbe.domain.job.repository.JobRoleRepository;
+import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResponse;
+import com.example.interviewfitbe.domain.pose.service.PoseAnalysisService;
+import com.example.interviewfitbe.domain.speech_coaching.service.SpeechAnalysisService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class GroupInterviewAnswerAnalysisJobServiceTest {
+
+    private GroupInterviewAnswerAnalysisRepository analysisRepository;
+    private EyeBlinkingAnalysisService blinkingService;
+    private EyeGazeAnalysisService gazeService;
+    private PoseAnalysisService poseService;
+    private SpeechAnalysisService speechService;
+    private GroupInterviewAnswerAnalysisJobService service;
+    private GroupInterviewAnswerAnalysisEntity analysis;
+
+    @BeforeEach
+    @SuppressWarnings("unchecked")
+    void setUp() {
+        analysisRepository = mock(GroupInterviewAnswerAnalysisRepository.class);
+        blinkingService = mock(EyeBlinkingAnalysisService.class);
+        gazeService = mock(EyeGazeAnalysisService.class);
+        poseService = mock(PoseAnalysisService.class);
+        speechService = mock(SpeechAnalysisService.class);
+        GroupQuestionRepository questionRepository = mock(GroupQuestionRepository.class);
+        JobRoleRepository jobRoleRepository = mock(JobRoleRepository.class);
+        TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
+        TransactionStatus transactionStatus = mock(TransactionStatus.class);
+
+        when(transactionTemplate.execute(any())).thenAnswer(invocation ->
+                ((TransactionCallback<Object>) invocation.getArgument(0))
+                        .doInTransaction(transactionStatus));
+        doAnswer(invocation -> {
+            ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(transactionStatus);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        when(interview.getJobRoleId()).thenReturn(2L);
+        GroupInterviewAnswerEntity answer = GroupInterviewAnswerEntity.builder()
+                .id(123L)
+                .groupInterview(interview)
+                .participantUserId(5L)
+                .questionId(30L)
+                .videoObjectKey("videos/answer.webm")
+                .build();
+        analysis = GroupInterviewAnswerAnalysisEntity.builder()
+                .id(77L)
+                .answer(answer)
+                .build();
+
+        when(analysisRepository.findByAnswerId(123L)).thenReturn(Optional.of(analysis));
+        when(analysisRepository.findByAnswerIdForUpdate(123L)).thenReturn(Optional.of(analysis));
+        GroupQuestionEntity question = mock(GroupQuestionEntity.class);
+        when(question.getQuestionText()).thenReturn("지원 동기를 말씀해 주세요.");
+        when(questionRepository.findById(30L)).thenReturn(Optional.of(question));
+        when(jobRoleRepository.findById(2L)).thenReturn(Optional.of(
+                JobRoleEntity.builder().category("IT/개발").name("백엔드").build()
+        ));
+
+        service = new GroupInterviewAnswerAnalysisJobService(
+                analysisRepository,
+                questionRepository,
+                jobRoleRepository,
+                blinkingService,
+                gazeService,
+                poseService,
+                speechService,
+                new ObjectMapper(),
+                transactionTemplate
+        );
+    }
+
+    @Test
+    void analyzesOneVideoWithAllExistingFastApiClientsAndStoresOneResult() {
+        when(speechService.analyzeSpeech(
+                eq("minio"), eq("videos/answer.webm"), eq("IT/개발"),
+                eq(10L), eq(123L), eq(30L), anyString()
+        )).thenReturn(Map.of("result", Map.of(
+                "text_script", "안녕하세요",
+                "speech_score", 82,
+                "speech_score_status", "SCORED",
+                "filler_word_analysis", Map.of("total_count", 1),
+                "repeated_expressions", List.of(),
+                "speech_pace_analysis", Map.of("characters_per_second", 4.2),
+                "silence_analysis", Map.of("total_silence_seconds", 1.0),
+                "ai_evaluation", Map.of("feedback", "좋습니다"),
+                "external_ai_analysis", Map.of(
+                        "star", Map.of(
+                                "situation", "서비스 장애 상황",
+                                "task", "서비스 복구",
+                                "action", "로그 분석",
+                                "result", "정상화"
+                        ),
+                        "strengths", List.of("행동 과정이 구체적입니다."),
+                        "improvements", List.of("성과를 수치로 제시하세요.")
+                )
+        )));
+        when(blinkingService.analyzeBlinking("videos/answer.webm"))
+                .thenReturn(Map.of("result", Map.of("blink_count", 10)));
+        when(gazeService.analyzeGaze("videos/answer.webm"))
+                .thenReturn(Map.of("result", Map.of("center_ratio", 0.8)));
+        when(poseService.analyzePosture("videos/answer.webm"))
+                .thenReturn(List.of(PoseAnalysisResponse.builder().timestamp(1.0).build()));
+
+        service.analyzeAsync(123L);
+
+        assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.DONE);
+        assertThat(analysis.getSpeechText()).isEqualTo("안녕하세요");
+        assertThat(analysis.getSpeechScore()).isEqualTo(82);
+        assertThat(analysis.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.SCORED);
+        assertThat(analysis.getSpeechScoreReason()).isNull();
+        assertThat(analysis.getSpeechResultJson()).contains("filler_word_analysis");
+        assertThat(analysis.getAiEvaluationJson()).contains("좋습니다");
+        assertThat(analysis.getExternalAiAnalysisJson())
+                .contains("서비스 장애 상황")
+                .contains("행동 과정이 구체적입니다.");
+        assertThat(analysis.getEyeBlinkingResultJson()).contains("blink_count");
+        assertThat(analysis.getEyeGazeResultJson()).contains("center_ratio");
+        assertThat(analysis.getPoseResultJson()).contains("timestamp");
+
+        var response = com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse
+                .from(analysis, null);
+        assertThat(response.getSpeechScore()).isEqualTo(82);
+        assertThat(response.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.SCORED);
+        assertThat(response.getSpeechScoreReason()).isNull();
+
+    }
+
+    @Test
+    void missingExternalAiAnalysisDoesNotFailExistingAnalysis() {
+        when(speechService.analyzeSpeech(anyString(), anyString(), any(), anyLong(),
+                anyLong(), anyLong(), anyString()))
+                .thenReturn(Map.of("result", Map.of(
+                        "text_script", "안녕하세요",
+                        "ai_evaluation", Map.of("feedback", "기존 평가")
+                )));
+        when(blinkingService.analyzeBlinking(anyString())).thenReturn(Map.of());
+        when(gazeService.analyzeGaze(anyString())).thenReturn(Map.of());
+        when(poseService.analyzePosture(anyString())).thenReturn(List.of());
+
+        service.analyzeAsync(123L);
+
+        assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.DONE);
+        assertThat(analysis.getAiEvaluationJson()).contains("기존 평가");
+        assertThat(analysis.getExternalAiAnalysisJson()).isNull();
+    }
+
+    @Test
+    void insufficientSpeechDataStillCompletesAllAnalyses() {
+        when(speechService.analyzeSpeech(anyString(), anyString(), any(), anyLong(),
+                anyLong(), anyLong(), anyString()))
+                .thenReturn(Map.of("result", new java.util.HashMap<>(Map.of(
+                        "text_script", "짧은 답변",
+                        "speech_score_status", "INSUFFICIENT_DATA",
+                        "speech_score_reason", "발화 데이터가 부족하여 점수를 산출할 수 없습니다.",
+                        "ai_evaluation", Map.of("feedback", "내용 피드백")
+                ))));
+        when(blinkingService.analyzeBlinking(anyString()))
+                .thenReturn(Map.of("result", Map.of("score", 70)));
+        when(gazeService.analyzeGaze(anyString()))
+                .thenReturn(Map.of("result", Map.of("score", 80)));
+        when(poseService.analyzePosture(anyString()))
+                .thenReturn(List.of(PoseAnalysisResponse.builder().timestamp(1.0).build()));
+
+        service.analyzeAsync(123L);
+
+        assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.DONE);
+        assertThat(analysis.getSpeechScore()).isNull();
+        assertThat(analysis.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.INSUFFICIENT_DATA);
+        assertThat(analysis.getSpeechScoreReason()).contains("발화 데이터가 부족");
+        assertThat(analysis.getAiEvaluationJson()).contains("내용 피드백");
+        assertThat(analysis.getEyeBlinkingResultJson()).contains("70");
+        assertThat(analysis.getEyeGazeResultJson()).contains("80");
+        assertThat(analysis.getPoseResultJson()).contains("timestamp");
+
+        var response = com.example.interviewfitbe.domain.group.dto.GroupInterviewAnswerAnalysisResponse
+                .from(analysis, null);
+        assertThat(response.getSpeechScore()).isNull();
+        assertThat(response.getSpeechScoreStatus())
+                .isEqualTo(com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus.INSUFFICIENT_DATA);
+        assertThat(response.getSpeechScoreReason()).contains("발화 데이터가 부족");
+    }
+
+    @Test
+    void analysisFailureIsStoredWithoutThrowingToUploadFlow() {
+        when(speechService.analyzeSpeech(anyString(), anyString(), any(), anyLong(),
+                anyLong(), anyLong(), anyString()))
+                .thenThrow(new IllegalStateException("FastAPI unavailable"));
+
+        service.analyzeAsync(123L);
+
+        assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
+        assertThat(analysis.getErrorMessage()).contains("FastAPI unavailable");
+        verifyNoInteractions(blinkingService, gazeService, poseService);
+    }
+}

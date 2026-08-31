@@ -2,14 +2,13 @@ package com.example.interviewfitbe.domain.question.controller;
 
 import com.example.interviewfitbe.domain.question.dto.QuestionDto;
 import com.example.interviewfitbe.domain.question.dto.QuestionRequest;
-import com.example.interviewfitbe.domain.coverletter.service.PdfService;
 import com.example.interviewfitbe.domain.question.dto.QuestionResponse;
+import com.example.interviewfitbe.domain.question.mapper.QuestionMapper;
 import com.example.interviewfitbe.domain.question.service.QuestionService;
+import com.example.interviewfitbe.global.jwt.AuthUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -18,30 +17,18 @@ import java.util.List;
 @RestController
 public class QuestionController {
     private final QuestionService questionService;
-    private final PdfService pdfService;
-
-    @GetMapping
-    public ResponseEntity<List<QuestionResponse>> getAllQuestions() {
-        List<QuestionResponse> results = questionService.getAllQuestions();
-        return ResponseEntity.ok(results);
-    }
+    private final QuestionMapper questionMapper;
 
     @GetMapping("/{id}")
-    public ResponseEntity<QuestionResponse> getQuestion(@PathVariable Long id) {
-        QuestionResponse result = questionService.getQuestion(id);
+    public ResponseEntity<QuestionDto> getQuestion(@PathVariable Long id) {
+        QuestionDto result = questionMapper.toDto(questionService.getQuestion(id));
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<List<QuestionDto>> createQuestions(
-            @RequestPart("request") QuestionRequest request,
-            @RequestPart(value = "coverLetterFile", required = false) MultipartFile coverLetterFile
-    ) {
-        if (coverLetterFile != null && !coverLetterFile.isEmpty()) {
-            String coverLetter = pdfService.extractText(coverLetterFile);
-            request.updateCoverLetter(coverLetter);
-        }
-        List<QuestionDto> responses = questionService.createQuestions(request.getUserId(), request);
+    @PostMapping("/one-to-one/create")
+    public ResponseEntity<List<QuestionResponse>> createQuestions(@RequestBody QuestionRequest request) {
+        Long userId = AuthUtils.getCurrentUserId();
+        List<QuestionResponse> responses = questionService.createQuestions(userId, request);
         return ResponseEntity.ok(responses);
     }
 }

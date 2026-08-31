@@ -13,28 +13,46 @@ public class UserService {
     private final UserRepository userRepository;
 
     /**
-     * 새로운 사용자 등록
+     * 카카오 로그인 / 회원가입 처리.
+     *
+     * 카카오 고유 ID를 기준으로 이미 가입된 유저가 있으면 기존 유저를 반환하고,
+     * 없으면 새로 가입시킨다.
      */
     @Transactional
-    public Long registerUser(String email, String name) {
-        if (userRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("이미 존재하는 이메일입니다: " + email);
+    public UserEntity processKakaoLogin(Long kakaoId, String email, String name) {
+        if (kakaoId == null) {
+            throw new IllegalArgumentException("kakaoId는 필수입니다.");
         }
 
-        UserEntity user = UserEntity.builder()
-                .email(email)
-                .name(name)
-                .build();
+        return userRepository.findByKakaoId(kakaoId)
+                .map(existingUser -> {
+                    existingUser.updateKakaoProfile(email, name);
+                    return existingUser;
+                })
+                .orElseGet(() -> {
+                    UserEntity newUser = UserEntity.builder()
+                            .kakaoId(kakaoId)
+                            .email(email)
+                            .name(resolveName(name))
+                            .build();
 
-        return userRepository.save(user).getId();
+                    return userRepository.save(newUser);
+                });
     }
 
-    /**
-     * ID로 사용자 조회
-     */
     @Transactional(readOnly = true)
     public UserEntity getUserById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다. id=" + userId));
+                .orElseThrow(() ->
+                        new IllegalArgumentException("사용자를 찾을 수 없습니다. id=" + userId)
+                );
+    }
+
+    private String resolveName(String name) {
+        if (name == null || name.isBlank()) {
+            return "카카오사용자";
+        }
+
+        return name;
     }
 }

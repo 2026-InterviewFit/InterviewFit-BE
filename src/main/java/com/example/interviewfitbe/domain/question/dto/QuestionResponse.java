@@ -11,10 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class QuestionResponse {
     private Long id;
-    private Long interviewId;
-    private Long interviewAnswerId;
     private String question;
-    private String jobName;
-    private String coverLetterContent;
-    private String createdAt;
+    private Integer questionOrder;
 }

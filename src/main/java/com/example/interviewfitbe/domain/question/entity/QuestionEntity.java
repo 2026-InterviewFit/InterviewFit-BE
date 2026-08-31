@@ -1,13 +1,14 @@
 package com.example.interviewfitbe.domain.question.entity;
 
-import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
-import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
+import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.question.enums.QuestionType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -22,13 +23,20 @@ public class QuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id")
     private InterviewEntity interview;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interview_answer_id")
-    private InterviewAnswerEntity interviewAnswer;
+    @JoinColumn(name = "job_role_id", nullable = false)
+    private JobRoleEntity jobRole;
+
+    // 자기소개서 문항별 저장 테이블
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cover_letter_question_id")
+    private CoverLetterQuestionEntity coverLetterQuestion;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
@@ -36,23 +44,9 @@ public class QuestionEntity {
     @Enumerated(EnumType.STRING)
     private QuestionType type;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_role_id", nullable = false)
-    private JobRoleEntity jobRole;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cover_letter_id")
-    private CoverLetterEntity coverLetter;
+    private Integer questionOrder;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    public void linkInterview(InterviewEntity interview) {
-        this.interview = interview;
-    }
-
-    public void linkInterviewAnswer(InterviewAnswerEntity interviewAnswer) {
-        this.interviewAnswer = interviewAnswer;
-    }
 }

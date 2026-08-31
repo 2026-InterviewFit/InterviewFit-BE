@@ -1,0 +1,283 @@
+package com.example.interviewfitbe.domain.group.service;
+
+import com.example.interviewfitbe.domain.group.entity.*;
+import com.example.interviewfitbe.domain.group.repository.*;
+import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.user.entity.UserEntity;
+import com.example.interviewfitbe.domain.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class GroupInterviewComparisonServiceTest {
+    private GroupInterviewAnswerAnalysisRepository analysisRepository;
+    private GroupInterviewComparisonReportRepository reportRepository;
+    private GroupInterviewComparisonScoreCalculator calculator;
+    private GroupComparisonFeedbackClient feedbackClient;
+    private UserRepository userRepository;
+    private GroupInterviewComparisonService service;
+    private final List<GroupInterviewComparisonReportEntity> saved = new ArrayList<>();
+
+    @BeforeEach
+    void setUp() {
+        GroupInterviewRepository interviewRepository = mock(GroupInterviewRepository.class);
+        GroupInterviewSessionRepository sessionRepository = mock(GroupInterviewSessionRepository.class);
+        GroupParticipantRepository participantRepository = mock(GroupParticipantRepository.class);
+        analysisRepository = mock(GroupInterviewAnswerAnalysisRepository.class);
+        reportRepository = mock(GroupInterviewComparisonReportRepository.class);
+        calculator = mock(GroupInterviewComparisonScoreCalculator.class);
+        feedbackClient = mock(GroupComparisonFeedbackClient.class);
+        userRepository = mock(UserRepository.class);
+
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getRoomStatus()).thenReturn("COMPLETED");
+        GroupInterviewSessionEntity session = mock(GroupInterviewSessionEntity.class);
+        when(session.getStatus()).thenReturn(InterviewStatus.FINISHED);
+        when(interviewRepository.findById(10L)).thenReturn(Optional.of(interview));
+        when(interviewRepository.existsById(10L)).thenReturn(true);
+        when(sessionRepository.findByInterviewIdForUpdate(10L)).thenReturn(Optional.of(session));
+        when(participantRepository.existsByRoomIdAndUserId(10L, 1L)).thenReturn(true);
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L)).thenReturn(List.of(
+                GroupParticipantEntity.builder().roomId(10L).userId(1L).build(),
+                GroupParticipantEntity.builder().roomId(10L).userId(2L).build()));
+        when(reportRepository.findByRoomIdAndParticipantUserIdAndScopeAndQuestionIndex(
+                anyLong(), anyLong(), any(), anyInt())).thenReturn(Optional.empty());
+        when(reportRepository.findByRoomIdAndParticipantUserIdAndScopeAndQuestionIndexIsNull(
+                anyLong(), anyLong(), any())).thenReturn(Optional.empty());
+        when(reportRepository.findAllByRoomIdAndScopeOrderByRankAscParticipantUserIdAsc(
+                eq(10L), any())).thenAnswer(invocation -> {
+            GroupComparisonScope scope = invocation.getArgument(1);
+            return saved.stream().filter(r -> r.getScope() == scope).toList();
+        });
+        when(reportRepository.save(any())).thenAnswer(invocation -> {
+            GroupInterviewComparisonReportEntity report = invocation.getArgument(0);
+            if (!saved.contains(report)) saved.add(report);
+            return report;
+        });
+        when(feedbackClient.createFeedback(any())).thenReturn(List.of());
+
+        service = new GroupInterviewComparisonService(interviewRepository, sessionRepository,
+                participantRepository, analysisRepository, reportRepository, calculator,
+                feedbackClient, userRepository);
+    }
+
+    @Test
+    void createsQuestionRanksOnlyWhenEveryAnalysisIsDone() {
+        var first = analysis(1L, AnalysisStatus.DONE);
+        var second = analysis(2L, AnalysisStatus.DONE);
+        when(analysisRepository.findAllForComparison(10L, 0)).thenReturn(List.of(first, second));
+        when(analysisRepository.findAllForComparison(10L, 1)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 2)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 3)).thenReturn(List.of());
+        when(calculator.calculate(first)).thenReturn(scores("90"));
+        when(calculator.calculate(second)).thenReturn(scores("80"));
+
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).hasSize(2);
+        assertThat(saved).allMatch(r -> r.getStatus() == GroupComparisonStatus.DONE);
+        assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(1L))
+                .singleElement().extracting(GroupInterviewComparisonReportEntity::getRank).isEqualTo(1);
+        assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(2L))
+                .singleElement().extracting(GroupInterviewComparisonReportEntity::getRank).isEqualTo(2);
+        assertThat(saved).allMatch(report -> report.getStrengthSummary() == null
+                && report.getImprovementSummary() == null);
+        verifyNoInteractions(feedbackClient);
+    }
+
+    @Test
+    void createsOverallAveragesAndStoresFeedbackForBothParticipants() {
+        List<GroupInterviewComparisonReportEntity> questions = new ArrayList<>();
+        for (int questionIndex = 0; questionIndex < GroupInterviewSessionEntity.TOTAL_ROUNDS; questionIndex++) {
+            questions.add(questionReport(1L, questionIndex, "90"));
+            questions.add(questionReport(2L, questionIndex, "80"));
+        }
+        when(reportRepository.findAllByRoomIdAndScopeOrderByRankAscParticipantUserIdAsc(
+                10L, GroupComparisonScope.QUESTION)).thenReturn(questions);
+        when(feedbackClient.createFeedback(any())).thenReturn(List.of(
+                new GroupComparisonFeedbackClient.Feedback(1L, "종합 강점 1", "종합 개선 1"),
+                new GroupComparisonFeedbackClient.Feedback(2L, "종합 강점 2", "종합 개선 2")));
+
+        service.generateAvailableComparisons(10L);
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).hasSize(2).allMatch(r -> r.getScope() == GroupComparisonScope.OVERALL);
+        assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(1L)).singleElement()
+                .satisfies(report -> {
+                    assertThat(report.getTotalScore()).isEqualByComparingTo("90.00");
+                    assertThat(report.getRank()).isEqualTo(1);
+                    assertThat(report.getStrengthSummary()).isEqualTo("종합 강점 1");
+                    assertThat(report.getImprovementSummary()).isEqualTo("종합 개선 1");
+                });
+        verify(feedbackClient, times(1)).createFeedback(any());
+    }
+
+    @Test
+    void failedAnalysisCreatesPartialWithoutRanks() {
+        var done = analysis(1L, AnalysisStatus.DONE);
+        var failed = analysis(2L, AnalysisStatus.FAILED);
+        when(analysisRepository.findAllForComparison(10L, 0)).thenReturn(List.of(done, failed));
+        when(analysisRepository.findAllForComparison(10L, 1)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 2)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 3)).thenReturn(List.of());
+        when(calculator.calculate(done)).thenReturn(scores("90"));
+
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).hasSize(2);
+        assertThat(saved).allMatch(r -> r.getStatus() == GroupComparisonStatus.PARTIAL);
+        assertThat(saved).allMatch(r -> r.getRank() == null);
+        assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(2L))
+                .singleElement().extracting(GroupInterviewComparisonReportEntity::getTotalScore).isNull();
+    }
+
+    @Test
+    void numericComparisonRemainsDoneWhenFeedbackIsUnavailable() {
+        var first = analysis(1L, AnalysisStatus.DONE);
+        var second = analysis(2L, AnalysisStatus.DONE);
+        when(analysisRepository.findAllForComparison(10L, 0)).thenReturn(List.of(first, second));
+        when(analysisRepository.findAllForComparison(10L, 1)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 2)).thenReturn(List.of());
+        when(analysisRepository.findAllForComparison(10L, 3)).thenReturn(List.of());
+        when(calculator.calculate(first)).thenReturn(scores("90"));
+        when(calculator.calculate(second)).thenReturn(scores("80"));
+        when(feedbackClient.createFeedback(any())).thenReturn(List.of());
+
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).hasSize(2);
+        assertThat(saved).allMatch(r -> r.getStatus() == GroupComparisonStatus.DONE);
+        assertThat(saved).extracting(GroupInterviewComparisonReportEntity::getRank)
+                .containsExactlyInAnyOrder(1, 2);
+        assertThat(saved).allMatch(r -> r.getStrengthSummary() == null
+                && r.getImprovementSummary() == null);
+    }
+
+    @Test
+    void lookupReturnsParticipantNamesWithoutRegeneratingComparisons() {
+        GroupInterviewComparisonReportEntity report = questionReport(1L, 0, "90");
+        when(reportRepository.findAllByRoomIdAndScopeAndQuestionIndexOrderByRankAscParticipantUserIdAsc(
+                10L, GroupComparisonScope.QUESTION, 0)).thenReturn(List.of(report));
+        when(userRepository.findAllById(List.of(1L))).thenReturn(List.of(
+                UserEntity.builder().id(1L).kakaoId(101L).name("홍길동").build()));
+
+        var response = service.getQuestion(10L, 0, 1L);
+
+        assertThat(response).singleElement().satisfies(item -> {
+            assertThat(item.getParticipantUserId()).isEqualTo(1L);
+            assertThat(item.getParticipantName()).isEqualTo("홍길동");
+        });
+        verify(analysisRepository, never()).findAllForComparison(anyLong(), anyInt());
+        verifyNoInteractions(feedbackClient);
+    }
+
+    @Test
+    void fourthQuestionComparisonIsAvailable() {
+        GroupInterviewComparisonReportEntity report = questionReport(1L, 3, "90");
+        when(reportRepository.findAllByRoomIdAndScopeAndQuestionIndexOrderByRankAscParticipantUserIdAsc(
+                10L, GroupComparisonScope.QUESTION, 3)).thenReturn(List.of(report));
+        when(userRepository.findAllById(List.of(1L))).thenReturn(List.of(
+                UserEntity.builder().id(1L).kakaoId(101L).name("홍길동").build()));
+
+        var response = service.getQuestion(10L, 3, 1L);
+
+        assertThat(response).singleElement().satisfies(item -> {
+            assertThat(item.getQuestionIndex()).isEqualTo(3);
+            assertThat(item.getTotalScore()).isEqualByComparingTo("90");
+        });
+    }
+
+    @Test
+    void createsAllFourQuestionComparisonsAndOverallAverage() {
+        for (int questionIndex = 0;
+             questionIndex < GroupInterviewSessionEntity.TOTAL_ROUNDS;
+             questionIndex++) {
+            var first = analysis(1L, AnalysisStatus.DONE, questionIndex);
+            var second = analysis(2L, AnalysisStatus.DONE, questionIndex);
+            when(analysisRepository.findAllForComparison(10L, questionIndex))
+                    .thenReturn(List.of(first, second));
+            when(calculator.calculate(first)).thenReturn(scores(Integer.toString(80 + questionIndex)));
+            when(calculator.calculate(second)).thenReturn(scores(Integer.toString(70 + questionIndex)));
+        }
+
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).filteredOn(r -> r.getScope() == GroupComparisonScope.QUESTION)
+                .hasSize(8)
+                .anyMatch(r -> Integer.valueOf(3).equals(r.getQuestionIndex()))
+                .allMatch(r -> r.getStatus() == GroupComparisonStatus.DONE)
+                .allMatch(r -> r.getRank() != null);
+        assertThat(saved).filteredOn(r -> r.getScope() == GroupComparisonScope.OVERALL)
+                .hasSize(2)
+                .allMatch(r -> r.getStatus() == GroupComparisonStatus.DONE)
+                .filteredOn(r -> r.getParticipantUserId().equals(1L))
+                .singleElement()
+                .extracting(GroupInterviewComparisonReportEntity::getTotalScore)
+                .isEqualTo(new BigDecimal("81.50"));
+    }
+
+    @Test
+    void missingFourthQuestionScoreKeepsExistingPartialPolicy() {
+        var complete = analysis(1L, AnalysisStatus.DONE, 3);
+        var incomplete = analysis(2L, AnalysisStatus.DONE, 3);
+        when(analysisRepository.findAllForComparison(10L, 3))
+                .thenReturn(List.of(complete, incomplete));
+        when(calculator.calculate(complete)).thenReturn(scores("90"));
+        when(calculator.calculate(incomplete)).thenReturn(
+                new GroupInterviewComparisonScoreCalculator.Scores(
+                        new BigDecimal("80"), null, new BigDecimal("80"),
+                        new BigDecimal("80"), new BigDecimal("80"), null
+                )
+        );
+
+        service.generateAvailableComparisons(10L);
+
+        assertThat(saved).hasSize(2).allMatch(
+                report -> report.getStatus() == GroupComparisonStatus.PARTIAL
+                        && report.getRank() == null
+        );
+        assertThat(saved).filteredOn(r -> r.getParticipantUserId().equals(2L))
+                .singleElement()
+                .extracting(GroupInterviewComparisonReportEntity::getTotalScore)
+                .isNull();
+    }
+
+    private GroupInterviewAnswerAnalysisEntity analysis(Long participantId, AnalysisStatus status) {
+        return analysis(participantId, status, 0);
+    }
+
+    private GroupInterviewAnswerAnalysisEntity analysis(
+            Long participantId,
+            AnalysisStatus status,
+            int questionIndex
+    ) {
+        GroupInterviewEntity room = mock(GroupInterviewEntity.class);
+        when(room.getId()).thenReturn(10L);
+        GroupInterviewAnswerEntity answer = GroupInterviewAnswerEntity.builder()
+                .groupInterview(room).participantUserId(participantId).questionIndex(questionIndex).build();
+        return GroupInterviewAnswerAnalysisEntity.builder().answer(answer).status(status).build();
+    }
+
+    private GroupInterviewComparisonScoreCalculator.Scores scores(String value) {
+        BigDecimal score = new BigDecimal(value);
+        return new GroupInterviewComparisonScoreCalculator.Scores(
+                score, score, score, score, score, score);
+    }
+
+    private GroupInterviewComparisonReportEntity questionReport(
+            Long participantId, int questionIndex, String value) {
+        BigDecimal score = new BigDecimal(value);
+        return GroupInterviewComparisonReportEntity.builder()
+                .roomId(10L).participantUserId(participantId)
+                .scope(GroupComparisonScope.QUESTION).questionIndex(questionIndex)
+                .contentScore(score).speechScore(score).gazeScore(score).poseScore(score)
+                .blinkScore(score).totalScore(score).rank(participantId.intValue())
+                .participantCount(2).status(GroupComparisonStatus.DONE).build();
+    }
+}

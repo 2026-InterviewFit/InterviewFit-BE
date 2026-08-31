@@ -1,12 +1,12 @@
 package com.example.interviewfitbe.domain.pose.mapper;
 
-import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseLogs;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseNotDetectedStatistics;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseScoreResult;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseStatistics;
-import com.example.interviewfitbe.domain.pose.entity.PoseAnalysisResultEntity;
+import com.example.interviewfitbe.domain.pose.entity.PoseReportEntity;
 import com.example.interviewfitbe.domain.pose.entity.PoseBadLogEntity;
 import com.example.interviewfitbe.domain.pose.entity.PoseNotDetectedLogEntity;
 import com.example.interviewfitbe.domain.pose.enums.PoseGrade;
@@ -18,11 +18,10 @@ import java.util.List;
 
 @Component
 public class PoseMapper {
-    public PoseAnalysisResultDto toDto(PoseAnalysisResultEntity entity) {
+    public PoseAnalysisResultDto toDto(PoseReportEntity entity) {
         return PoseAnalysisResultDto.builder()
                 .id(entity.getId())
                 .interviewId(entity.getInterview().getId())
-                .interviewAnswerId(entity.getInterviewAnswer().getId())
                 .totalDuration(entity.getTotalDuration())
                 .badCount(entity.getBadCount())
                 .badDuration(entity.getBadDuration())
@@ -40,10 +39,9 @@ public class PoseMapper {
                 .build();
     }
 
-    public PoseAnalysisResultEntity toEntity(Double totalDuration, PoseStatistics stats, PoseNotDetectedStatistics notDetectedStats, PoseScoreResult result, InterviewAnswerEntity interviewAnswer) {
-        return PoseAnalysisResultEntity.builder()
-                .interview(interviewAnswer.getInterview())
-                .interviewAnswer(interviewAnswer)
+    public PoseReportEntity toEntity(Double totalDuration, PoseStatistics stats, PoseNotDetectedStatistics notDetectedStats, PoseScoreResult result, InterviewEntity interview) {
+        return PoseReportEntity.builder()
+                .interview(interview)
                 .totalDuration(totalDuration)
                 .badCount(stats.getBadCount())
                 .badDuration(stats.getBadDuration())
@@ -60,10 +58,9 @@ public class PoseMapper {
                 .build();
     }
 
-    public PoseAnalysisResultEntity toEmptyResult(InterviewAnswerEntity interviewAnswer) {
-        return PoseAnalysisResultEntity.builder()
-                .interview(interviewAnswer.getInterview())
-                .interviewAnswer(interviewAnswer)
+    public PoseReportEntity toEmptyResult(InterviewEntity interview) {
+        return PoseReportEntity.builder()
+                .interview(interview)
                 .totalDuration(0.0)
                 .badCount(0)
                 .badDuration(0.0)
@@ -76,7 +73,7 @@ public class PoseMapper {
                 .faceNotDetectedDuration(0.0)
                 .badRatio(0.0)
                 .score(0)
-                .grade(PoseGrade.E)
+                .grade(PoseGrade.POOR)
                 .build();
     }
 

@@ -24,4 +24,21 @@ public class AsyncConfig {
 
         return executor;
     }
+
+    @Bean("coverLetterExecutor")
+    public Executor coverLetterExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("cover-letter-");
+
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+
+        executor.initialize();
+
+        return executor;
+    }
 }

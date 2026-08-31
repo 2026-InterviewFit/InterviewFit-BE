@@ -10,12 +10,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class QuestionRequest {
-    private Long userId; // 나중에 유저 만들면 삭제하기
+    private Long interviewId;
     private Integer count;
     private Long jobRoleId;
-    private String coverLetter;
-
-    public void updateCoverLetter(String coverLetter) {
-        this.coverLetter = coverLetter;
-    }
+    private String jobName;
+    private Long coverLetterId;
 }

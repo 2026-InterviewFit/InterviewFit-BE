@@ -11,34 +11,37 @@ import lombok.Setter;
 @NoArgsConstructor
 public class FollowUpCreateRequest {
 
-    /**
-     * 직무 선택 ID.
-     * interviewId 또는 questionId가 없을 때 직무명을 조회하기 위해 사용한다.
+    private Long interviewId;
+
+    // JWT에서 추출한 로그인 사용자 ID
+    private Long userId;
+
+    /*
+     * source_question_id.
+     * FE에서 questionId로 보내도 받게 alias 처리.
      */
+    @JsonProperty("source_question_id")
+    @JsonAlias({"sourceQuestionId", "questionId"})
+    private Long sourceQuestionId;
+
+    /*
+     * source_answer_id.
+     */
+    @JsonProperty("source_answer_id")
+    @JsonAlias({"sourceAnswerId", "answerId"})
+    private Long sourceAnswerId;
+
     private Long jobRoleId;
 
-    /**
-     * FE 단독 테스트용 직무명.
-     */
     private String job;
 
-    /**
-     * 팀원 question 도메인에서 생성/저장된 질문 ID.
-     * 있으면 QuestionEntity.question을 원본 질문으로 사용할 수 있다.
-     */
-    private Long questionId;
-
-    /**
-     * 원본 면접 질문.
-     * FE와 FastAPI가 snake_case/camelCase를 섞어 쓸 수 있어 둘 다 허용한다.
-     */
     @JsonProperty("original_question")
     @JsonAlias({"originalQuestion", "question"})
     private String originalQuestion;
 
-    /**
-     * 지원자의 답변 텍스트.
-     * STT 결과 텍스트가 여기에 들어온다.
+    /*
+     * 원 답변 텍스트.
+     * sourceAnswerId가 있으면 DB의 answerText로 대체 가능.
      */
     private String answer;
 
@@ -46,11 +49,13 @@ public class FollowUpCreateRequest {
     @JsonAlias("interviewStyle")
     private String interviewStyle = "normal";
 
-    private Long userId;
+    @JsonProperty("retrieved_context_json")
+    @JsonAlias("retrievedContextJson")
+    private String retrievedContextJson;
 
-    /**
-     * 면접 세션 ID.
-     * 있으면 FollowUpQuestion을 InterviewEntity와 FK로 연결한다.
-     */
-    private Long interviewId;
+    @JsonProperty("result_json")
+    @JsonAlias("resultJson")
+    private String resultJson;
+
+
 }

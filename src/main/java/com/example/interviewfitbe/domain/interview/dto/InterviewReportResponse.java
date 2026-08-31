@@ -1,6 +1,8 @@
 package com.example.interviewfitbe.domain.interview.dto;
 
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
+import com.example.interviewfitbe.domain.speech_coaching.dto.ExternalAiAnalysis;
+import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,29 +16,26 @@ import java.util.List;
 public class InterviewReportResponse {
 
     private Long interviewId;
-
     private Long userId;
-
     private Long jobRoleId;
-
     private String jobCategory;
-
     private String jobName;
-
     private LocalDateTime createdAt;
-
-    /**
-     * 전체 분석 상태.
-     *
-     * EMPTY / UPLOADED / RUNNING / DONE / FAILED
-     */
     private String analysisStatus;
-
-    /**
-     * 모든 답변 분석이 DONE이면 true.
-     */
     private boolean completed;
 
+    /**
+     * 전체 면접 영상 기준 비언어/스피치 분석 결과.
+     */
+    private EyeReport eye;
+    private PoseReport pose;
+
+    /**
+     * 질문별 결과.
+     *
+     * 신규 면접에서는 각 기본 질문의 InterviewAnswer를 반환하고,
+     * 기존 데이터에 질문별 답변이 없는 경우에는 전체 면접 Answer를 fallback으로 반환한다.
+     */
     private List<AnswerReport> answers;
 
     @Getter
@@ -45,46 +44,81 @@ public class InterviewReportResponse {
     public static class AnswerReport {
 
         private Long answerId;
-
+        private Long interviewQuestionId;
         private Long questionId;
-
         private String questionText;
-
         private String videoObjectKey;
-
+        private String answerText;
         private Integer answerOrder;
-
+        private Double startTime;
+        private Double endTime;
         private AnalysisStatus analysisStatus;
-
         private String errorMessage;
 
-        private EyeReport eye;
+        /**
+         * 질문별 Gemini 내용 평가.
+         */
+        private AiEvaluationReport aiEvaluation;
 
         /**
-         * 시선 추적 분석 결과.
+         * 이 기본 답변을 source_answer_id로 사용하는 꼬리질문 목록.
+         */
+        private List<FollowUpReport> followUps;
+
+        /**
+         * 기존 FE 호환용.
+         * gaze/speech의 정량 지표는 전체 면접 영상 결과를 공유하고,
+         * aiEvaluationJson/modelAnswer에는 현재 Answer의 질문별 AI 평가를 넣는다.
          */
         private GazeReport gaze;
-
-        private PoseReport pose;
-
         private SpeechReport speech;
     }
 
     @Getter
     @Builder
     @AllArgsConstructor
+    public static class FollowUpReport {
+        private Long followUpQuestionId;
+        private String questionText;
+        private LocalDateTime createdAt;
+        private List<FollowUpAnswerReport> answers;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class FollowUpAnswerReport {
+        private Long followUpAnswerId;
+        private String answerText;
+        private Double startTime;
+        private Double endTime;
+        private AnalysisStatus analysisStatus;
+        private String errorMessage;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class AiEvaluationReport {
+        private Long evaluationId;
+        private String starEvaluationJson;
+        private String geminiFeedback;
+        private String keywordsJson;
+        private String modelAnswer;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
     public static class EyeReport {
-
         private Long reportId;
-
-        private Integer blinkCount;
-
-        private Double blinkRate;
-
         private Double durationSeconds;
-
+        private Integer blinkCount;
+        private Double blinkRate;
+        private Integer notDetectedCount;
+        private Double notDetectedRatio;
         private Double score;
-
+        private String grade;
         private String feedback;
     }
 
@@ -92,37 +126,12 @@ public class InterviewReportResponse {
     @Builder
     @AllArgsConstructor
     public static class GazeReport {
-
         private Long reportId;
-
-        /**
-         * 정면 응시 비율.
-         */
         private Double centerRatio;
-
-        /**
-         * 시선 이탈 비율.
-         */
         private Double gazeAwayRatio;
-
-        /**
-         * 시선 이탈 횟수.
-         */
         private Integer gazeAwayCount;
-
-        /**
-         * 시선 분석 점수.
-         */
         private Double score;
-
-        /**
-         * 시선 분석 평가 문구.
-         */
         private String evaluation;
-
-        /**
-         * 프레임별 상세 분석 JSON.
-         */
         private String resultJson;
     }
 
@@ -130,27 +139,16 @@ public class InterviewReportResponse {
     @Builder
     @AllArgsConstructor
     public static class PoseReport {
-
         private Long reportId;
-
         private Double totalDuration;
-
         private Integer badCount;
-
         private Double badDuration;
-
         private Integer shoulderBadCount;
-
         private Integer faceBadCount;
-
         private Double shoulderBadDuration;
-
         private Double faceBadDuration;
-
         private Double badRatio;
-
         private Integer score;
-
         private String grade;
     }
 
@@ -158,35 +156,24 @@ public class InterviewReportResponse {
     @Builder
     @AllArgsConstructor
     public static class SpeechReport {
-
         private Long reportId;
-
+        private Double speechScore;
+        private SpeechScoreStatus speechScoreStatus;
+        private String speechScoreReason;
         private String textScript;
-
         private Integer totalFillerCount;
-
         private String fillerDetailsJson;
-
         private String repeatedExpressionsJson;
-
         private String paceEvaluation;
-
         private String paceFeedback;
-
         private Double charactersPerSecond;
-
         private Double totalSilenceSeconds;
-
         private Double pauseRatePercent;
-
         private Integer criticalSilenceCount;
-
         private Double volumeDbMean;
-
         private Double volumeDbStd;
-
         private String aiEvaluationJson;
-
         private String modelAnswer;
+        private ExternalAiAnalysis externalAiAnalysis;
     }
 }
