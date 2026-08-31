@@ -49,12 +49,4 @@ public class QuestionEntity {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    public void assignInterview(InterviewEntity interview) {
-        this.interview = interview;
-    }
-
-    public void assignOrder(Integer questionOrder) {
-        this.questionOrder = questionOrder;
-    }
 }
