@@ -2,6 +2,7 @@ package com.example.interviewfitbe.domain.interview.dto;
 
 import com.example.interviewfitbe.domain.interview.enums.AnalysisStatus;
 import com.example.interviewfitbe.domain.speech_coaching.dto.ExternalAiAnalysis;
+import com.example.interviewfitbe.domain.speech_coaching.enums.SpeechScoreStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -155,6 +156,9 @@ public class InterviewReportResponse {
     @AllArgsConstructor
     public static class SpeechReport {
         private Long reportId;
+        private Double speechScore;
+        private SpeechScoreStatus speechScoreStatus;
+        private String speechScoreReason;
         private String textScript;
         private Integer totalFillerCount;
         private String fillerDetailsJson;
