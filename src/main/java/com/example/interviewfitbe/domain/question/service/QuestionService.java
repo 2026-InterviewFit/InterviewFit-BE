@@ -123,18 +123,19 @@ public class QuestionService {
         if (request == null) {
             throw new IllegalArgumentException("질문 생성 요청이 필요합니다.");
         }
-        if (request.getCount() == null || request.getCount() <= 0) {
-            request.setCount(3);
-            throw new BaseException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
+        if (request.getInterviewId() == null) {
+            throw new IllegalArgumentException("interviewId는 필수입니다.");
         }
         if (request.getJobRoleId() == null) {
+            request.setCount(3);
             request.setJobRoleId(11L);
             request.setJobName("기타");
             request.setCoverLetterId(null);
             throw new BaseException(QuestionErrorCode.JOB_ROLE_REQUIRED);
         }
-        if (request.getInterviewId() == null) {
-            throw new IllegalArgumentException("interviewId는 필수입니다.");
+        if (request.getCount() == null || request.getCount() <= 0) {
+            request.setCount(3);
+            throw new BaseException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
         }
     }
 
