@@ -1,6 +1,7 @@
 package com.example.interviewfitbe.domain.pose.mapper;
 
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
+import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResult;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseLogs;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseNotDetectedStatistics;
@@ -96,6 +97,42 @@ public class PoseMapper {
         return PoseLogs.builder()
                 .badLogs(badLogs)
                 .notDetectedLogs(notDetectedLogs)
+                .build();
+    }
+
+    public PoseAnalysisResult toEmptyResult() {
+        return PoseAnalysisResult.builder()
+                .totalDuration(0.0)
+                .badCount(0)
+                .badDuration(0.0)
+                .shoulderBadCount(0)
+                .faceBadCount(0)
+                .shoulderBadDuration(0.0)
+                .faceBadDuration(0.0)
+                .notDetectedDuration(0.0)
+                .shoulderNotDetectedDuration(0.0)
+                .faceNotDetectedDuration(0.0)
+                .badRatio(0.0)
+                .score(0)
+                .grade(null)
+                .build();
+    }
+
+    public PoseAnalysisResult toAnalysisResult(Double totalDuration, PoseStatistics stats, PoseNotDetectedStatistics notDetectedStats, PoseScoreResult result) {
+        return PoseAnalysisResult.builder()
+                .totalDuration(totalDuration)
+                .badCount(stats.getBadCount())
+                .badDuration(stats.getBadDuration())
+                .shoulderBadCount(stats.getShoulderBadCount())
+                .faceBadCount(stats.getFaceBadCount())
+                .shoulderBadDuration(stats.getShoulderBadDuration())
+                .faceBadDuration(stats.getFaceBadDuration())
+                .notDetectedDuration(notDetectedStats.getNotDetectedDuration())
+                .shoulderNotDetectedDuration(notDetectedStats.getShoulderNotDetectedDuration())
+                .faceNotDetectedDuration(notDetectedStats.getFaceNotDetectedDuration())
+                .badRatio(result.getBadRatio())
+                .score(result.getScore())
+                .grade(result.getGrade())
                 .build();
     }
 }
