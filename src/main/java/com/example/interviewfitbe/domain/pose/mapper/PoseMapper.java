@@ -98,4 +98,40 @@ public class PoseMapper {
                 .notDetectedLogs(notDetectedLogs)
                 .build();
     }
+
+    public PoseAnalysisResultDto toEmptyResult() {
+        return PoseAnalysisResultDto.builder()
+                .totalDuration(0.0)
+                .badCount(0)
+                .badDuration(0.0)
+                .shoulderBadCount(0)
+                .faceBadCount(0)
+                .shoulderBadDuration(0.0)
+                .faceBadDuration(0.0)
+                .notDetectedDuration(0.0)
+                .shoulderNotDetectedDuration(0.0)
+                .faceNotDetectedDuration(0.0)
+                .badRatio(0.0)
+                .score(0)
+                .grade(PoseGrade.POOR.name())
+                .build();
+    }
+
+    public PoseAnalysisResultDto toAnalysisResult(Double totalDuration, PoseStatistics stats, PoseNotDetectedStatistics notDetectedStats, PoseScoreResult result) {
+        return PoseAnalysisResultDto.builder()
+                .totalDuration(totalDuration)
+                .badCount(stats.getBadCount())
+                .badDuration(stats.getBadDuration())
+                .shoulderBadCount(stats.getShoulderBadCount())
+                .faceBadCount(stats.getFaceBadCount())
+                .shoulderBadDuration(stats.getShoulderBadDuration())
+                .faceBadDuration(stats.getFaceBadDuration())
+                .notDetectedDuration(notDetectedStats.getNotDetectedDuration())
+                .shoulderNotDetectedDuration(notDetectedStats.getShoulderNotDetectedDuration())
+                .faceNotDetectedDuration(notDetectedStats.getFaceNotDetectedDuration())
+                .badRatio(result.getBadRatio())
+                .score(result.getScore())
+                .grade(result.getGrade().name())
+                .build();
+    }
 }
