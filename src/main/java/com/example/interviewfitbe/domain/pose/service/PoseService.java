@@ -4,7 +4,7 @@ import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.pose.calculator.PoseScoreCalculator;
 import com.example.interviewfitbe.domain.pose.calculator.PoseStatisticsCalculator;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResponse;
-import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResult;
+import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseLogs;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseNotDetectedStatistics;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseScoreResult;
@@ -42,7 +42,7 @@ public class PoseService {
                         new BaseException(PoseErrorCode.POSE_ANALYSIS_RESULT_NOT_FOUND));
     }
 
-    public PoseAnalysisResult processPostureAnalysisForJson(String videoObjectKey) {
+    public PoseAnalysisResultDto processPostureAnalysisForJson(String videoObjectKey) {
         // 1. FastAPI 분석 결과
         List<PoseAnalysisResponse> responses = poseAnalysisService.analyzePosture(videoObjectKey);
         double totalDuration = calculateTotalDuration(responses);
@@ -56,22 +56,11 @@ public class PoseService {
 
         // 3. 통계 및 점수 계산
         PoseStatistics stats = poseStatisticsCalculator.calculateStatistics(logs.getBadLogs());
-
         PoseNotDetectedStatistics notDetectedStats = poseStatisticsCalculator.calculateNotDetectedStatistics(logs.getNotDetectedLogs());
-
-        PoseScoreResult result = poseScoreCalculator.calculateScoreResult(
-                                        stats.getBadDuration(),
-                                        notDetectedStats.getNotDetectedDuration(),
-                                        totalDuration
-                                );
+        PoseScoreResult result = poseScoreCalculator.calculateScoreResult(stats.getBadDuration(), notDetectedStats.getNotDetectedDuration(), totalDuration);
 
         // 4. DB 저장 없이 DTO 반환
-        return poseMapper.toAnalysisResult(
-                totalDuration,
-                stats,
-                notDetectedStats,
-                result
-        );
+        return poseMapper.toAnalysisResult(totalDuration, stats, notDetectedStats, result);
     }
 
     public void processPostureAnalysis(String videoObjectKey, InterviewEntity interview) {

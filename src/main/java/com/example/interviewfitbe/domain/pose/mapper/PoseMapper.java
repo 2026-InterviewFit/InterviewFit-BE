@@ -1,7 +1,6 @@
 package com.example.interviewfitbe.domain.pose.mapper;
 
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
-import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResult;
 import com.example.interviewfitbe.domain.pose.dto.PoseAnalysisResultDto;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseLogs;
 import com.example.interviewfitbe.domain.pose.dto.statistics.PoseNotDetectedStatistics;
@@ -100,8 +99,8 @@ public class PoseMapper {
                 .build();
     }
 
-    public PoseAnalysisResult toEmptyResult() {
-        return PoseAnalysisResult.builder()
+    public PoseAnalysisResultDto toEmptyResult() {
+        return PoseAnalysisResultDto.builder()
                 .totalDuration(0.0)
                 .badCount(0)
                 .badDuration(0.0)
@@ -114,12 +113,12 @@ public class PoseMapper {
                 .faceNotDetectedDuration(0.0)
                 .badRatio(0.0)
                 .score(0)
-                .grade(null)
+                .grade(PoseGrade.POOR.name())
                 .build();
     }
 
-    public PoseAnalysisResult toAnalysisResult(Double totalDuration, PoseStatistics stats, PoseNotDetectedStatistics notDetectedStats, PoseScoreResult result) {
-        return PoseAnalysisResult.builder()
+    public PoseAnalysisResultDto toAnalysisResult(Double totalDuration, PoseStatistics stats, PoseNotDetectedStatistics notDetectedStats, PoseScoreResult result) {
+        return PoseAnalysisResultDto.builder()
                 .totalDuration(totalDuration)
                 .badCount(stats.getBadCount())
                 .badDuration(stats.getBadDuration())
@@ -132,7 +131,7 @@ public class PoseMapper {
                 .faceNotDetectedDuration(notDetectedStats.getFaceNotDetectedDuration())
                 .badRatio(result.getBadRatio())
                 .score(result.getScore())
-                .grade(result.getGrade())
+                .grade(result.getGrade().name())
                 .build();
     }
 }
