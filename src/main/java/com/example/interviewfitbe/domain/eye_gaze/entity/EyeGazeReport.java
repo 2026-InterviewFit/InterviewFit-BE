@@ -1,7 +1,8 @@
 package com.example.interviewfitbe.domain.eye_gaze.entity;
 
-import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.eye_gaze.enums.EyeGazeGrade;
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
+import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,6 +23,16 @@ public class EyeGazeReport {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interview_id", nullable = false)
     private InterviewEntity interview;
+
+    /*
+     * 질문별 답변과 시선 분석 결과 연결.
+     *
+     * 일반 면접/그룹/PT 면접 모두 InterviewAnswerEntity를 통해
+     * 실제 분석 대상 영상을 식별한다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_answer_id")
+    private InterviewAnswerEntity interviewAnswer;
 
     @Column(name = "duration_seconds")
     private Double durationSeconds;
