@@ -15,6 +15,18 @@ public interface GroupInterviewAnswerRepository
 
     List<GroupInterviewAnswerEntity> findAllByGroupInterviewIdOrderByIdAsc(Long roomId);
 
+    @Query(value = """
+            SELECT gq.question_text
+            FROM group_interview_answers ga
+            JOIN group_questions gq ON gq.id = ga.group_question_id
+            WHERE ga.participant_user_id IN (:userIds)
+              AND ga.group_question_id IS NOT NULL
+            GROUP BY gq.question_text
+            ORDER BY MAX(ga.created_at) DESC
+            LIMIT 200
+            """, nativeQuery = true)
+    List<String> findRecentQuestionTextsByParticipantUserIds(@Param("userIds") List<Long> userIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from GroupInterviewAnswerEntity a " +
             "where a.id = :answerId and a.groupInterview.id = :roomId")

@@ -58,6 +58,14 @@ public class GroupInterviewSessionEntity {
 
     private Long currentAnswerId;
 
+    private Long round1QuestionId;
+
+    private Long round2QuestionId;
+
+    private Long round3QuestionId;
+
+    private Long round4QuestionId;
+
     @Version
     private Long version;
 
@@ -70,6 +78,29 @@ public class GroupInterviewSessionEntity {
         this.currentParticipantIndex = 0;
         this.status = InterviewStatus.QUESTION_VIEW;
 
+    }
+
+    public void assignQuestion(int round, Long questionId) {
+        if (questionId == null) {
+            throw new IllegalArgumentException("배정할 질문 ID는 필수입니다.");
+        }
+        switch (round) {
+            case 1 -> this.round1QuestionId = questionId;
+            case 2 -> this.round2QuestionId = questionId;
+            case 3 -> this.round3QuestionId = questionId;
+            case 4 -> this.round4QuestionId = questionId;
+            default -> throw new IllegalArgumentException("지원하지 않는 라운드입니다: " + round);
+        }
+    }
+
+    public Long assignedQuestionId(int round) {
+        return switch (round) {
+            case 1 -> round1QuestionId;
+            case 2 -> round2QuestionId;
+            case 3 -> round3QuestionId;
+            case 4 -> round4QuestionId;
+            default -> null;
+        };
     }
 
 

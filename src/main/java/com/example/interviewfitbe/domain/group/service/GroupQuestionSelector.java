@@ -3,6 +3,8 @@ package com.example.interviewfitbe.domain.group.service;
 import com.example.interviewfitbe.domain.group.entity.GroupQuestionEntity;
 
 import java.util.List;
+import java.util.Set;
+import java.util.random.RandomGenerator;
 import java.util.concurrent.ThreadLocalRandom;
 
 final class GroupQuestionSelector {
@@ -12,17 +14,31 @@ final class GroupQuestionSelector {
 
     static GroupQuestionEntity select(
             List<GroupQuestionEntity> candidates,
-            Long roomId,
-            int round
+            Set<String> excludedQuestionTexts
+    ) {
+        return select(candidates, excludedQuestionTexts, ThreadLocalRandom.current());
+    }
+
+    static GroupQuestionEntity select(
+            List<GroupQuestionEntity> candidates,
+            Set<String> excludedQuestionTexts,
+            RandomGenerator random
     ) {
         if (candidates == null || candidates.isEmpty()) {
             return null;
         }
 
-        int index = roomId == null
-                ? ThreadLocalRandom.current().nextInt(candidates.size())
-                : Math.floorMod(Long.hashCode(roomId * 31 + round), candidates.size());
+        List<GroupQuestionEntity> preferred = candidates.stream()
+                .filter(question -> excludedQuestionTexts == null
+                        || !excludedQuestionTexts.contains(normalize(question.getQuestionText())))
+                .toList();
+        List<GroupQuestionEntity> pool = preferred.isEmpty() ? candidates : preferred;
+        int index = random.nextInt(pool.size());
 
-        return candidates.get(index);
+        return pool.get(index);
+    }
+
+    static String normalize(String text) {
+        return text == null ? "" : text.replaceAll("\\s+", " ").trim();
     }
 }

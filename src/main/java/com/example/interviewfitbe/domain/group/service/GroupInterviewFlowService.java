@@ -22,6 +22,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -85,7 +90,9 @@ public class GroupInterviewFlowService {
         interview.startInterview();
 
 
-        GroupInterviewSessionEntity savedSession = sessionRepository.save(session);
+        GroupInterviewSessionEntity savedSession = sessionRepository.saveAndFlush(session);
+        assignQuestions(savedSession, roomId);
+        savedSession = sessionRepository.saveAndFlush(savedSession);
 
         broadcastProgress("INTERVIEW_STARTED", roomId, actorUserId, savedSession);
 
@@ -309,6 +316,15 @@ public class GroupInterviewFlowService {
         if (session.getCurrentRound() == null) {
             return null;
         }
+        Long assignedQuestionId = session.assignedQuestionId(session.getCurrentRound());
+        if (assignedQuestionId != null) {
+            return groupQuestionRepository.findById(assignedQuestionId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "세션에 배정된 질문을 찾을 수 없습니다. questionId=" + assignedQuestionId
+                    ));
+        }
+
+        // 배정 질문 컬럼 도입 전에 생성된 진행 중 세션을 위한 호환 경로다.
         if (session.getCurrentRound() == 1) {
             return groupQuestionRepository
                     .findFirstByRoundNumberAndQuestionText(
@@ -337,7 +353,63 @@ public class GroupInterviewFlowService {
         }
 
         long roomId = session.getInterview().getId();
-        return GroupQuestionSelector.select(candidates, roomId, round);
+        return GroupQuestionSelector.select(candidates, Set.of());
+    }
+
+    private void assignQuestions(GroupInterviewSessionEntity session, Long roomId) {
+        List<Long> participantUserIds = groupParticipantRepository
+                .findAllByRoomIdOrderByIdAsc(roomId).stream()
+                .map(GroupParticipantEntity::getUserId)
+                .toList();
+        Set<String> recentlyUsedQuestionTexts = participantUserIds.isEmpty()
+                ? new HashSet<>()
+                : answerRepository.findRecentQuestionTextsByParticipantUserIds(participantUserIds)
+                .stream()
+                .map(GroupQuestionSelector::normalize)
+                .collect(Collectors.toCollection(HashSet::new));
+
+        for (int round = 1; round <= GroupInterviewSessionEntity.TOTAL_ROUNDS; round++) {
+            List<GroupQuestionEntity> candidates = selectableQuestions(
+                    round,
+                    session.getInterview().getJobRoleId()
+            );
+            if (candidates.isEmpty()) {
+                throw new IllegalStateException(
+                        "라운드에 사용할 활성 질문이 없습니다. round=" + round
+                                + ", jobRoleId=" + session.getInterview().getJobRoleId()
+                );
+            }
+            GroupQuestionEntity selected = GroupQuestionSelector.select(
+                    distinctByQuestionText(candidates),
+                    recentlyUsedQuestionTexts
+            );
+            session.assignQuestion(round, selected.getId());
+            recentlyUsedQuestionTexts.add(GroupQuestionSelector.normalize(selected.getQuestionText()));
+        }
+    }
+
+    private List<GroupQuestionEntity> selectableQuestions(int round, Long jobRoleId) {
+        if (round == 4) {
+            if (jobRoleId == null) {
+                throw new IllegalStateException("4라운드 질문 선택에 jobRoleId가 필요합니다.");
+            }
+            return groupQuestionRepository.findSelectableRoundFourQuestions(jobRoleId);
+        }
+        return groupQuestionRepository
+                .findAllByRoundNumberAndJobRoleIsNullAndSelectionEnabledTrueOrderByIdAsc(round);
+    }
+
+    private List<GroupQuestionEntity> distinctByQuestionText(List<GroupQuestionEntity> questions) {
+        return new java.util.ArrayList<>(questions.stream().collect(Collectors.toMap(
+                question -> normalizeQuestionText(question.getQuestionText()),
+                Function.identity(),
+                (first, ignored) -> first,
+                LinkedHashMap::new
+        )).values());
+    }
+
+    private String normalizeQuestionText(String text) {
+        return GroupQuestionSelector.normalize(text);
     }
 
     private Long currentParticipantUserId(Long roomId, Integer index) {
