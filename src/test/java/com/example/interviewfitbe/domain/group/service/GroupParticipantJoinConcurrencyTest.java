@@ -4,7 +4,6 @@ import com.example.interviewfitbe.domain.group.repository.GroupParticipantReposi
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -42,8 +41,9 @@ class GroupParticipantJoinConcurrencyTest {
             assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
             start.countDown();
 
-            int successes = first.get(10, TimeUnit.SECONDS) + second.get(10, TimeUnit.SECONDS);
-            assertThat(successes).isEqualTo(1);
+            int successfulIdempotentRequests =
+                    first.get(10, TimeUnit.SECONDS) + second.get(10, TimeUnit.SECONDS);
+            assertThat(successfulIdempotentRequests).isEqualTo(2);
             assertThat(participantRepository.countByRoomIdAndUserId(TEST_ROOM_ID, TEST_USER_ID))
                     .isEqualTo(1);
         } finally {
@@ -58,8 +58,6 @@ class GroupParticipantJoinConcurrencyTest {
             start.await(5, TimeUnit.SECONDS);
             joinWriter.insert(TEST_ROOM_ID, TEST_USER_ID);
             return 1;
-        } catch (DataIntegrityViolationException exception) {
-            return 0;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(exception);

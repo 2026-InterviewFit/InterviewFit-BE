@@ -30,6 +30,10 @@ public class GroupQuestionEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String questionText; // 면접 질문 내용
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean selectionEnabled = true;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 }
