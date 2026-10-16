@@ -432,4 +432,30 @@ public class PtInterviewController {
                 Map.of("videoUrl", videoUrl)
         );
     }
+    /**
+     * PT 발표 전체 영상 다시보기 URL 조회
+     */
+    @GetMapping("/{ptInterviewId}/presentation/video")
+    public ResponseEntity<Map<String, String>> getPresentationVideo(
+            @PathVariable Long ptInterviewId
+    ) throws Exception {
+
+        String objectKey =
+                ptPresentationService.getPresentationVideoObjectKey(
+                        ptInterviewId
+                );
+
+        String videoUrl = minioClient.getPresignedObjectUrl(
+                GetPresignedObjectUrlArgs.builder()
+                        .method(Method.GET)
+                        .bucket(bucketName)
+                        .object(objectKey)
+                        .expiry(1, TimeUnit.HOURS)
+                        .build()
+        );
+
+        return ResponseEntity.ok(
+                Map.of("videoUrl", videoUrl)
+        );
+    }
 }
