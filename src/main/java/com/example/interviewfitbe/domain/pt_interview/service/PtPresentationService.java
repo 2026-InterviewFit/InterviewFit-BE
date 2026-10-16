@@ -8,6 +8,7 @@ import com.example.interviewfitbe.domain.speech_coaching.dto.SpeechAnalyzeReques
 import com.example.interviewfitbe.domain.speech_coaching.service.SpeechReportService;
 import com.example.interviewfitbe.domain.video_storage.dto.VideoUrlResponse;
 import com.example.interviewfitbe.domain.video_storage.entity.VideoType;
+import com.example.interviewfitbe.domain.video_storage.repository.VideoRepository;
 import com.example.interviewfitbe.domain.video_storage.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class PtPresentationService {
     private final VideoService videoService;
     private final SpeechReportService speechReportService;
     private final EyeGazeService eyeGazeService;
+    private final VideoRepository videoRepository;
 
     /**
      * PT 발표 전체 영상 업로드 및
@@ -145,5 +147,40 @@ public class PtPresentationService {
         );
 
         return speechReportId;
+    }
+    /**
+     * PT 발표 전체 영상의 MinIO ObjectKey 조회
+     */
+    public String getPresentationVideoObjectKey(
+            Long ptInterviewId
+    ) {
+        PtInterviewEntity ptInterview =
+                ptInterviewRepository.findById(ptInterviewId)
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "존재하지 않는 PT 면접입니다. ptInterviewId="
+                                                + ptInterviewId
+                                )
+                        );
+
+        InterviewEntity interview = ptInterview.getInterview();
+
+        if (interview == null) {
+            throw new IllegalStateException(
+                    "PT 면접에 연결된 Interview가 없습니다."
+            );
+        }
+
+        return videoRepository
+                .findTopByInterviewIdAndVideoTypeOrderByCreatedAtDesc(
+                        interview.getId(),
+                        VideoType.PT_PRESENTATION
+                )
+                .map(video -> video.getObjectKey())
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "저장된 PT 발표 영상이 없습니다."
+                        )
+                );
     }
 }
