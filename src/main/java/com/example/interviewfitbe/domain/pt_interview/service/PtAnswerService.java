@@ -114,6 +114,7 @@ public class PtAnswerService {
                         .startTime(null)
                         .endTime(null)
                         .answerText(null)
+                        .videoObjectKey(videoObjectKey)
                         .build();
 
         answer.markUploaded();
@@ -255,5 +256,40 @@ public class PtAnswerService {
                 answer.getAnalysisStatus(),
                 answer.getCreatedAt()
         );
+    }
+    @Transactional(readOnly = true)
+    public String getAnswerVideoObjectKey(
+            Long ptInterviewId,
+            Long answerId
+    ) {
+        InterviewAnswerEntity answer =
+                interviewAnswerRepository.findById(answerId)
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "존재하지 않는 PT 답변입니다."
+                                )
+                        );
+
+        if (answer.getPtQuestion() == null
+                || answer.getPtQuestion().getPtInterview() == null
+                || !ptInterviewId.equals(
+                answer.getPtQuestion()
+                        .getPtInterview()
+                        .getId()
+        )) {
+            throw new IllegalArgumentException(
+                    "해당 PT 면접에 속하지 않는 답변입니다."
+            );
+        }
+
+        String objectKey = answer.getVideoObjectKey();
+
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new IllegalStateException(
+                    "해당 답변에 연결된 영상이 없습니다."
+            );
+        }
+
+        return objectKey;
     }
 }

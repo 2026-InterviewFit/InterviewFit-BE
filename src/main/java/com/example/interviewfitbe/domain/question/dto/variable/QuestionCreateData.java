@@ -4,13 +4,11 @@ import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterEntity;
 import com.example.interviewfitbe.domain.coverletter.entity.CoverLetterQuestionAnalysisEntity;
 import com.example.interviewfitbe.domain.job.entity.JobRoleEntity;
 import com.example.interviewfitbe.domain.question.entity.QuestionEntity;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.List;
 
+@Setter
 @Getter
 @Builder
 @AllArgsConstructor

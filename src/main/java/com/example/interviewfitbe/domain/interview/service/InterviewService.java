@@ -84,8 +84,6 @@ public class InterviewService {
 
     /**
      * 면접 시작.
-     *
-     * userId는 JWT 인증 사용자 ID를 사용한다.
      */
     @Transactional
     public InterviewStartResponse startInterview(
@@ -100,7 +98,6 @@ public class InterviewService {
             );
         }
 
-
         if (
                 request == null
                         || request.getJobRoleId() == null
@@ -110,7 +107,6 @@ public class InterviewService {
                     "jobRoleId는 필수입니다."
             );
         }
-
 
         UserEntity user =
                 userRepository
@@ -124,7 +120,6 @@ public class InterviewService {
                                 )
                         );
 
-
         JobRoleEntity jobRole =
                 jobRoleRepository
                         .findById(
@@ -136,49 +131,23 @@ public class InterviewService {
                                 )
                         );
 
-
         InterviewEntity interview =
                 InterviewEntity.builder()
-
-                        .user(
-                                user
-                        )
-
-                        .jobRole(
-                                jobRole
-                        )
-
+                        .user(user)
+                        .jobRole(jobRole)
                         .build();
-
 
         InterviewEntity savedInterview =
                 interviewRepository.save(
                         interview
                 );
 
-
         return InterviewStartResponse.builder()
-
-                .interviewId(
-                        savedInterview.getId()
-                )
-
-                .userId(
-                        user.getId()
-                )
-
-                .jobRoleId(
-                        jobRole.getId()
-                )
-
-                .jobName(
-                        jobRole.getName()
-                )
-
-                .status(
-                        "STARTED"
-                )
-
+                .interviewId(savedInterview.getId())
+                .userId(user.getId())
+                .jobRoleId(jobRole.getId())
+                .jobName(jobRole.getName())
+                .status("STARTED")
                 .build();
     }
 
@@ -186,17 +155,14 @@ public class InterviewService {
     /**
      * 면접 분석 결과 조회.
      *
-     * 현재 데이터 위치:
-     *
+     * 최상위:
      * report.eye
      * report.pose
+     * report.gaze
      *
+     * 질문별:
      * report.answers[].gaze
      * report.answers[].speech
-     *
-     * speech 안의 Gemini 내용 평가는
-     * ai_evaluation 테이블에서 answerId 기준으로 조회하여
-     * aiEvaluationJson / modelAnswer로 합쳐서 내려준다.
      */
     @Transactional(readOnly = true)
     public InterviewReportResponse getInterviewReport(
@@ -215,25 +181,23 @@ public class InterviewService {
                         );
 
         if (!interview.getUser().getId().equals(userId)) {
+
             throw new AccessDeniedException(
                     "본인의 면접만 조회할 수 있습니다."
             );
         }
 
         /*
-         * interview_answers는 이제 두 종류 모두 실제 분석 대상이다.
+         * interview_answers는 두 종류 모두 실제 분석 대상이다.
          *
-         * 1) 질문별 Answer
-         *    - audio/webm
-         *    - STT + Gemini 질문별 내용 평가
-         *
-         * 2) 전체 면접 Answer
-         *    - video/webm
-         *    - eye + pose + speech + 전체 Gemini
+         * 1. 질문별 Answer
+         * 2. 전체 면접 영상 Answer
          */
         List<InterviewAnswerEntity> allAnswers =
                 interviewAnswerRepository
-                        .findByInterview_IdOrderByAnswerOrderAsc(interviewId);
+                        .findByInterview_IdOrderByAnswerOrderAsc(
+                                interviewId
+                        );
 
         List<InterviewAnswerEntity> questionAnswers =
                 allAnswers.stream()
@@ -246,58 +210,81 @@ public class InterviewService {
                         .toList();
 
         /*
-         * 기존 면접 데이터에는 질문별 Answer가 없을 수 있으므로
-         * 그런 경우 전체영상 Answer를 answers에 fallback으로 반환한다.
+         * 기존 데이터 호환.
          */
         List<InterviewAnswerEntity> reportAnswers =
                 questionAnswers.isEmpty()
                         ? fullInterviewAnswers
                         : questionAnswers;
 
+        /*
+         * 눈 깜빡임 분석.
+         */
         InterviewReportResponse.EyeReport eyeReport =
                 eyeBlinkingReportRepository
-                        .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
+                        .findTopByInterview_IdOrderByCreatedAtDesc(
+                                interviewId
+                        )
                         .map(this::toEyeReport)
                         .orElse(null);
 
+        /*
+         * 자세 분석.
+         */
         InterviewReportResponse.PoseReport poseReport =
                 poseReportRepository
-                        .findTopByInterview_IdOrderByIdDesc(interviewId)
+                        .findTopByInterview_IdOrderByIdDesc(
+                                interviewId
+                        )
                         .map(this::toPoseReport)
                         .orElse(null);
 
+        /*
+         * 시선 분석.
+         *
+         * 동일 면접에 분석 결과가 여러 개 존재할 수 있으므로
+         * 가장 최근 createdAt 기준 결과를 사용한다.
+         */
         InterviewReportResponse.GazeReport gazeReport =
                 eyeGazeReportRepository
-                        .findTopByInterview_IdOrderByCreatedAtDesc(interviewId)
+                        .findTopByInterview_IdOrderByCreatedAtDesc(
+                                interviewId
+                        )
                         .map(this::toGazeReport)
                         .orElse(null);
 
         /*
-         * speech_report는 계속 면접 전체 영상 기준 1개만 유지한다.
-         * 질문별 정량 음성 리포트를 따로 만들지 않기 때문에
-         * 기존 DB unique 제약을 건드릴 필요가 없다.
+         * Speech 분석.
          */
         SpeechReportEntity speechReportEntity =
                 speechReportRepository
-                        .findByInterview_Id(interviewId)
+                        .findByInterview_Id(
+                                interviewId
+                        )
                         .orElse(null);
 
+        /*
+         * 질문별 Answer 리포트.
+         */
         List<InterviewReportResponse.AnswerReport> answerReports =
                 reportAnswers.stream()
                         .map(
                                 answer -> {
+
                                     AiEvaluationEntity aiEvaluation =
                                             aiEvaluationRepository
-                                                    .findByInterviewAnswer_Id(answer.getId())
+                                                    .findByInterviewAnswer_Id(
+                                                            answer.getId()
+                                                    )
                                                     .orElse(null);
 
                                     InterviewReportResponse.SpeechReport speechReport =
                                             speechReportEntity == null
                                                     ? null
                                                     : toSpeechReport(
-                                                            speechReportEntity,
-                                                            aiEvaluation
-                                                    );
+                                                    speechReportEntity,
+                                                    aiEvaluation
+                                            );
 
                                     return toAnswerReport(
                                             answer,
@@ -310,15 +297,23 @@ public class InterviewService {
                         .toList();
 
         /*
-         * 신규 구조에서는 질문별 분석 + 전체 영상 분석이 모두 끝나야
-         * 최종 리포트가 DONE이다.
+         * 분석 대상 전체.
          */
-        List<InterviewAnswerEntity> analysisTargets = new ArrayList<>();
-        analysisTargets.addAll(questionAnswers);
-        analysisTargets.addAll(fullInterviewAnswers);
+        List<InterviewAnswerEntity> analysisTargets =
+                new ArrayList<>();
+
+        analysisTargets.addAll(
+                questionAnswers
+        );
+
+        analysisTargets.addAll(
+                fullInterviewAnswers
+        );
 
         String overallStatus =
-                determineOverallStatus(analysisTargets);
+                determineOverallStatus(
+                        analysisTargets
+                );
 
         boolean completed =
                 !fullInterviewAnswers.isEmpty()
@@ -330,20 +325,64 @@ public class InterviewService {
                                                 == AnalysisStatus.DONE
                         );
 
-        JobRoleEntity jobRole = interview.getJobRole();
+        JobRoleEntity jobRole =
+                interview.getJobRole();
 
+        /*
+         * 최종 응답.
+         *
+         * gazeReport를 최상위에도 반드시 포함한다.
+         */
         return InterviewReportResponse.builder()
-                .interviewId(interview.getId())
-                .userId(interview.getUser().getId())
-                .jobRoleId(jobRole.getId())
-                .jobCategory(jobRole.getCategory())
-                .jobName(jobRole.getName())
-                .createdAt(interview.getCreatedAt())
-                .analysisStatus(overallStatus)
-                .completed(completed)
-                .eye(eyeReport)
-                .pose(poseReport)
-                .answers(answerReports)
+
+                .interviewId(
+                        interview.getId()
+                )
+
+                .userId(
+                        interview.getUser().getId()
+                )
+
+                .jobRoleId(
+                        jobRole.getId()
+                )
+
+                .jobCategory(
+                        jobRole.getCategory()
+                )
+
+                .jobName(
+                        jobRole.getName()
+                )
+
+                .createdAt(
+                        interview.getCreatedAt()
+                )
+
+                .analysisStatus(
+                        overallStatus
+                )
+
+                .completed(
+                        completed
+                )
+
+                .eye(
+                        eyeReport
+                )
+
+                .pose(
+                        poseReport
+                )
+
+                .gaze(
+                        gazeReport
+                )
+
+                .answers(
+                        answerReports
+                )
+
                 .build();
     }
 
@@ -363,6 +402,9 @@ public class InterviewService {
     }
 
 
+    /**
+     * 질문별 결과 DTO.
+     */
     private InterviewReportResponse.AnswerReport toAnswerReport(
             InterviewAnswerEntity answer,
             InterviewReportResponse.GazeReport gazeReport,
@@ -371,21 +413,71 @@ public class InterviewService {
     ) {
 
         return InterviewReportResponse.AnswerReport.builder()
-                .answerId(answer.getId())
-                .interviewQuestionId(answer.getInterviewQuestionId())
-                .questionId(answer.getQuestionId())
-                .questionText(answer.getQuestionText())
-                .videoObjectKey(answer.getVideoObjectKey())
-                .answerText(answer.getAnswerText())
-                .answerOrder(answer.getAnswerOrder())
-                .startTime(answer.getStartTime())
-                .endTime(answer.getEndTime())
-                .analysisStatus(answer.getAnalysisStatus())
-                .errorMessage(answer.getErrorMessage())
-                .aiEvaluation(toAiEvaluationReport(aiEvaluation))
-                .followUps(toFollowUpReports(answer))
-                .gaze(gazeReport)
-                .speech(speechReport)
+
+                .answerId(
+                        answer.getId()
+                )
+
+                .interviewQuestionId(
+                        answer.getInterviewQuestionId()
+                )
+
+                .questionId(
+                        answer.getQuestionId()
+                )
+
+                .questionText(
+                        answer.getQuestionText()
+                )
+
+                .videoObjectKey(
+                        answer.getVideoObjectKey()
+                )
+
+                .answerText(
+                        answer.getAnswerText()
+                )
+
+                .answerOrder(
+                        answer.getAnswerOrder()
+                )
+
+                .startTime(
+                        answer.getStartTime()
+                )
+
+                .endTime(
+                        answer.getEndTime()
+                )
+
+                .analysisStatus(
+                        answer.getAnalysisStatus()
+                )
+
+                .errorMessage(
+                        answer.getErrorMessage()
+                )
+
+                .aiEvaluation(
+                        toAiEvaluationReport(
+                                aiEvaluation
+                        )
+                )
+
+                .followUps(
+                        toFollowUpReports(
+                                answer
+                        )
+                )
+
+                .gaze(
+                        gazeReport
+                )
+
+                .speech(
+                        speechReport
+                )
+
                 .build();
     }
 
@@ -399,11 +491,27 @@ public class InterviewService {
         }
 
         return InterviewReportResponse.AiEvaluationReport.builder()
-                .evaluationId(aiEvaluation.getId())
-                .starEvaluationJson(aiEvaluation.getStarEvaluationJson())
-                .geminiFeedback(aiEvaluation.getGeminiFeedback())
-                .keywordsJson(aiEvaluation.getKeywordsJson())
-                .modelAnswer(aiEvaluation.getModelAnswer())
+
+                .evaluationId(
+                        aiEvaluation.getId()
+                )
+
+                .starEvaluationJson(
+                        aiEvaluation.getStarEvaluationJson()
+                )
+
+                .geminiFeedback(
+                        aiEvaluation.getGeminiFeedback()
+                )
+
+                .keywordsJson(
+                        aiEvaluation.getKeywordsJson()
+                )
+
+                .modelAnswer(
+                        aiEvaluation.getModelAnswer()
+                )
+
                 .build();
     }
 
@@ -412,14 +520,22 @@ public class InterviewService {
             InterviewAnswerEntity sourceAnswer
     ) {
 
-        if (sourceAnswer == null || sourceAnswer.getId() == null) {
+        if (
+                sourceAnswer == null
+                        || sourceAnswer.getId() == null
+        ) {
+
             return List.of();
         }
 
         return followUpQuestionRepository
-                .findBySourceAnswer_IdOrderByCreatedAtAsc(sourceAnswer.getId())
+                .findBySourceAnswer_IdOrderByCreatedAtAsc(
+                        sourceAnswer.getId()
+                )
                 .stream()
-                .map(this::toFollowUpReport)
+                .map(
+                        this::toFollowUpReport
+                )
                 .toList();
     }
 
@@ -434,14 +550,29 @@ public class InterviewService {
                                 followUpQuestion.getId()
                         )
                         .stream()
-                        .map(this::toFollowUpAnswerReport)
+                        .map(
+                                this::toFollowUpAnswerReport
+                        )
                         .toList();
 
         return InterviewReportResponse.FollowUpReport.builder()
-                .followUpQuestionId(followUpQuestion.getId())
-                .questionText(followUpQuestion.getFollowUpQuestion())
-                .createdAt(followUpQuestion.getCreatedAt())
-                .answers(answers)
+
+                .followUpQuestionId(
+                        followUpQuestion.getId()
+                )
+
+                .questionText(
+                        followUpQuestion.getFollowUpQuestion()
+                )
+
+                .createdAt(
+                        followUpQuestion.getCreatedAt()
+                )
+
+                .answers(
+                        answers
+                )
+
                 .build();
     }
 
@@ -451,16 +582,38 @@ public class InterviewService {
     ) {
 
         return InterviewReportResponse.FollowUpAnswerReport.builder()
-                .followUpAnswerId(answer.getId())
-                .answerText(answer.getAnswerText())
-                .startTime(answer.getStartTime())
-                .endTime(answer.getEndTime())
-                .analysisStatus(answer.getAnalysisStatus())
-                .errorMessage(answer.getErrorMessage())
+
+                .followUpAnswerId(
+                        answer.getId()
+                )
+
+                .answerText(
+                        answer.getAnswerText()
+                )
+
+                .startTime(
+                        answer.getStartTime()
+                )
+
+                .endTime(
+                        answer.getEndTime()
+                )
+
+                .analysisStatus(
+                        answer.getAnalysisStatus()
+                )
+
+                .errorMessage(
+                        answer.getErrorMessage()
+                )
+
                 .build();
     }
 
 
+    /**
+     * 눈 깜빡임 DTO 변환.
+     */
     private InterviewReportResponse.EyeReport toEyeReport(
             EyeBlinkingReportEntity report
     ) {
@@ -509,6 +662,9 @@ public class InterviewService {
     }
 
 
+    /**
+     * 시선 분석 DTO 변환.
+     */
     private InterviewReportResponse.GazeReport toGazeReport(
             EyeGazeReport report
     ) {
@@ -547,6 +703,9 @@ public class InterviewService {
     }
 
 
+    /**
+     * 자세 분석 DTO 변환.
+     */
     private InterviewReportResponse.PoseReport toPoseReport(
             PoseReportEntity report
     ) {
@@ -670,10 +829,6 @@ public class InterviewService {
                         report.getCriticalSilenceCount()
                 )
 
-                /*
-                 * 현재 SpeechReportEntity에는 volume 필드가 없으므로
-                 * DTO에는 null로 내려간다.
-                 */
                 .volumeDbMean(
                         null
                 )
@@ -682,11 +837,6 @@ public class InterviewService {
                         null
                 )
 
-                /*
-                 * FE SpeechAnalysisCard / reportUtils가
-                 * JSON.parse(aiEvaluationJson)를 사용하므로
-                 * 반드시 JSON object 문자열로 내려준다.
-                 */
                 .aiEvaluationJson(
                         toAiEvaluationJson(
                                 aiEvaluation
@@ -703,8 +853,8 @@ public class InterviewService {
                         aiEvaluation == null
                                 ? null
                                 : externalAiAnalysisJsonCodec.deserializeSafely(
-                                        aiEvaluation.getExternalAiAnalysisJson()
-                                )
+                                aiEvaluation.getExternalAiAnalysisJson()
+                        )
                 )
 
                 .build();
@@ -712,19 +862,7 @@ public class InterviewService {
 
 
     /**
-     * ai_evaluation 테이블은 다음처럼 컬럼이 분리되어 있다.
-     *
-     * starEvaluationJson : {"S": 8, "T": 7, "A": 9, "R": 6}
-     * geminiFeedback     : "..."
-     * keywordsJson       : ["Spring Boot", "PostgreSQL"]
-     *
-     * FE는 아래 형태를 기대한다.
-     *
-     * {
-     *   "star_score": {...},
-     *   "feedback": "...",
-     *   "keywords": [...]
-     * }
+     * AI 평가 JSON 변환.
      */
     private String toAiEvaluationJson(
             AiEvaluationEntity aiEvaluation
@@ -734,17 +872,14 @@ public class InterviewService {
             return null;
         }
 
-
         ObjectNode root =
                 objectMapper.createObjectNode();
 
-
         /*
-         * STAR 점수
+         * STAR 점수.
          */
         String starJson =
                 aiEvaluation.getStarEvaluationJson();
-
 
         if (
                 starJson != null
@@ -779,13 +914,11 @@ public class InterviewService {
             );
         }
 
-
         /*
-         * Gemini 피드백
+         * Gemini 피드백.
          */
         String feedback =
                 aiEvaluation.getGeminiFeedback();
-
 
         if (feedback != null) {
 
@@ -801,13 +934,11 @@ public class InterviewService {
             );
         }
 
-
         /*
-         * 키워드
+         * 키워드.
          */
         String keywordsJson =
                 aiEvaluation.getKeywordsJson();
-
 
         if (
                 keywordsJson != null
@@ -842,16 +973,12 @@ public class InterviewService {
             );
         }
 
-
         return root.toString();
     }
 
 
     /**
-     * 1:1 면접 Answer 종류를 구분한다.
-     *
-     * 질문별 Answer: STT + Gemini 내용 평가 대상
-     * 전체영상 Answer: eye + pose + speech 전체 분석 대상
+     * 질문별 Answer 판별.
      */
     private boolean isQuestionAnswer(
             InterviewAnswerEntity answer
@@ -865,6 +992,9 @@ public class InterviewService {
     }
 
 
+    /**
+     * 전체 면접 영상 Answer 판별.
+     */
     private boolean isFullInterviewVideoAnswer(
             InterviewAnswerEntity answer
     ) {
@@ -875,6 +1005,9 @@ public class InterviewService {
     }
 
 
+    /**
+     * 전체 분석 상태 계산.
+     */
     private String determineOverallStatus(
             List<InterviewAnswerEntity> answers
     ) {
@@ -882,7 +1015,6 @@ public class InterviewService {
         if (answers.isEmpty()) {
             return "EMPTY";
         }
-
 
         boolean hasFailed =
                 answers.stream()
@@ -892,11 +1024,9 @@ public class InterviewService {
                                                 == AnalysisStatus.FAILED
                         );
 
-
         if (hasFailed) {
             return "FAILED";
         }
-
 
         boolean allDone =
                 answers.stream()
@@ -906,11 +1036,9 @@ public class InterviewService {
                                                 == AnalysisStatus.DONE
                         );
 
-
         if (allDone) {
             return "DONE";
         }
-
 
         boolean hasRunning =
                 answers.stream()
@@ -920,11 +1048,9 @@ public class InterviewService {
                                                 == AnalysisStatus.RUNNING
                         );
 
-
         if (hasRunning) {
             return "RUNNING";
         }
-
 
         return "UPLOADED";
     }

@@ -23,12 +23,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PtReportService {
@@ -45,9 +47,6 @@ public class PtReportService {
     private final EyeBlinkingReportRepository eyeBlinkingReportRepository;
     private final PoseReportRepository poseReportRepository;
 
-    /*
-     * 기존 질문별 AI 평가 조회
-     */
     private final AiEvaluationRepository aiEvaluationRepository;
 
     private final ObjectMapper objectMapper;
@@ -93,6 +92,12 @@ public class PtReportService {
                                 ptInterviewId
                         );
 
+        if (questions.isEmpty()) {
+            throw new IllegalStateException(
+                    "PT 질문이 존재하지 않습니다."
+            );
+        }
+
         /*
          * 4. PT 질문별 실제 사용자 답변 조회
          */
@@ -101,6 +106,21 @@ public class PtReportService {
                         .findAllByPtQuestion_PtInterview_IdOrderByAnswerOrderAsc(
                                 ptInterviewId
                         );
+
+        /*
+         * 중요:
+         *
+         * 질문별 비동기 분석이 모두 끝나기 전에
+         * PT 리포트가 생성되는 Race Condition을 방지한다.
+         *
+         * InterviewAnswerAnalysisJobService는
+         * Speech / STT / Gemini 저장까지 모두 끝난 다음
+         * analysisStatus를 DONE으로 변경한다.
+         */
+        validateAnswersReadyForReport(
+                questions,
+                answers
+        );
 
         /*
          * 5. 발표자료 자체 AI 요약
@@ -117,6 +137,7 @@ public class PtReportService {
                 ptInterview.getInterview() == null
                         || ptInterview.getInterview().getId() == null
         ) {
+
             throw new IllegalStateException(
                     "PT 면접에 연결된 Interview 정보를 찾을 수 없습니다."
             );
@@ -148,7 +169,9 @@ public class PtReportService {
         List<Double> speechScores =
                 speechReport
                         .map(report ->
-                                java.util.Collections.singletonList(report.getScore())
+                                java.util.Collections.singletonList(
+                                        report.getScore()
+                                )
                         )
                         .orElseGet(List::of);
 
@@ -160,6 +183,20 @@ public class PtReportService {
                         questions,
                         answers
                 );
+
+        /*
+         * 리포트 요청 직전 확인 로그
+         */
+        for (PtQuestionAnswerRequest item : qaItems) {
+
+            log.info(
+                    "[PT Report] questionNumber={}, answerLength={}",
+                    item.questionNumber(),
+                    item.answer() == null
+                            ? 0
+                            : item.answer().length()
+            );
+        }
 
         /*
          * 9. 시선 점수
@@ -210,10 +247,6 @@ public class PtReportService {
 
         /*
          * 14. 질문별 상세 분석 JSON 저장
-         *
-         * 여기에는 기존 PT FastAPI 분석 결과만 저장한다.
-         * STAR / modelAnswer / geminiFeedback은
-         * 조회 시 ai_evaluation 테이블에서 결합한다.
          */
         String resultJson =
                 serializeQuestionAnalyses(
@@ -282,6 +315,139 @@ public class PtReportService {
     }
 
     /**
+     * PT 리포트 생성 가능 여부 검증
+     *
+     * 모든 질문에 답변이 존재하고,
+     * 질문별 비동기 분석이 DONE 상태가 된 뒤에만
+     * 종합 리포트를 생성한다.
+     */
+    private void validateAnswersReadyForReport(
+            List<PtQuestionEntity> questions,
+            List<InterviewAnswerEntity> answers
+    ) {
+
+        if (answers.size() < questions.size()) {
+
+            throw new IllegalStateException(
+                    "아직 모든 PT 질문의 답변이 업로드되지 않았습니다. "
+                            + "questions="
+                            + questions.size()
+                            + ", answers="
+                            + answers.size()
+            );
+        }
+
+        for (PtQuestionEntity question : questions) {
+
+            InterviewAnswerEntity answer =
+                    answers.stream()
+                            .filter(item ->
+                                    item.getPtQuestion() != null
+                                            && item.getPtQuestion().getId() != null
+                                            && item
+                                            .getPtQuestion()
+                                            .getId()
+                                            .equals(
+                                                    question.getId()
+                                            )
+                            )
+                            .findFirst()
+                            .orElseThrow(() ->
+                                    new IllegalStateException(
+                                            "PT 질문에 대한 답변이 존재하지 않습니다. "
+                                                    + "questionNumber="
+                                                    + question.getQuestionNumber()
+                                    )
+                            );
+
+            if (answer.getAnalysisStatus() == null) {
+
+                throw new IllegalStateException(
+                        "PT 답변 분석 상태를 확인할 수 없습니다. "
+                                + "questionNumber="
+                                + question.getQuestionNumber()
+                                + ", answerId="
+                                + answer.getId()
+                );
+            }
+
+            String status =
+                    answer
+                            .getAnalysisStatus()
+                            .name();
+
+            /*
+             * 분석 실패라면 리포트 생성을 진행하지 않는다.
+             */
+            if ("FAILED".equals(status)) {
+
+                throw new IllegalStateException(
+                        "PT 답변 분석에 실패했습니다. "
+                                + "questionNumber="
+                                + question.getQuestionNumber()
+                                + ", answerId="
+                                + answer.getId()
+                );
+            }
+
+            /*
+             * STT / Gemini까지 모두 끝난 경우에만
+             * InterviewAnswerAnalysisJobService에서 DONE이 된다.
+             */
+            if (!"DONE".equals(status)) {
+
+                throw new IllegalStateException(
+                        "PT 답변 분석이 아직 완료되지 않았습니다. "
+                                + "questionNumber="
+                                + question.getQuestionNumber()
+                                + ", answerId="
+                                + answer.getId()
+                                + ", status="
+                                + status
+                );
+            }
+
+            /*
+             * DONE이라면 AI 평가도 존재해야 정상이다.
+             */
+            if (
+                    aiEvaluationRepository
+                            .findByInterviewAnswer_Id(
+                                    answer.getId()
+                            )
+                            .isEmpty()
+            ) {
+
+                throw new IllegalStateException(
+                        "PT 답변 AI 평가 결과가 존재하지 않습니다. "
+                                + "questionNumber="
+                                + question.getQuestionNumber()
+                                + ", answerId="
+                                + answer.getId()
+                );
+            }
+
+            /*
+             * STT 결과가 비어 있을 수는 있다.
+             *
+             * 실제 사용자가 아무 말도 하지 않은 경우에는
+             * 정상적으로 빈 STT가 발생할 수 있으므로,
+             * answerText가 빈 값이라는 이유만으로
+             * 분석 미완료로 판단하지 않는다.
+             */
+            log.info(
+                    "[PT Report Ready] questionNumber={}, answerId={}, status={}, answerLength={}",
+                    question.getQuestionNumber(),
+                    answer.getId(),
+                    status,
+                    answer.getAnswerText() == null
+                            ? 0
+                            : answer.getAnswerText().length()
+            );
+        }
+    }
+
+    /**
      * 생성된 PT 종합 리포트 조회
      */
     @Transactional(readOnly = true)
@@ -306,7 +472,7 @@ public class PtReportService {
     }
 
     /**
-     * PT 질문과 실제 사용자 답변을 연결한다.
+     * PT 질문과 실제 사용자 답변 연결
      */
     private List<PtQuestionAnswerRequest> buildQuestionAnswerItems(
             List<PtQuestionEntity> questions,
@@ -346,6 +512,7 @@ public class PtReportService {
                     matchedAnswer != null
                             && matchedAnswer.getAnswerText() != null
             ) {
+
                 answerText =
                         matchedAnswer
                                 .getAnswerText()
@@ -446,7 +613,7 @@ public class PtReportService {
     }
 
     /**
-     * 질문별 분석 결과를 JSON으로 저장
+     * 질문별 분석 결과 JSON 저장
      */
     private String serializeQuestionAnalyses(
             List<PtQuestionAnalysisResponse> analyses
@@ -476,7 +643,7 @@ public class PtReportService {
     }
 
     /**
-     * 저장된 질문별 분석 JSON 복원
+     * 질문별 분석 JSON 복원
      */
     private List<PtQuestionAnalysisResponse> deserializeQuestionAnalyses(
             String resultJson
@@ -502,10 +669,6 @@ public class PtReportService {
 
         } catch (Exception e) {
 
-            /*
-             * 기존 데이터가 다른 형식이어도
-             * 리포트 전체 조회는 실패시키지 않는다.
-             */
             return List.of();
         }
     }
@@ -517,11 +680,6 @@ public class PtReportService {
             Long interviewId
     ) {
 
-        /*
-         * 눈 깜빡임
-         *
-         * 발표 영상은 interviewAnswer가 null인 결과를 사용한다.
-         */
         PtEyeBlinkingDetailResponse blinking =
                 eyeBlinkingReportRepository
                         .findTopByInterview_IdAndInterviewAnswerIsNullOrderByCreatedAtDesc(
@@ -530,9 +688,6 @@ public class PtReportService {
                         .map(this::toBlinkingDetail)
                         .orElse(null);
 
-        /*
-         * 시선
-         */
         PtEyeGazeDetailResponse gaze =
                 eyeGazeReportRepository
                         .findTopByInterview_IdOrderByCreatedAtDesc(
@@ -541,9 +696,6 @@ public class PtReportService {
                         .map(this::toGazeDetail)
                         .orElse(null);
 
-        /*
-         * 음성
-         */
         PtSpeechDetailResponse speech =
                 speechReportRepository
                         .findByInterview_Id(
@@ -621,7 +773,7 @@ public class PtReportService {
 
     /**
      * 기존 PT 질문별 분석 결과와
-     * ai_evaluation의 STAR / 피드백 / 모범답안을 결합한다.
+     * ai_evaluation의 STAR / 피드백 / 모범답안 결합
      */
     private List<PtQuestionAnalysisResponse> enrichQuestionAnalyses(
             Long ptInterviewId,
@@ -724,16 +876,7 @@ public class PtReportService {
     }
 
     /**
-     * DB에 저장된 STAR JSON:
-     *
-     * {
-     *   "S": 6,
-     *   "T": 7,
-     *   "A": 5,
-     *   "R": 5
-     * }
-     *
-     * 를 FE가 사용하기 쉬운 DTO로 변환한다.
+     * STAR JSON -> DTO
      */
     private PtStarAnalysisResponse parseStarAnalysis(
             String starJson
@@ -793,10 +936,6 @@ public class PtReportService {
 
         } catch (Exception e) {
 
-            /*
-             * STAR JSON 하나가 깨져 있어도
-             * PT 리포트 전체 조회를 실패시키지 않는다.
-             */
             return null;
         }
     }
@@ -847,6 +986,7 @@ public class PtReportService {
                         .getInterview()
                         .getId() == null
         ) {
+
             throw new IllegalStateException(
                     "PT 면접에 연결된 Interview 정보를 찾을 수 없습니다."
             );
@@ -858,26 +998,17 @@ public class PtReportService {
                         .getInterview()
                         .getId();
 
-        /*
-         * PT FastAPI 질문 분석 결과 복원
-         */
         List<PtQuestionAnalysisResponse> storedQuestionAnalyses =
                 deserializeQuestionAnalyses(
                         report.getResultJson()
                 );
 
-        /*
-         * 기존 AI 평가 데이터 결합
-         */
         List<PtQuestionAnalysisResponse> enrichedQuestionAnalyses =
                 enrichQuestionAnalyses(
                         ptInterviewId,
                         storedQuestionAnalyses
                 );
 
-        /*
-         * 발표 상세 분석 구성
-         */
         PtPresentationAnalysisResponse presentationAnalysis =
                 buildPresentationAnalysis(
                         interviewId

@@ -15,13 +15,10 @@ public class GroupParticipantJoinWriter {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public GroupParticipantEntity insert(Long roomId, Long userId) {
-        return groupParticipantRepository.saveAndFlush(
-                GroupParticipantEntity.builder()
-                        .roomId(roomId)
-                        .userId(userId)
-                        .status("JOINED")
-                        .build()
-        );
+        groupParticipantRepository.insertIfAbsent(roomId, userId);
+        return groupParticipantRepository
+                .findFirstByRoomIdAndUserIdOrderByIdAsc(roomId, userId)
+                .orElseThrow(() -> new IllegalStateException("참가자 저장 결과를 찾을 수 없습니다."));
     }
 
 }

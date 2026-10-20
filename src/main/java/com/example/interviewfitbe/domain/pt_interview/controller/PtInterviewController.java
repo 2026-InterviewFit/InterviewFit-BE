@@ -10,10 +10,8 @@ import com.example.interviewfitbe.domain.pt_interview.dto.PtQuestionResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtReportResponse;
 import com.example.interviewfitbe.domain.pt_interview.dto.PtSlideResponse;
 import com.example.interviewfitbe.domain.pt_interview.service.*;
-import io.minio.GetObjectArgs;
-import io.minio.MinioClient;
-import io.minio.StatObjectArgs;
-import io.minio.StatObjectResponse;
+import io.minio.*;
+import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +25,8 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/pt-interviews")
@@ -405,6 +405,57 @@ public class PtInterviewController {
 
         return ResponseEntity.ok(
                 speechReportId
+        );
+    }
+    @GetMapping("/{ptInterviewId}/answers/{answerId}/video")
+    public ResponseEntity<Map<String, String>> getAnswerVideo(
+            @PathVariable Long ptInterviewId,
+            @PathVariable Long answerId
+    ) throws Exception {
+
+        String objectKey =
+                ptAnswerService.getAnswerVideoObjectKey(
+                        ptInterviewId,
+                        answerId
+                );
+
+        String videoUrl = minioClient.getPresignedObjectUrl(
+                GetPresignedObjectUrlArgs.builder()
+                        .method(Method.GET)
+                        .bucket(bucketName)
+                        .object(objectKey)
+                        .expiry(1, TimeUnit.HOURS)
+                        .build()
+        );
+
+        return ResponseEntity.ok(
+                Map.of("videoUrl", videoUrl)
+        );
+    }
+    /**
+     * PT 발표 전체 영상 다시보기 URL 조회
+     */
+    @GetMapping("/{ptInterviewId}/presentation/video")
+    public ResponseEntity<Map<String, String>> getPresentationVideo(
+            @PathVariable Long ptInterviewId
+    ) throws Exception {
+
+        String objectKey =
+                ptPresentationService.getPresentationVideoObjectKey(
+                        ptInterviewId
+                );
+
+        String videoUrl = minioClient.getPresignedObjectUrl(
+                GetPresignedObjectUrlArgs.builder()
+                        .method(Method.GET)
+                        .bucket(bucketName)
+                        .object(objectKey)
+                        .expiry(1, TimeUnit.HOURS)
+                        .build()
+        );
+
+        return ResponseEntity.ok(
+                Map.of("videoUrl", videoUrl)
         );
     }
 }

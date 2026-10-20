@@ -8,6 +8,7 @@ import com.example.interviewfitbe.domain.eye_gaze.enums.EyeGazeGrade;
 import com.example.interviewfitbe.domain.eye_gaze.enums.GazeDirection;
 import com.example.interviewfitbe.domain.eye_gaze.repository.EyeGazeBadLogRepository;
 import com.example.interviewfitbe.domain.eye_gaze.repository.EyeGazeReportRepository;
+import com.example.interviewfitbe.domain.interview.entity.InterviewAnswerEntity;
 import com.example.interviewfitbe.domain.interview.entity.InterviewEntity;
 import com.example.interviewfitbe.domain.interview.repository.InterviewRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,12 +39,34 @@ public class EyeGazeService {
     private String uploadDir;
 
     /**
-     * MinIO objectKey 기반 시선 분석
+     * 기존 호환용 MinIO objectKey 기반 시선 분석.
+     *
+     * InterviewAnswerEntity가 없는 기존 호출부를 유지하기 위한 메서드.
      */
     @Transactional
     public EyeGazeAnalyzeResponse analyzeAndSave(
             String videoObjectKey,
             InterviewEntity interview
+    ) {
+
+        return analyzeAndSave(
+                videoObjectKey,
+                interview,
+                null
+        );
+    }
+
+    /**
+     * 답변 단위 MinIO objectKey 기반 시선 분석.
+     *
+     * PT / 일반 면접 답변의 InterviewAnswerEntity와
+     * EyeGazeReport를 연결한다.
+     */
+    @Transactional
+    public EyeGazeAnalyzeResponse analyzeAndSave(
+            String videoObjectKey,
+            InterviewEntity interview,
+            InterviewAnswerEntity interviewAnswer
     ) {
 
         validateVideoUrl(videoObjectKey);
@@ -67,6 +90,7 @@ public class EyeGazeService {
         EyeGazeReport saved =
                 saveReport(
                         interview,
+                        interviewAnswer,
                         analysisResult,
                         fastApiResponse
                 );
@@ -84,7 +108,10 @@ public class EyeGazeService {
     }
 
     /**
-     * 요청 DTO 기반 시선 분석
+     * 요청 DTO 기반 시선 분석.
+     *
+     * 현재 DTO에는 interviewAnswerId가 없으므로
+     * 기존 호환을 위해 interviewAnswer는 null로 저장한다.
      */
     @Transactional
     public EyeGazeAnalyzeResponse analyzeAndSave(
@@ -113,6 +140,7 @@ public class EyeGazeService {
         EyeGazeReport saved =
                 saveReport(
                         interview,
+                        null,
                         analysisResult,
                         fastApiResponse
                 );
@@ -130,7 +158,7 @@ public class EyeGazeService {
     }
 
     /**
-     * 직접 업로드한 영상 분석
+     * 직접 업로드한 영상 분석.
      */
     @Transactional
     public EyeGazeAnalyzeResponse analyzeUploadedVideoAndSave(
@@ -153,10 +181,11 @@ public class EyeGazeService {
     }
 
     /**
-     * 시선 분석 리포트 저장
+     * 시선 분석 리포트 저장.
      */
     private EyeGazeReport saveReport(
             InterviewEntity interview,
+            InterviewAnswerEntity interviewAnswer,
             Map<String, Object> analysisResult,
             Map<String, Object> fastApiResponse
     ) {
@@ -170,7 +199,13 @@ public class EyeGazeService {
         EyeGazeReport report =
                 EyeGazeReport.builder()
 
-                        .interview(interview)
+                        .interview(
+                                interview
+                        )
+
+                        .interviewAnswer(
+                                interviewAnswer
+                        )
 
                         .durationSeconds(
                                 getDouble(
@@ -220,10 +255,14 @@ public class EyeGazeService {
                                 )
                         )
 
-                        .score(score)
+                        .score(
+                                score
+                        )
 
                         .grade(
-                                calculateGrade(score)
+                                calculateGrade(
+                                        score
+                                )
                         )
 
                         .evaluation(
@@ -247,7 +286,7 @@ public class EyeGazeService {
     }
 
     /**
-     * FastAPI의 bad_logs를 DB에 저장
+     * FastAPI의 bad_logs를 DB에 저장.
      */
     @SuppressWarnings("unchecked")
     private void saveBadLogs(
@@ -327,6 +366,9 @@ public class EyeGazeService {
         }
     }
 
+    /**
+     * 시선 방향 문자열을 Enum으로 변환.
+     */
     private GazeDirection parseDirection(
             String value
     ) {
@@ -339,8 +381,11 @@ public class EyeGazeService {
         }
 
         try {
+
             return GazeDirection.valueOf(
-                    value.trim().toUpperCase()
+                    value
+                            .trim()
+                            .toUpperCase()
             );
 
         } catch (IllegalArgumentException e) {
@@ -349,6 +394,9 @@ public class EyeGazeService {
         }
     }
 
+    /**
+     * 영상 URL / object key 검증.
+     */
     private void validateVideoUrl(
             String videoUrl
     ) {
@@ -364,6 +412,9 @@ public class EyeGazeService {
         }
     }
 
+    /**
+     * Interview 조회.
+     */
     private InterviewEntity findInterview(
             Long interviewId
     ) {
@@ -376,7 +427,9 @@ public class EyeGazeService {
         }
 
         return interviewRepository
-                .findById(interviewId)
+                .findById(
+                        interviewId
+                )
                 .orElseThrow(
                         () ->
                                 new EntityNotFoundException(
@@ -386,6 +439,16 @@ public class EyeGazeService {
                 );
     }
 
+    /**
+     * FastAPI 응답에서 실제 분석 결과 추출.
+     *
+     * {
+     *   "result": {...}
+     * }
+     *
+     * 구조이면 result를 반환하고,
+     * 아니면 전체 응답을 결과로 사용한다.
+     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> extractAnalysisResult(
             Map<String, Object> fastApiResponse
@@ -405,8 +468,12 @@ public class EyeGazeService {
     }
 
     /**
-     * FastAPI가 0~100 비율을 반환하면
-     * DB 저장 시 0~1로 변환한다.
+     * FastAPI가 0~100 형태 비율을 반환하면
+     * DB에는 0~1 형태로 통일하여 저장한다.
+     *
+     * 예:
+     * 96.88 -> 0.9688
+     * 3.12  -> 0.0312
      */
     private Double normalizeRatio(
             Double value
@@ -423,6 +490,9 @@ public class EyeGazeService {
         return value;
     }
 
+    /**
+     * 시선 점수 기반 등급 계산.
+     */
     private EyeGazeGrade calculateGrade(
             Double score
     ) {
@@ -450,6 +520,9 @@ public class EyeGazeService {
         return EyeGazeGrade.POOR;
     }
 
+    /**
+     * 직접 업로드된 영상 임시 저장.
+     */
     private String saveVideoFile(
             MultipartFile file
     ) {
@@ -477,7 +550,10 @@ public class EyeGazeService {
                 boolean created =
                         dir.mkdirs();
 
-                if (!created && !dir.exists()) {
+                if (
+                        !created
+                                && !dir.exists()
+                ) {
 
                     throw new IOException(
                             "업로드 디렉터리를 생성할 수 없습니다."
@@ -519,6 +595,9 @@ public class EyeGazeService {
         }
     }
 
+    /**
+     * 확장자 추출.
+     */
     private String getExtension(
             String fileName
     ) {
@@ -536,6 +615,9 @@ public class EyeGazeService {
         );
     }
 
+    /**
+     * 분석 결과 JSON 저장용 문자열 변환.
+     */
     private String toJson(
             Map<String, Object> data
     ) {
@@ -630,7 +712,9 @@ public class EyeGazeService {
         for (String key : keys) {
 
             Object value =
-                    map.get(key);
+                    map.get(
+                            key
+                    );
 
             if (value != null) {
                 return value;

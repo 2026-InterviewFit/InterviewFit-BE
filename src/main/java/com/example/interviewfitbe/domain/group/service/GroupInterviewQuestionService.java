@@ -3,6 +3,7 @@ package com.example.interviewfitbe.domain.group.service;
 import com.example.interviewfitbe.domain.group.dto.GroupQuestionResponse;
 import com.example.interviewfitbe.domain.group.entity.GroupQuestionEntity;
 import com.example.interviewfitbe.domain.group.repository.GroupInterviewRepository;
+import com.example.interviewfitbe.domain.group.repository.GroupInterviewSessionRepository;
 import com.example.interviewfitbe.domain.group.repository.GroupQuestionRepository;
 import com.example.interviewfitbe.domain.job.repository.JobRoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,7 @@ public class GroupInterviewQuestionService {
     private final GroupQuestionRepository groupQuestionRepository;
     private final JobRoleRepository jobRoleRepository;
     private final GroupInterviewRepository groupInterviewRepository;
+    private final GroupInterviewSessionRepository sessionRepository;
 
     /**
      * 다대일 면접 방 시작 시 1~4라운드 질문 세트를 구성하여 반환
@@ -55,28 +58,53 @@ public class GroupInterviewQuestionService {
 
         List<GroupQuestionEntity> selectedQuestions = new ArrayList<>();
 
-        // 1라운드: 자기소개
-        selectedQuestions.add(selfIntroductionQuestion());
+        if (roomId != null) {
+            var existingSession = sessionRepository.findByInterviewId(roomId);
+            if (existingSession.isPresent()) {
+                for (int round = 1; round <= 4; round++) {
+                    Long questionId = existingSession.get().assignedQuestionId(round);
+                    if (questionId != null) {
+                        selectedQuestions.add(groupQuestionRepository.findById(questionId)
+                                .orElseThrow(() -> new IllegalStateException(
+                                        "세션에 배정된 질문을 찾을 수 없습니다. questionId=" + questionId
+                                )));
+                    }
+                }
+                if (selectedQuestions.size() == 4) {
+                    return selectedQuestions.stream()
+                            .map(GroupQuestionResponse::from)
+                            .collect(Collectors.toList());
+                }
+                selectedQuestions.clear();
+            }
+        }
+
+        // 세션 시작 전 미리보기는 활성 질문 풀에서 임시 무작위 세트를 반환한다.
+        List<GroupQuestionEntity> round1 = groupQuestionRepository
+                .findAllByRoundNumberAndJobRoleIsNullAndSelectionEnabledTrueOrderByIdAsc(1);
+        if (!round1.isEmpty()) {
+            selectedQuestions.add(GroupQuestionSelector.select(round1, Set.of()));
+        }
 
         // 2라운드: 공통 역량 질문
         List<GroupQuestionEntity> round2 = groupQuestionRepository
-                .findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(2);
+                .findAllByRoundNumberAndJobRoleIsNullAndSelectionEnabledTrueOrderByIdAsc(2);
         if (!round2.isEmpty()) {
-            selectedQuestions.add(GroupQuestionSelector.select(round2, roomId, 2));
+            selectedQuestions.add(GroupQuestionSelector.select(round2, Set.of()));
         }
 
         // 3라운드: 압박 면접 질문
         List<GroupQuestionEntity> round3 = groupQuestionRepository
-                .findAllByRoundNumberAndJobRoleIsNullOrderByIdAsc(3);
+                .findAllByRoundNumberAndJobRoleIsNullAndSelectionEnabledTrueOrderByIdAsc(3);
         if (!round3.isEmpty()) {
-            selectedQuestions.add(GroupQuestionSelector.select(round3, roomId, 3));
+            selectedQuestions.add(GroupQuestionSelector.select(round3, Set.of()));
         }
 
         // 4라운드: 직무 토의형 질문 (선택한 직무 연동)
         List<GroupQuestionEntity> round4 = groupQuestionRepository
-                .findAllByRoundNumberAndJobRoleIdOrderByIdAsc(4, jobRoleId);
+                .findSelectableRoundFourQuestions(jobRoleId);
         if (!round4.isEmpty()) {
-            selectedQuestions.add(GroupQuestionSelector.select(round4, roomId, 4));
+            selectedQuestions.add(GroupQuestionSelector.select(round4, Set.of()));
         }
 
         return selectedQuestions.stream()
@@ -84,9 +112,4 @@ public class GroupInterviewQuestionService {
                 .collect(Collectors.toList());
     }
 
-    private GroupQuestionEntity selfIntroductionQuestion() {
-        return groupQuestionRepository
-                .findFirstByRoundNumberAndQuestionText(1, SELF_INTRODUCTION_QUESTION)
-                .orElseThrow(() -> new IllegalStateException("자기소개 질문 데이터가 없습니다."));
-    }
 }

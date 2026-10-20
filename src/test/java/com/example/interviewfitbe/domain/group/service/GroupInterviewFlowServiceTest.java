@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 class GroupInterviewFlowServiceTest {
 
     private GroupInterviewSessionRepository sessionRepository;
+    private GroupInterviewRepository interviewRepository;
     private GroupParticipantRepository participantRepository;
     private GroupQuestionRepository questionRepository;
     private GroupInterviewAnswerRepository answerRepository;
@@ -33,13 +34,14 @@ class GroupInterviewFlowServiceTest {
     @BeforeEach
     void setUp() {
         sessionRepository = mock(GroupInterviewSessionRepository.class);
+        interviewRepository = mock(GroupInterviewRepository.class);
         participantRepository = mock(GroupParticipantRepository.class);
         questionRepository = mock(GroupQuestionRepository.class);
         answerRepository = mock(GroupInterviewAnswerRepository.class);
         completionService = mock(GroupInterviewAnswerCompletionService.class);
         messagingTemplate = mock(SimpMessagingTemplate.class);
         service = new GroupInterviewFlowService(
-                mock(GroupInterviewRepository.class),
+                interviewRepository,
                 sessionRepository,
                 participantRepository,
                 questionRepository,
@@ -57,6 +59,41 @@ class GroupInterviewFlowServiceTest {
                 1,
                 GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION
         )).thenReturn(Optional.of(question(1L, GroupInterviewQuestionService.SELF_INTRODUCTION_QUESTION)));
+    }
+
+    @Test
+    void startPersistsOneRandomQuestionPerRoundAndExcludesRecentQuestions() {
+        GroupInterviewEntity interview = mock(GroupInterviewEntity.class);
+        when(interview.getId()).thenReturn(10L);
+        when(interview.getHostUserId()).thenReturn(5L);
+        when(interview.getJobRoleId()).thenReturn(2L);
+        when(interviewRepository.findById(10L)).thenReturn(Optional.of(interview));
+        when(sessionRepository.findByInterviewId(10L)).thenReturn(Optional.empty());
+        when(sessionRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(participantRepository.findAllByRoomIdOrderByIdAsc(10L))
+                .thenReturn(List.of(participant(5L), participant(6L)));
+        when(answerRepository.findRecentQuestionTextsByParticipantUserIds(List.of(5L, 6L)))
+                .thenReturn(List.of("최근 1", "최근 2", "최근 3", "최근 4"));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIsNullAndSelectionEnabledTrueOrderByIdAsc(1))
+                .thenReturn(List.of(question(11L, "최근 1"), question(12L, "신규 1")));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIsNullAndSelectionEnabledTrueOrderByIdAsc(2))
+                .thenReturn(List.of(question(21L, "최근 2"), question(22L, "신규 2")));
+        when(questionRepository.findAllByRoundNumberAndJobRoleIsNullAndSelectionEnabledTrueOrderByIdAsc(3))
+                .thenReturn(List.of(question(31L, "최근 3"), question(32L, "신규 3")));
+        when(questionRepository.findSelectableRoundFourQuestions(2L))
+                .thenReturn(List.of(question(41L, "최근 4"), question(42L, "신규 4")));
+        when(questionRepository.findById(12L)).thenReturn(Optional.of(question(12L, "신규 1")));
+        when(questionRepository.findById(22L)).thenReturn(Optional.of(question(22L, "신규 2")));
+        when(questionRepository.findById(32L)).thenReturn(Optional.of(question(32L, "신규 3")));
+        when(questionRepository.findById(42L)).thenReturn(Optional.of(question(42L, "신규 4")));
+
+        GroupInterviewSessionEntity session = service.start(10L, 5L);
+
+        assertThat(session.assignedQuestionId(1)).isEqualTo(12L);
+        assertThat(session.assignedQuestionId(2)).isEqualTo(22L);
+        assertThat(session.assignedQuestionId(3)).isEqualTo(32L);
+        assertThat(session.assignedQuestionId(4)).isEqualTo(42L);
+        verify(sessionRepository, times(2)).saveAndFlush(session);
     }
 
     @Test
