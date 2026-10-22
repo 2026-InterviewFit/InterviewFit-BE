@@ -13,7 +13,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test:
-        [ "CMD-SHELL", "mc ready local" ]
+        ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,7 +21,7 @@ services:
       - interview-network
 
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     container_name: interviewfit-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -34,7 +34,8 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,17 +44,19 @@ services:
       - interview-network
 
   minio-init:
-    image: minio/mc:latest
+    image: pgsty/mc:latest
     container_name: interviewfit-minio-init
     restart: "no"
     depends_on:
       minio:
-        condition: service_healthy
-    entrypoint:
-      - /bin/sh
-      - -c
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command:
       - |
-        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+          echo "Waiting for MinIO..."
+          sleep 2
+        done
         mc mb --ignore-existing local/interview-videos
         echo "MinIO bucket is ready"
     environment:
