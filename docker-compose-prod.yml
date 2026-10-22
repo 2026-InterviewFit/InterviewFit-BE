@@ -1,0 +1,20 @@
+services:
+  spring:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: interview-springboot
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - interview-network
+
+networks:
+  interview-network:
+    external: true
+    name: interview-network

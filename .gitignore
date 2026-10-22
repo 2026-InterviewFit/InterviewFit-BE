@@ -42,11 +42,17 @@ out/
 build.gradle
 *.properties
 data/
-dockerfile
-docker-compose.yml
 uploads/
+
+# Log files
+*.log
+be-log.txt
 
 # Local frontend integration contract
 /docs/group-interview-frontend-contract.md
 
 src/main/resources/application-local.propertiessrc/main/resources/application.properties
+
+.env
+.env.prod
+/infra/.env.db
